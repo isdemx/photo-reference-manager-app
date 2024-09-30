@@ -24,7 +24,7 @@ class PhotoTagsViewWidget extends StatelessWidget {
               .toList();
 
           return Wrap(
-            spacing: 8.0,
+            spacing: 4.0,
             children: tags.map((tag) {
               return GestureDetector(
                 onTap: () {
@@ -41,7 +41,13 @@ class PhotoTagsViewWidget extends StatelessWidget {
                   _showColorPicker(context, tag);
                 },
                 child: Chip(
-                  label: Text(tag.name),
+                  label: Text(
+                    tag.name,
+                    style: const TextStyle(
+                      fontSize: 12.0, // Уменьшаем размер шрифта
+                    ),
+                  ),
+                  labelPadding: EdgeInsets.zero,
                   backgroundColor: Color(tag.colorValue),
                   onDeleted: () {
                     // Удаление тега из фотографии

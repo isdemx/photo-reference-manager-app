@@ -25,61 +25,103 @@ class AddTagWidget extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Tag'),
-          content: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(hintText: 'Tag Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final String tagName = _controller.text.trim();
-                if (tagName.isNotEmpty) {
-                  final tagState = tagBloc.state;
+        return BlocBuilder<TagBloc, TagState>(
+          builder: (context, tagState) {
+            if (tagState is TagLoaded) {
+              final existingTags = tagState.tags;
 
-                  if (tagState is TagLoaded) {
-                    final existingTag = tagState.tags.firstWhere(
-                      (tag) => tag.name == tagName,
-                        orElse: () => Tag(id: '', name: '', colorValue: Colors.blue.value), // Возвращаем пустой объект как "заглушку"
-                    );
+              return AlertDialog(
+                title: const Text('Add Tag'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Поле ввода для нового тега
+                      TextField(
+                        controller: _controller,
+                        decoration: const InputDecoration(hintText: 'Tag Name'),
+                      ),
+                      const SizedBox(height: 16.0),
+                      // Отображение списка существующих тегов
+                      Wrap(
+                        spacing: 8.0,
+                        runSpacing: 8.0,
+                        children: existingTags.map((tag) {
+                          final isSelected = photo.tagIds.contains(tag.id);
 
-                    if (existingTag.id.isNotEmpty) {
-                      // Тег существует, добавляем его ID в photo.tagIds
-                      if (!photo.tagIds.contains(existingTag.id)) {
-                        photo.tagIds.add(existingTag.id);
-                        context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                          return ChoiceChip(
+                            label: Text(tag.name),
+                            selected: isSelected,
+                            selectedColor: Color(tag.colorValue).withOpacity(0.5),
+                            backgroundColor: Color(tag.colorValue),
+                            onSelected: (selected) {
+                              if (selected) {
+                                if (!photo.tagIds.contains(tag.id)) {
+                                  photo.tagIds.add(tag.id);
+                                  context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                                }
+                              } else {
+                                if (photo.tagIds.contains(tag.id)) {
+                                  photo.tagIds.remove(tag.id);
+                                  context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                                }
+                              }
+                              // Обновляем состояние диалога
+                              (context as Element).markNeedsBuild();
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      final String tagName = _controller.text.trim();
+                      if (tagName.isNotEmpty) {
+                        final existingTag = existingTags.firstWhere(
+                          (tag) => tag.name.toLowerCase() == tagName.toLowerCase(),
+                          orElse: () => Tag(id: '', name: '', colorValue: Colors.blue.value),
+                        );
+
+                        if (existingTag.id.isNotEmpty) {
+                          // Тег уже существует
+                          if (!photo.tagIds.contains(existingTag.id)) {
+                            photo.tagIds.add(existingTag.id);
+                            context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                          }
+                        } else {
+                          // Создаём новый тег
+                          final newTag = Tag(
+                            id: const Uuid().v4(),
+                            name: tagName,
+                            colorValue: Colors.blue.value,
+                          );
+                          tagBloc.add(AddTag(newTag));
+
+                          // Добавляем новый тег к фото
+                          photo.tagIds.add(newTag.id);
+                          context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                        }
                       }
-                    } else {
-                      // Создаём новый тег
-                      final newTag = Tag(
-                        id: const Uuid().v4(),
-                        name: tagName,
-                        colorValue: Colors.blue.value, // Используем colorValue
-                      );
-                      tagBloc.add(AddTag(newTag));
 
-                      // Добавляем новый тег к фото
-                      photo.tagIds.add(newTag.id);
-                      context.read<PhotoBloc>().add(UpdatePhoto(photo));
-                    }
-
-                    Navigator.of(context).pop();
-                  } else {
-                    // Теги ещё не загружены
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Tags are loading. Please wait and try again.')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Add'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Add'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              );
+            } else if (tagState is TagLoading) {
+              return const Center(child: CircularProgressIndicator());
+            } else {
+              return const Center(child: Text('Failed to load tags.'));
+            }
+          },
         );
       },
     );

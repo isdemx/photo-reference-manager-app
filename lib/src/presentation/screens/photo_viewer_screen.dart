@@ -67,6 +67,19 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             ),
             if (_showActions)
               Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ),
+              ),
+            if (_showActions)
+              Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
@@ -90,16 +103,19 @@ class ActionBar extends StatelessWidget {
     return Container(
       color: Colors.black54,
       padding: const EdgeInsets.all(8.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PhotoTagsViewWidget(photo: photo),
-          const SizedBox(height: 8.0),
-          AddTagWidget(photo: photo),
-          AddToFolderWidget(photo: photo),
-          // Виджет комментария
-          // Кнопки редактирования изображения
-        ],
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PhotoTagsViewWidget(photo: photo),
+            const SizedBox(height: 8.0),
+            AddTagWidget(photo: photo),
+            const SizedBox(height: 8.0),
+            AddToFolderWidget(photo: photo),
+            // Виджет комментария
+            // Кнопки редактирования изображения
+          ],
+        ),
       ),
     );
   }
