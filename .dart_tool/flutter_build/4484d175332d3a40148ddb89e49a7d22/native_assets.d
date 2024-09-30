@@ -1,0 +1,1 @@
+ /Users/sergeykudryashov/Development/photo-reference-manager-app/.dart_tool/flutter_build/4484d175332d3a40148ddb89e49a7d22/native_assets.yaml: 
