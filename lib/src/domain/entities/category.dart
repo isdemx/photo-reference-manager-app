@@ -22,4 +22,19 @@ class Category extends HiveObject {
     required this.folderIds,
     required this.sortOrder,
   });
+
+  // Метод copyWith
+  Category copyWith({
+    String? id,
+    String? name,
+    List<String>? folderIds,
+    int? sortOrder,
+  }) {
+    return Category(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      folderIds: folderIds ?? this.folderIds,
+      sortOrder: sortOrder ?? this.sortOrder,
+    );
+  }
 }

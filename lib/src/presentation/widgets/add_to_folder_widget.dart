@@ -59,8 +59,17 @@ class AddToFolderWidget extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () {
-                // Обновляем folderIds фотографии
-                photo.folderIds.addAll(selectedFolderIds.toList());
+                // Удаляем фото из папок, в которых оно больше не должно находиться
+                final removedFolders = photo.folderIds
+                    .where((folderId) => !selectedFolderIds.contains(folderId))
+                    .toList();
+
+                // Обновляем folderIds фотографии: добавляем новые и удаляем лишние
+                photo.folderIds
+                  ..clear() // Очищаем все текущие папки
+                  ..addAll(selectedFolderIds); // Добавляем выбранные папки
+
+                // Обновляем фотографию через PhotoBloc
                 context.read<PhotoBloc>().add(UpdatePhoto(photo));
                 Navigator.of(context).pop();
               },

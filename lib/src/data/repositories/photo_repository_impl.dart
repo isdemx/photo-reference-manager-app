@@ -1,9 +1,11 @@
 // lib/src/data/repositories/photo_repository_impl.dart
 
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path_package;
+import 'package:photographers_reference_app/src/data/utils/compress_photo_isolate.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/repositories/photo_repository.dart';
 
@@ -11,17 +13,6 @@ class PhotoRepositoryImpl implements PhotoRepository {
   final Box<Photo> photoBox;
 
   PhotoRepositoryImpl(this.photoBox);
-
-  Future<Directory> _getAppPhotosDirectory() async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final photosDir = Directory('${appDir.path}/photos');
-
-    if (!await photosDir.exists()) {
-      await photosDir.create(recursive: true);
-    }
-
-    return photosDir;
-  }
 
   Future<String> _copyPhotoToAppDirectory(String originalPhotoPath) async {
     final photosDir = await _getAppPhotosDirectory();
@@ -37,39 +28,76 @@ class PhotoRepositoryImpl implements PhotoRepository {
     }
 
     final newFile = await File(originalPhotoPath).copy(newFilePath);
+    print('Photo copied to: ${newFile.path}'); // Логирование
 
     return newFile.path;
   }
 
   @override
   Future<void> addPhoto(Photo photo) async {
-    if (photo.isStoredInApp) {
-      // Копируем фотографию в директорию приложения
-      final newPath = await _copyPhotoToAppDirectory(photo.path);
-      photo.path = newPath;
-    }
+    try {
+      if (photo.isStoredInApp) {
+        final fileName = path_package.basename(photo.path);
+        final photosDir = await _getAppPhotosDirectory();
+        final newFilePath = path_package.join(photosDir.path, fileName);
 
-    // Сохраняем фотографию в бокс
-    await photoBox.put(photo.id, photo);
+        // Копируем файл из исходного пути в директорию приложения
+        File newFile = await File(photo.path).copy(newFilePath);
+
+        // Сжимаем файл до 200 КБ в изоляте
+        await compute(compressPhotoIsolate, newFile.path);
+
+        // Обновляем имя файла
+        photo.fileName = path_package.basename(newFile.path);
+      }
+
+      await photoBox.put(photo.id, photo);
+      print('Photo saved with id: ${photo.id}');
+    } catch (e) {
+      print('Error adding photo: $e');
+      rethrow;
+    }
+  }
+
+  Future<Directory> _getAppPhotosDirectory() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final photosDir = Directory('${appDir.path}/photos');
+    if (!(await photosDir.exists())) {
+      await photosDir.create(recursive: true);
+    }
+    return photosDir;
   }
 
   @override
   Future<List<Photo>> getPhotos() async {
-    return photoBox.values.toList();
+    final photos = photoBox.values.toList();
+    photos.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
+    return photos;
   }
 
   @override
   Future<void> deletePhoto(String id) async {
-    final photo = photoBox.get(id);
-    if (photo != null) {
-      if (photo.isStoredInApp) {
-        // Удаляем файл фотографии из директории приложения
-        final file = File(photo.path);
-        if (await file.exists()) {
-          await file.delete();
+    try {
+      final photo = photoBox.get(id);
+      if (photo != null) {
+        if (photo.isStoredInApp) {
+          final photosDir = await _getAppPhotosDirectory();
+          final filePath = path_package.join(photosDir.path, photo.fileName);
+          final file = File(filePath);
+          if (await file.exists()) {
+            await file.delete();
+            print('Deleted photo file at: $filePath');
+          } else {
+            print('Photo file does not exist at: $filePath');
+          }
         }
+        await photoBox.delete(id);
+        print('Deleted photo with id: $id from Hive');
+      } else {
+        print('Photo with id: $id not found');
       }
-      await photoBox.delete(id);
+    } catch (e) {
+      print('Error deleting photo: $e');
     }
   }
 

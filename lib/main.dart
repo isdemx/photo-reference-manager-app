@@ -17,11 +17,13 @@ import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.da
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/all_photos_screen.dart';
+import 'package:photographers_reference_app/src/presentation/screens/all_tags_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/folder_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,19 +43,21 @@ void main() async {
 class MyApp extends StatelessWidget {
   final Future<void> _initHive = _initializeHive();
 
-  static Future<void> _initializeHive() async {
-    // Удаляем боксы, если необходимо
-    // await Hive.deleteBoxFromDisk('categories');
-    // await Hive.deleteBoxFromDisk('folders');
-    // await Hive.deleteBoxFromDisk('photos');
-    // await Hive.deleteBoxFromDisk('tags');
-    // await Hive.deleteBoxFromDisk('photos');
-
-    // Открываем боксы
+  static Future<void> openHiveBoxes() async {
+    print('open box');
     await Hive.openBox<Category>('categories');
     await Hive.openBox<Folder>('folders');
     await Hive.openBox<Photo>('photos');
     await Hive.openBox<Tag>('tags');
+    print('opened box');
+  }
+
+  static Future<void> _initializeHive() async {
+    print('init');
+    // Открываем боксы
+    await openHiveBoxes();
+
+    await PhotoPathHelper().initialize();
   }
 
   @override
@@ -91,72 +95,85 @@ class PhotographersReferenceApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiBlocProvider(
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider<CategoryBloc>(
-          create: (context) => CategoryBloc(
-            categoryRepository: CategoryRepositoryImpl(Hive.box('categories')),
-          )..add(LoadCategories()),
+        RepositoryProvider<CategoryRepositoryImpl>(
+          create: (context) => CategoryRepositoryImpl(Hive.box('categories')),
         ),
-        BlocProvider<FolderBloc>(
-          create: (context) => FolderBloc(
-            folderRepository: FolderRepositoryImpl(Hive.box('folders')),
-          )..add(LoadFolders()),
+        RepositoryProvider<FolderRepositoryImpl>(
+          create: (context) => FolderRepositoryImpl(Hive.box('folders')),
         ),
-        BlocProvider<PhotoBloc>(
-          create: (context) => PhotoBloc(
-            photoRepository: PhotoRepositoryImpl(Hive.box('photos')),
-          )..add(LoadPhotos()),
+        RepositoryProvider<PhotoRepositoryImpl>(
+          create: (context) => PhotoRepositoryImpl(Hive.box('photos')),
         ),
-        BlocProvider<TagBloc>(
-          create: (context) => TagBloc(
-            tagRepository: TagRepositoryImpl(Hive.box('tags')),
-          )..add(LoadTags()),
+        RepositoryProvider<TagRepositoryImpl>(
+          create: (context) => TagRepositoryImpl(Hive.box('tags')),
         ),
       ],
-      child: MaterialApp(
-        title: 'Photographers Reference',
-        theme: ThemeData(
-          brightness: Brightness.dark,
-          primaryColor: Colors.black,
-          scaffoldBackgroundColor: Colors.black,
-          appBarTheme: const AppBarTheme(
-            color: Colors.black,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<CategoryBloc>(
+            create: (context) => CategoryBloc(
+              categoryRepository: RepositoryProvider.of<CategoryRepositoryImpl>(context),
+            )..add(LoadCategories()),
           ),
+          BlocProvider<FolderBloc>(
+            create: (context) => FolderBloc(
+              folderRepository: RepositoryProvider.of<FolderRepositoryImpl>(context),
+            )..add(LoadFolders()),
+          ),
+          BlocProvider<PhotoBloc>(
+            create: (context) => PhotoBloc(
+              photoRepository: RepositoryProvider.of<PhotoRepositoryImpl>(context),
+            )..add(LoadPhotos()),
+          ),
+          BlocProvider<TagBloc>(
+            create: (context) => TagBloc(
+              tagRepository: RepositoryProvider.of<TagRepositoryImpl>(context),
+            )..add(LoadTags()),
+          ),
+        ],
+        child: MaterialApp(
+          title: 'Photographers Reference',
+          theme: ThemeData(
+            brightness: Brightness.dark,
+            primaryColor: Colors.black,
+            scaffoldBackgroundColor: Colors.black,
+            appBarTheme: const AppBarTheme(
+              color: Colors.black,
+            ),
+          ),
+          home: const MainScreen(),
+          routes: {
+            '/upload': (context) => const UploadScreen(),
+            '/all_tags': (context) => const AllTagsScreen(),
+            '/all_photos': (context) => const AllPhotosScreen(),
+          },
+          onGenerateRoute: (settings) {
+            if (settings.name == '/folder') {
+              final folder = settings.arguments as Folder;
+              return MaterialPageRoute(
+                builder: (context) => FolderScreen(folder: folder),
+              );
+            } else if (settings.name == '/photo') {
+              final args = settings.arguments as Map<String, dynamic>;
+              final photos = args['photos'] as List<Photo>;
+              final index = args['index'] as int;
+              return MaterialPageRoute(
+                builder: (context) => PhotoViewerScreen(
+                  photos: photos,
+                  initialIndex: index,
+                ),
+              );
+            } else if (settings.name == '/tag') {
+              final tag = settings.arguments as Tag;
+              return MaterialPageRoute(
+                builder: (context) => TagScreen(tag: tag),
+              );
+            }
+            return null;
+          },
         ),
-        home: const MainScreen(),
-        routes: {
-          '/upload': (context) => const UploadScreen(),
-        },
-        onGenerateRoute: (settings) {
-          if (settings.name == '/folder') {
-            final folder = settings.arguments as Folder;
-            return MaterialPageRoute(
-              builder: (context) => FolderScreen(folder: folder),
-            );
-          } else if (settings.name == '/photo') {
-            final args = settings.arguments as Map<String, dynamic>;
-            final photos =
-                args['photos'] as List<Photo>; // Получаем список фотографий
-            final index = args['index'] as int; // Получаем индекс фотографии
-            return MaterialPageRoute(
-              builder: (context) => PhotoViewerScreen(
-                photos: photos,
-                initialIndex: index,
-              ),
-            );
-          } else if (settings.name == '/all_photos') {
-            return MaterialPageRoute(
-              builder: (context) => const AllPhotosScreen(),
-            );
-          } else if (settings.name == '/tag') {
-            final tag = settings.arguments as Tag;
-            return MaterialPageRoute(
-              builder: (context) => TagScreen(tag: tag),
-            );
-          }
-          return null;
-        },
       ),
     );
   }

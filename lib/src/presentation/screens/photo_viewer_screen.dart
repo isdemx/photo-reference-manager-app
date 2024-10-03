@@ -8,6 +8,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
+import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -60,8 +61,16 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               },
               itemBuilder: (context, index) {
                 final photo = photos[index];
+                final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
                 return PhotoView(
-                  imageProvider: FileImage(File(photo.path)),
+                  imageProvider: FileImage(File(fullPath)),
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Error loading image: $error');
+                    return const Center(
+                      child:
+                          Icon(Icons.broken_image, size: 50, color: Colors.red),
+                    );
+                  },
                 );
               },
             ),
@@ -109,9 +118,19 @@ class ActionBar extends StatelessWidget {
           children: [
             PhotoTagsViewWidget(photo: photo),
             const SizedBox(height: 8.0),
-            AddTagWidget(photo: photo),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: AddTagWidget(photo: photo),
+                ),
+                const SizedBox(width: 8.0),
+                Expanded(
+                  child: AddToFolderWidget(photo: photo),
+                ),
+              ],
+            ),
             const SizedBox(height: 8.0),
-            AddToFolderWidget(photo: photo),
             // Виджет комментария
             // Кнопки редактирования изображения
           ],

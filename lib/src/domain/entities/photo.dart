@@ -30,10 +30,13 @@ class Photo extends HiveObject {
   @HiveField(7)
   bool isStoredInApp; // Новое поле
 
+  @HiveField(8)
+  String fileName; // Храните только имя файла
 
   Photo({
     required this.id,
     required this.path,
+    required this.fileName,
     required this.folderIds,
     required this.tagIds,
     required this.comment,
@@ -41,4 +44,9 @@ class Photo extends HiveObject {
     required this.sortOrder,
     this.isStoredInApp = false,
   });
+
+  @override
+  String toString() {
+    return 'Photo{id: $id, fileName: "$fileName", isStoredInApp: $isStoredInApp, tagIds: $tagIds, folderIds: $folderIds}';
+  }
 }

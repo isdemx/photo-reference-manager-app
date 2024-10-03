@@ -72,7 +72,7 @@ class PhotoTagsViewWidget extends StatelessWidget {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Выберите цвет для тега "${tag.name}"'),
+          title: Text('Color for "${tag.name}" tag'),
           content: SingleChildScrollView(
             child: ColorPicker(
               pickerColor: pickerColor,
@@ -84,13 +84,13 @@ class PhotoTagsViewWidget extends StatelessWidget {
           ),
           actions: [
             TextButton(
-              child: const Text('Отмена'),
+              child: const Text('Cancel'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('Ок'),
+              child: const Text('Ok'),
               onPressed: () {
                 // Обновляем цвет тега
                 tag.colorValue = pickerColor.value;

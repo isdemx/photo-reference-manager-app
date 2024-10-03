@@ -30,4 +30,23 @@ class Folder extends HiveObject {
     required this.dateCreated,
     required this.sortOrder,
   });
+
+  // Метод copyWith
+  Folder copyWith({
+    String? id,
+    String? name,
+    String? categoryId,
+    List<String>? photoIds,
+    DateTime? dateCreated,
+    int? sortOrder,
+  }) {
+    return Folder(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      categoryId: categoryId ?? this.categoryId,
+      photoIds: photoIds ?? this.photoIds,
+      dateCreated: dateCreated ?? this.dateCreated,
+      sortOrder: sortOrder ?? this.sortOrder,
+    );
+  }
 }

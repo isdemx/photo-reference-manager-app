@@ -1,0 +1,11 @@
+framework module file_saver {
+  umbrella header "file_saver-umbrella.h"
+
+  export *
+  module * { export * }
+}
+
+module file_saver.Swift {
+  header "file_saver-Swift.h"
+  requires objc
+}

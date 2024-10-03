@@ -19,6 +19,7 @@ class PhotoAdapter extends TypeAdapter<Photo> {
     return Photo(
       id: fields[0] as String,
       path: fields[1] as String,
+      fileName: fields[8] as String,
       folderIds: (fields[2] as List).cast<String>(),
       tagIds: (fields[3] as List).cast<String>(),
       comment: fields[4] as String,
@@ -31,7 +32,7 @@ class PhotoAdapter extends TypeAdapter<Photo> {
   @override
   void write(BinaryWriter writer, Photo obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +48,9 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       ..writeByte(6)
       ..write(obj.sortOrder)
       ..writeByte(7)
-      ..write(obj.isStoredInApp);
+      ..write(obj.isStoredInApp)
+      ..writeByte(8)
+      ..write(obj.fileName);
   }
 
   @override

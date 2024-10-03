@@ -2,11 +2,13 @@
 
 import 'dart:io';
 
+import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
 class TagScreen extends StatelessWidget {
   final Tag tag;
@@ -41,6 +43,7 @@ class TagScreen extends StatelessWidget {
               itemCount: photos.length,
               itemBuilder: (context, index) {
                 final photo = photos[index];
+                final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
                 return GestureDetector(
                   onTap: () {
                     // Переход на экран просмотра фотографий
@@ -54,8 +57,11 @@ class TagScreen extends StatelessWidget {
                       ),
                     );
                   },
-                  child: Image.file(
-                    File(photo.path),
+                  child: ExtendedImage.file(
+                    File(fullPath),
+                    cacheWidth: 200,
+                    enableMemoryCache: true,
+                    clearMemoryCacheIfFailed: true,
                     fit: BoxFit.cover,
                   ),
                 );

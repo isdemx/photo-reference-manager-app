@@ -14,6 +14,7 @@ class PhotoBloc extends Bloc<PhotoEvent, PhotoState> {
   PhotoBloc({required this.photoRepository}) : super(PhotoInitial()) {
     on<LoadPhotos>(_onLoadPhotos);
     on<AddPhoto>(_onAddPhoto);
+    on<PhotosAdded>(_onPhotosAdded);
     on<DeletePhoto>(_onDeletePhoto);
     on<UpdatePhoto>(_onUpdatePhoto);
   }
@@ -33,11 +34,22 @@ class PhotoBloc extends Bloc<PhotoEvent, PhotoState> {
       await photoRepository.addPhoto(event.photo);
       add(LoadPhotos());
     } catch (e) {
-      emit(const PhotoError('Failed to add photo'));
+      // Обработка ошибок
     }
   }
 
-  Future<void> _onDeletePhoto(DeletePhoto event, Emitter<PhotoState> emit) async {
+  Future<void> _onPhotosAdded(
+      PhotosAdded event, Emitter<PhotoState> emit) async {
+    if (state is PhotoLoaded) {
+      final currentPhotos = (state as PhotoLoaded).photos;
+      emit(PhotoLoaded(List.from(currentPhotos)..addAll(event.photos)));
+    } else {
+      add(LoadPhotos());
+    }
+  }
+
+  Future<void> _onDeletePhoto(
+      DeletePhoto event, Emitter<PhotoState> emit) async {
     try {
       await photoRepository.deletePhoto(event.id);
       add(LoadPhotos());
@@ -46,7 +58,8 @@ class PhotoBloc extends Bloc<PhotoEvent, PhotoState> {
     }
   }
 
-  Future<void> _onUpdatePhoto(UpdatePhoto event, Emitter<PhotoState> emit) async {
+  Future<void> _onUpdatePhoto(
+      UpdatePhoto event, Emitter<PhotoState> emit) async {
     try {
       await photoRepository.updatePhoto(event.photo);
       add(LoadPhotos());

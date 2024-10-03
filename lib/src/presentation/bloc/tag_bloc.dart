@@ -22,7 +22,6 @@ class TagBloc extends Bloc<TagEvent, TagState> {
     emit(TagLoading());
     try {
       final tags = await tagRepository.getTags();
-      print('!!!!! On Load Tags');
       emit(TagLoaded(tags));
     } catch (e) {
       emit(const TagError('Failed to load tags'));
@@ -30,30 +29,58 @@ class TagBloc extends Bloc<TagEvent, TagState> {
   }
 
   Future<void> _onAddTag(AddTag event, Emitter<TagState> emit) async {
-    print('!!!!!!!!!!On tag add');
-    try {
-      await tagRepository.addTag(event.tag);
-      add(LoadTags());
-    } catch (e) {
-      emit(const TagError('Failed to add tag'));
+    if (state is TagLoaded) {
+      final currentState = state as TagLoaded;
+      try {
+        await tagRepository.addTag(event.tag);
+
+        final updatedTags = List<Tag>.from(currentState.tags)..add(event.tag);
+
+        emit(TagLoaded(updatedTags));
+      } catch (e) {
+        emit(const TagError('Failed to add tag'));
+      }
     }
   }
 
   Future<void> _onDeleteTag(DeleteTag event, Emitter<TagState> emit) async {
-    try {
-      await tagRepository.deleteTag(event.id);
-      add(LoadTags());
-    } catch (e) {
-      emit(const TagError('Failed to delete tag'));
+    if (state is TagLoaded) {
+      final currentState = state as TagLoaded;
+      try {
+        await tagRepository.deleteTag(event.id);
+
+        final updatedTags =
+            currentState.tags.where((tag) => tag.id != event.id).toList();
+
+        emit(TagLoaded(updatedTags));
+      } catch (e) {
+        emit(const TagError('Failed to delete tag'));
+      }
     }
   }
 
   Future<void> _onUpdateTag(UpdateTag event, Emitter<TagState> emit) async {
-    try {
-      await tagRepository.updateTag(event.tag);
-      add(LoadTags());
-    } catch (e) {
-      emit(const TagError('Failed to update tag'));
+    if (state is TagLoaded) {
+      final currentState = state as TagLoaded;
+      try {
+        await tagRepository.updateTag(event.tag);
+
+        // Создаем новый объект Tag и новый список тегов
+        final updatedTag = Tag(
+          id: event.tag.id,
+          name: event.tag.name,
+          colorValue: event.tag.colorValue,
+        );
+
+        final updatedTags = currentState.tags.map((tag) {
+          return tag.id == updatedTag.id ? updatedTag : tag;
+        }).toList();
+
+        emit(TagLoaded(updatedTags));
+      } catch (e) {
+        print('Error updating tag: $e');
+        emit(const TagError('Failed to update tag'));
+      }
     }
   }
 }

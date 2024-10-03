@@ -26,6 +26,12 @@ class FolderRepositoryImpl implements FolderRepository {
 
   @override
   Future<void> updateFolder(Folder folder) async {
-    await folder.save();
+    try {
+      await folderBox.put(folder.id, folder);
+      print('Folder SAVED');
+    } catch (e) {
+      print('Error saving folder: $e');
+      rethrow;
+    }
   }
 }

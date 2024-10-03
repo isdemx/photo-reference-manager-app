@@ -37,3 +37,12 @@ class UpdatePhoto extends PhotoEvent {
   @override
   List<Object> get props => [photo];
 }
+
+class PhotosAdded extends PhotoEvent {
+  final List<Photo> photos;
+
+  const PhotosAdded(this.photos);
+
+  @override
+  List<Object> get props => [photos];
+}

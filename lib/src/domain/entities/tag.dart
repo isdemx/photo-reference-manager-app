@@ -1,10 +1,11 @@
 import 'package:hive/hive.dart';
 import 'package:flutter/material.dart';
+import 'package:equatable/equatable.dart';
 
 part 'tag.g.dart';
 
 @HiveType(typeId: 3)
-class Tag extends HiveObject {
+class Tag extends HiveObject with EquatableMixin {
   @HiveField(0)
   String id;
 
@@ -12,7 +13,7 @@ class Tag extends HiveObject {
   String name;
 
   @HiveField(2)
-  int colorValue; // Сохраняем цвет как int
+  int colorValue;
 
   Tag({
     required this.id,
@@ -25,4 +26,12 @@ class Tag extends HiveObject {
 
   // Сеттер для установки colorValue из объекта Color
   set color(Color newColor) => colorValue = newColor.value;
+
+  @override
+  List<Object?> get props => [id, name, colorValue];
+
+  @override
+  String toString() {
+    return 'Tag{id: $id, name: $name, colorValue: $colorValue}';
+  }
 }

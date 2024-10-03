@@ -26,6 +26,13 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<void> updateCategory(Category category) async {
-    await category.save();
+    print('SAVEEE');
+    try {
+      await categoryBox.put(category.id, category);
+      print('Category SAVED');
+    } catch (e) {
+      print('Error saving category: $e');
+      rethrow;
+    }
   }
 }

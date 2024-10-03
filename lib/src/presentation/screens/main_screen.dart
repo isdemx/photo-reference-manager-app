@@ -9,7 +9,11 @@ import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/utils/export_database.dart';
+import 'package:photographers_reference_app/src/utils/import_database.dart';
+import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:uuid/uuid.dart';
 
 class MainScreen extends StatelessWidget {
@@ -50,11 +54,38 @@ class MainScreen extends StatelessWidget {
     );
   }
 
+  Future<void> _exportDatabase(BuildContext context) async {
+    await exportDatabase(context);
+  }
+
+  Future<void> _importDatabase(BuildContext context) async {
+    try {
+      // Импортируем базу данных
+      await importDatabase(context);
+
+      // Обновляем состояние блоков
+      context.read<PhotoBloc>().add(LoadPhotos());
+      context.read<TagBloc>().add(LoadTags());
+      context.read<CategoryBloc>().add(LoadCategories());
+      context.read<FolderBloc>().add(LoadFolders());
+
+      // Показываем успешное уведомление
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Database imported succesfully')),
+      );
+    } catch (e) {
+      // Если произошла ошибка, показываем уведомление об ошибке
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not import databse')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Folders'),
+        title: const Text('Refmana'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -80,6 +111,28 @@ class MainScreen extends StatelessWidget {
               Navigator.pushNamed(context, '/all_photos');
             },
           ),
+          IconButton(
+            icon: const Icon(Icons.label), // Иконка для тегов
+            onPressed: () {
+              Navigator.pushNamed(
+                  context, '/all_tags'); // Навигация на AllTagsScreen
+            },
+            tooltip: 'All Tags', // Подсказка при наведении
+          ),
+          // IconButton(
+          //   icon: const Icon(Icons.download),
+          //   onPressed: () {
+          //     _exportDatabase(context);
+          //   },
+          //   tooltip: 'Экспорт базы данных',
+          // ),
+          // IconButton(
+          //   icon: const Icon(Icons.upload),
+          //   onPressed: () {
+          //     _importDatabase(context);
+          //   },
+          //   tooltip: 'Импорт базы данных',
+          // ),
         ],
       ),
       body: BlocBuilder<CategoryBloc, CategoryState>(
@@ -147,10 +200,54 @@ class CategoryWidget extends StatelessWidget {
     );
   }
 
+  void _showEditCategoryDialog(BuildContext context, Category category) {
+    final TextEditingController _controller = TextEditingController();
+    _controller.text =
+        category.name; 
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Category Name'),
+          content: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Category Name'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                final String newName = _controller.text.trim();
+                if (newName.isNotEmpty) {
+                  // Обновляем имя папки, если было введено новое
+                  final updatedCategory = category.copyWith(name: newName);
+                  context.read<CategoryBloc>().add(UpdateCategory(updatedCategory));
+                  Navigator.of(context).pop(); // Закрываем диалог
+                }
+              },
+              child: const Text('OK'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Закрываем диалог
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
-      title: Text(category.name),
+      title: GestureDetector(
+        onLongPress: () {
+          // Здесь можно обрабатывать долгий тап на заголовок
+          _showEditCategoryDialog(context, category);
+          // Добавьте здесь нужное действие
+        },
+        child: Text(category.name),
+      ),
       initiallyExpanded: true,
       trailing: IconButton(
         icon: const Icon(Icons.add),
@@ -222,7 +319,8 @@ class FolderWidget extends StatelessWidget {
           color: Color.fromARGB(255, 0, 0, 0), // Цвет фона
           borderRadius: BorderRadius.circular(8.0), // Закругленные углы
         ),
-        clipBehavior: Clip.hardEdge,  // Обрезка содержимого по границам контейнера
+        clipBehavior:
+            Clip.hardEdge, // Обрезка содержимого по границам контейнера
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -237,10 +335,12 @@ class FolderWidget extends StatelessWidget {
                   if (photos.isNotEmpty) {
                     // Получаем последнюю фотографию
                     final lastPhoto = photos.last;
+                    final fullPath =
+                        PhotoPathHelper().getFullPath(lastPhoto.fileName);
 
                     return Image.file(
-                      File(lastPhoto.path),
-                      fit: BoxFit.cover,  // Фото заполняет весь контейнер
+                      File(fullPath),
+                      fit: BoxFit.cover, // Фото заполняет весь контейнер
                       width: double.infinity,
                       height: double.infinity,
                     );
