@@ -632,6 +632,12 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "receive_sharing_intent",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/receive_sharing_intent-1.8.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
       "name": "shelf",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shelf-1.4.1",
       "packageUri": "lib/",
@@ -818,7 +824,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-10-03T09:42:12.978292Z",
+  "generated": "2024-10-05T22:02:49.109621Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

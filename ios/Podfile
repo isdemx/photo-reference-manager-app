@@ -1,5 +1,7 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '12.0'
+# ios/Podfile
+
+# Define the global platform for your project
+platform :ios, '12.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -32,8 +34,17 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Share Extension target
+  target 'Share Extension' do
+    inherit! :search_paths
+    # Если Share Extension требует дополнительных Pod'ов, добавьте их здесь
+  end
+
+  # RunnerTests target
   target 'RunnerTests' do
     inherit! :search_paths
+    # Если RunnerTests требует дополнительных Pod'ов, добавьте их здесь
   end
 end
 
