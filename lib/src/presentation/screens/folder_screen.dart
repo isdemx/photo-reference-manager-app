@@ -102,25 +102,30 @@ class _FolderScreenState extends State<FolderScreen> {
                 if (photoState is PhotoLoaded) {
                   // Фильтруем фотографии по папке
                   final List<Photo> photos = photoState.photos
-                      .where((photo) => photo.folderIds.contains(widget.folder.id))
+                      .where(
+                          (photo) => photo.folderIds.contains(widget.folder.id))
                       .toList();
 
                   if (photos.isNotEmpty) {
                     try {
                       // Вызываем хелпер для шаринга
-                      await _shareHelper.shareMultiplePhotos(photos);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Фотографии успешно отправлены!')),
-                      );
+                      var shareResponse =
+                          await _shareHelper.shareMultiplePhotos(photos);
+                      // if (shareResponse) {
+                      //   ScaffoldMessenger.of(context).showSnackBar(
+                      //     SnackBar(
+                      //         content: Text('Photos shared suscessfully!')),
+                      //   );
+                      // }
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Ошибка при шаринге: $e')),
+                        SnackBar(content: Text('Error while sharing photos: $e')),
                       );
                     }
                   } else {
                     // Показываем сообщение, если нет фотографий для шаринга
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Нет фотографий для шаринга')),
+                      SnackBar(content: Text('No photos for share')),
                     );
                   }
                 } else if (photoState is PhotoLoading) {
@@ -128,8 +133,10 @@ class _FolderScreenState extends State<FolderScreen> {
                   showDialog(
                     context: context,
                     barrierDismissible: false,
-                    builder: (context) => Center(child: CircularProgressIndicator()),
-                  ).then((_) => Navigator.of(context).pop()); // Закрываем диалог после загрузки
+                    builder: (context) =>
+                        Center(child: CircularProgressIndicator()),
+                  ).then((_) => Navigator.of(context)
+                      .pop()); // Закрываем диалог после загрузки
                 } else {
                   // Показываем ошибку, если произошла ошибка при загрузке
                   ScaffoldMessenger.of(context).showSnackBar(

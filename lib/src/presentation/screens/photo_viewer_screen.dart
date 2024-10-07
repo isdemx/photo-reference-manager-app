@@ -109,41 +109,44 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   errorBuilder: (context, error, stackTrace) {
                     print('Error loading image: $error');
                     return const Center(
-                      child: Icon(Icons.broken_image, size: 50, color: Colors.red),
+                      child:
+                          Icon(Icons.broken_image, size: 50, color: Colors.red),
                     );
                   },
                 );
               },
             ),
             // Чекбокс в верхнем левом углу
-            if (_showActions && _selectPhotoMode)
+            if (_selectPhotoMode)
               Positioned(
-                top: 40,
-                left: 16, // Чекбокс теперь слева
+                top: 10,
+                left: 0, // Чекбокс теперь слева
                 child: GestureDetector(
                   onTap: () {
                     _toggleSelection(currentPhoto);
                   },
-                  child: Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      border: Border.all(
-                        color: isSelected ? Colors.blue : Colors.grey,
-                        width: 2,
+                  child: SafeArea(
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                        border: Border.all(
+                          color: isSelected ? Colors.blue : Colors.grey,
+                          width: 2,
+                        ),
                       ),
+                      child: isSelected
+                          ? const Center(
+                              child: Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.blue,
+                              ),
+                            )
+                          : null,
                     ),
-                    child: isSelected
-                        ? const Center(
-                            child: Icon(
-                              Icons.check,
-                              size: 16,
-                              color: Colors.blue,
-                            ),
-                          )
-                        : null,
                   ),
                 ),
               ),
@@ -167,8 +170,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 right: 0,
                 child: ActionBar(
                   photo: photos[_currentIndex],
-                  isSelectionMode: _selectedPhotos.isNotEmpty || _selectPhotoMode,
-                  enableSelectPhotoMode: _enableSelectPhotoMode, // Передаем метод для включения режима выбора
+                  isSelectionMode:
+                      _selectedPhotos.isNotEmpty || _selectPhotoMode,
+                  enableSelectPhotoMode:
+                      _enableSelectPhotoMode, // Передаем метод для включения режима выбора
                   onShare: () {
                     _shareSelectedPhotos(); // Шаринг выбранных фото
                   },
@@ -263,10 +268,13 @@ class ActionBar extends StatelessWidget {
                     child: AddToFolderWidget(photo: photo),
                   ),
                   const SizedBox(width: 8.0),
-                  IconButton(
-                    icon: const Icon(Icons.share, color: Colors.white),
-                    onPressed: enableSelectPhotoMode, // Вызываем метод из родительского виджета
-                    tooltip: 'Share Photos',
+                  Expanded(
+                    child: IconButton(
+                      icon: const Icon(Icons.share, color: Colors.white),
+                      onPressed:
+                          enableSelectPhotoMode, // Вызываем метод из родительского виджета
+                      tooltip: 'Share Photos',
+                    ),
                   ),
                 ],
               ),

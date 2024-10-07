@@ -58,6 +58,10 @@ class AddToFolderWidget extends StatelessWidget {
           ),
           actions: [
             TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
               onPressed: () {
                 // Удаляем фото из папок, в которых оно больше не должно находиться
                 final removedFolders = photo.folderIds
@@ -75,10 +79,6 @@ class AddToFolderWidget extends StatelessWidget {
               },
               child: const Text('OK'),
             ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
           ],
         );
       },
@@ -87,9 +87,11 @@ class AddToFolderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () => _showAddToFolderDialog(context),
-      child: const Text('Add to Folder'),
+    return IconButton(
+      icon: const Icon(Icons.folder, color: Colors.white),
+      onPressed: () =>
+          _showAddToFolderDialog(context), // Вызов метода по нажатию
+      tooltip: 'Add to Folder', // Подсказка при долгом нажатии
     );
   }
 }

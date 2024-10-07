@@ -9,41 +9,56 @@ class PhotoShareHelper {
   final PhotoPathHelper _pathHelper = PhotoPathHelper();
 
   /// Шаринг одной фотографии
-  Future<void> shareSinglePhoto(Photo photo) async {
+  Future<bool> shareSinglePhoto(Photo photo) async {
     final String fullPath = await _pathHelper.getFullPath(photo.fileName);
     final File file = File(fullPath);
+    
     if (await file.exists()) {
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Check out this photo!',
-      );
+      try {
+        final ShareResult result = await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Refma: Check out this photo!',
+        );
+        return result.status == ShareResultStatus.success;
+      } catch (e) {
+        print('Error sharing photo: $e');
+        return false;
+      }
     } else {
       print('File not found: $fullPath');
-      // Вы можете показать SnackBar или другое уведомление пользователю
+      return false;
     }
   }
 
   /// Шаринг нескольких фотографий
-  Future<void> shareMultiplePhotos(List<Photo> photos) async {
+  Future<bool> shareMultiplePhotos(List<Photo> photos) async {
     List<XFile> xFiles = [];
+    
     for (var photo in photos) {
       final String fullPath = await _pathHelper.getFullPath(photo.fileName);
       final File file = File(fullPath);
+      
       if (await file.exists()) {
         xFiles.add(XFile(file.path));
       } else {
         print('File not found: $fullPath');
-        // Вы можете собрать список недоступных файлов и уведомить пользователя
       }
     }
+    
     if (xFiles.isNotEmpty) {
-      await Share.shareXFiles(
-        xFiles,
-        text: 'Check out these photos!',
-      );
+      try {
+        final ShareResult result = await Share.shareXFiles(
+          xFiles,
+          text: 'Refma: Check out these photos!',
+        );
+        return result.status == ShareResultStatus.success;
+      } catch (e) {
+        print('Error sharing photos: $e');
+        return false;
+      }
     } else {
       print('No valid files to share.');
-      // Показываем сообщение пользователю, что нет доступных файлов для шаринга
+      return false;
     }
   }
 }

@@ -52,18 +52,23 @@ class AddTagWidget extends StatelessWidget {
                           return ChoiceChip(
                             label: Text(tag.name),
                             selected: isSelected,
-                            selectedColor: Color(tag.colorValue).withOpacity(0.5),
+                            selectedColor:
+                                Color(tag.colorValue).withOpacity(0.5),
                             backgroundColor: Color(tag.colorValue),
                             onSelected: (selected) {
                               if (selected) {
                                 if (!photo.tagIds.contains(tag.id)) {
                                   photo.tagIds.add(tag.id);
-                                  context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                                  context
+                                      .read<PhotoBloc>()
+                                      .add(UpdatePhoto(photo));
                                 }
                               } else {
                                 if (photo.tagIds.contains(tag.id)) {
                                   photo.tagIds.remove(tag.id);
-                                  context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                                  context
+                                      .read<PhotoBloc>()
+                                      .add(UpdatePhoto(photo));
                                 }
                               }
                               // Обновляем состояние диалога
@@ -77,12 +82,18 @@ class AddTagWidget extends StatelessWidget {
                 ),
                 actions: [
                   TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
                     onPressed: () {
                       final String tagName = _controller.text.trim();
                       if (tagName.isNotEmpty) {
                         final existingTag = existingTags.firstWhere(
-                          (tag) => tag.name.toLowerCase() == tagName.toLowerCase(),
-                          orElse: () => Tag(id: '', name: '', colorValue: Colors.blue.value),
+                          (tag) =>
+                              tag.name.toLowerCase() == tagName.toLowerCase(),
+                          orElse: () => Tag(
+                              id: '', name: '', colorValue: Colors.blue.value),
                         );
 
                         if (existingTag.id.isNotEmpty) {
@@ -110,10 +121,7 @@ class AddTagWidget extends StatelessWidget {
                     },
                     child: const Text('Add'),
                   ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
-                  ),
+                  
                 ],
               );
             } else if (tagState is TagLoading) {
@@ -129,9 +137,10 @@ class AddTagWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ElevatedButton(
-      onPressed: () => _showAddTagDialog(context),
-      child: const Text('Add Tag'),
+    return IconButton(
+      icon: const Icon(Icons.label, color: Colors.white), // Иконка с тегом
+      onPressed: () => _showAddTagDialog(context), // Вызов метода по нажатию
+      tooltip: 'Add Tag', // Подсказка при долгом нажатии
     );
   }
 }
