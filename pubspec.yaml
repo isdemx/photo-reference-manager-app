@@ -53,6 +53,8 @@ dependencies:
   extended_image: ^8.3.1
   wakelock_plus: ^1.2.8
   flutter_native_splash: ^2.4.1
+  share_plus: ^10.0.2
+  photo_manager: ^3.5.0
 
 
 dev_dependencies:
@@ -117,3 +119,4 @@ flutter_native_splash:
   web: false
 
   color: "#000000"
+  image: assets/refma-icon-180.png

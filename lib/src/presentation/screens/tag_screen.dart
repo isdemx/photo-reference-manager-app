@@ -9,6 +9,7 @@ import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class TagScreen extends StatelessWidget {
   final Tag tag;
@@ -17,10 +18,51 @@ class TagScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Инициализируем хелпер
+    final PhotoShareHelper _shareHelper = PhotoShareHelper();
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Photos with tag "${tag.name}"'),
         backgroundColor: Color(tag.colorValue),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.share),
+            onPressed: () {
+              // Получаем текущее состояние PhotoBloc
+              final photoState = context.read<PhotoBloc>().state;
+
+              if (photoState is PhotoLoaded) {
+                // Фильтруем фотографии по тегу
+                final photos = photoState.photos
+                    .where((photo) => photo.tagIds.contains(tag.id))
+                    .toList();
+
+                if (photos.isNotEmpty) {
+                  // Вызываем хелпер для шаринга
+                  _shareHelper.shareMultiplePhotos(photos);
+                } else {
+                  // Показываем сообщение, если нет фотографий для шаринга
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Нет фотографий для шаринга')),
+                  );
+                }
+              } else if (photoState is PhotoLoading) {
+                // Показываем индикатор загрузки, если фотографии загружаются
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => Center(child: CircularProgressIndicator()),
+                );
+              } else {
+                // Показываем ошибку, если произошла ошибка при загрузке
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Ошибка при загрузке фотографий')),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: BlocBuilder<PhotoBloc, PhotoState>(
         builder: (context, photoState) {

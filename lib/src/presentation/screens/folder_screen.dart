@@ -14,6 +14,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.da
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class FolderScreen extends StatefulWidget {
   final Folder folder;
@@ -64,6 +65,9 @@ class _FolderScreenState extends State<FolderScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Инициализируем хелпер
+    final PhotoShareHelper _shareHelper = PhotoShareHelper();
+
     return BlocProvider(
       create: (context) => PhotoBloc(
         photoRepository: PhotoRepositoryImpl(Hive.box('photos')),
@@ -88,6 +92,51 @@ class _FolderScreenState extends State<FolderScreen> {
               tooltip: _isPinterestLayout
                   ? 'Switch to Grid View'
                   : 'Switch to Pinterest View',
+            ),
+            IconButton(
+              icon: const Icon(Icons.share),
+              onPressed: () async {
+                // Получаем текущее состояние PhotoBloc
+                final photoState = context.read<PhotoBloc>().state;
+
+                if (photoState is PhotoLoaded) {
+                  // Фильтруем фотографии по папке
+                  final List<Photo> photos = photoState.photos
+                      .where((photo) => photo.folderIds.contains(widget.folder.id))
+                      .toList();
+
+                  if (photos.isNotEmpty) {
+                    try {
+                      // Вызываем хелпер для шаринга
+                      await _shareHelper.shareMultiplePhotos(photos);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Фотографии успешно отправлены!')),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Ошибка при шаринге: $e')),
+                      );
+                    }
+                  } else {
+                    // Показываем сообщение, если нет фотографий для шаринга
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Нет фотографий для шаринга')),
+                    );
+                  }
+                } else if (photoState is PhotoLoading) {
+                  // Показываем индикатор загрузки, если фотографии загружаются
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => Center(child: CircularProgressIndicator()),
+                  ).then((_) => Navigator.of(context).pop()); // Закрываем диалог после загрузки
+                } else {
+                  // Показываем ошибку, если произошла ошибка при загрузке
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Ошибка при загрузке фотографий')),
+                  );
+                }
+              },
             ),
           ],
         ),
