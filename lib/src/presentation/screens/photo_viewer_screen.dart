@@ -2,11 +2,14 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
+import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
@@ -56,6 +59,64 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
     print('SETTTT $_selectPhotoMode');
   }
+
+  void _update() {
+    setState(() {
+      // Здесь обновляем состояние
+      // Например, если у вас есть теги или папки, которые были добавлены,
+      // они будут перерендерены в виджете.
+    });
+  }
+
+  void _confirmDelete(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Photo"),
+          content: const Text("Are you sure you want to delete this photo?"),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрыть диалог
+              },
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                // Удалить фото и закрыть диалог
+                _deletePhoto(context);
+                Navigator.of(context).pop(); // Закрыть диалог
+              },
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+void _deletePhoto(BuildContext context) {
+  BlocProvider.of<PhotoBloc>(context)
+      .add(DeletePhoto(widget.photos[_currentIndex].id));
+
+  setState(() {
+    widget.photos.removeAt(_currentIndex); // Убираем фото из списка
+
+    // Проверяем, чтобы индекс не вышел за пределы списка после удаления
+    if (_currentIndex >= widget.photos.length) {
+      _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
+    }
+
+    // Если после удаления не осталось фотографий, можно закрыть экран
+    if (widget.photos.isEmpty) {
+      Navigator.of(context).pop();
+    } else {
+      _pageController.jumpToPage(_currentIndex); // Переключаем галерею
+    }
+  });
+}
+
 
   void _toggleActions() {
     setState(() {
@@ -152,8 +213,22 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               ),
             if (_showActions)
               Positioned(
+                top: 16,
+                left: 40,
+                child: SafeArea(
+                  child: Text(
+                    '${_currentIndex + 1}/${widget.photos.length}, ${formatDate(currentPhoto.dateAdded)}', // Индекс и дата
+                    style: const TextStyle(
+                      fontSize: 10.0,
+                    ),
+                  ),
+                ),
+              ),
+
+            if (_showActions)
+              Positioned(
                 top: 0,
-                right: 0, // Крестик теперь справа
+                right: 0,
                 child: SafeArea(
                   child: IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
@@ -177,6 +252,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   onShare: () {
                     _shareSelectedPhotos(); // Шаринг выбранных фото
                   },
+                  update: _update,
+                  deletePhoto: () =>
+                      _confirmDelete(context), // Передаем функцию как указатель
                   onCancel: () {
                     _clearSelection(); // Сброс выбора фото
                   },
@@ -197,7 +275,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       var shared = await _shareHelper.shareMultiplePhotos(_selectedPhotos);
       if (shared) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Shared uccessfully'), duration: Duration(seconds: 1)),
+          const SnackBar(
+              content: Text('Shared uccessfully'),
+              duration: Duration(seconds: 1)),
         );
       }
 
@@ -216,6 +296,8 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onCancel;
   final VoidCallback enableSelectPhotoMode; // Новый параметр
+  final VoidCallback update; // Новый параметр
+  final VoidCallback deletePhoto; // Новый параметр
 
   const ActionBar({
     Key? key,
@@ -223,7 +305,9 @@ class ActionBar extends StatelessWidget {
     required this.isSelectionMode,
     required this.onShare,
     required this.onCancel,
-    required this.enableSelectPhotoMode, // Добавляем новый параметр
+    required this.enableSelectPhotoMode,
+    required this.update,
+    required this.deletePhoto,
   }) : super(key: key);
 
   @override
@@ -264,11 +348,21 @@ class ActionBar extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: AddTagWidget(photo: photo),
+                    child: AddTagWidget(
+                      photo: photo,
+                      onTagAdded: () {
+                        update();
+                      },
+                    ),
                   ),
                   const SizedBox(width: 8.0),
                   Expanded(
-                    child: AddToFolderWidget(photo: photo),
+                    child: AddToFolderWidget(
+                      photo: photo,
+                      onFolderAdded: () {
+                        update();
+                      },
+                    ),
                   ),
                   const SizedBox(width: 8.0),
                   Expanded(
@@ -276,6 +370,15 @@ class ActionBar extends StatelessWidget {
                       icon: const Icon(Icons.share, color: Colors.white),
                       onPressed:
                           enableSelectPhotoMode, // Вызываем метод из родительского виджета
+                      tooltip: 'Share Photos',
+                    ),
+                  ),
+                  Expanded(
+                    child: IconButton(
+                      icon: const Icon(Icons.delete,
+                          color: Color.fromARGB(255, 120, 13, 13)),
+                      onPressed:
+                          deletePhoto, // Вызываем метод из родительского виджета
                       tooltip: 'Share Photos',
                     ),
                   ),

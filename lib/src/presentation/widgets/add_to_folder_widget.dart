@@ -8,8 +8,13 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 
 class AddToFolderWidget extends StatelessWidget {
   final Photo photo;
+  final VoidCallback onFolderAdded; // Коллбек для обновления родительского стейта
 
-  const AddToFolderWidget({Key? key, required this.photo}) : super(key: key);
+  const AddToFolderWidget({
+    Key? key,
+    required this.photo,
+    required this.onFolderAdded, // Передаем коллбек из родительского виджета
+  }) : super(key: key);
 
   void _showAddToFolderDialog(BuildContext context) {
     final selectedFolderIds = Set<String>.from(photo.folderIds);
@@ -42,7 +47,6 @@ class AddToFolderWidget extends StatelessWidget {
                           } else {
                             selectedFolderIds.remove(folder.id);
                           }
-                          // Обновляем состояние диалога
                           (context as Element).markNeedsBuild();
                         },
                       );
@@ -63,19 +67,17 @@ class AddToFolderWidget extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                // Удаляем фото из папок, в которых оно больше не должно находиться
                 final removedFolders = photo.folderIds
                     .where((folderId) => !selectedFolderIds.contains(folderId))
                     .toList();
 
-                // Обновляем folderIds фотографии: добавляем новые и удаляем лишние
                 photo.folderIds
-                  ..clear() // Очищаем все текущие папки
-                  ..addAll(selectedFolderIds); // Добавляем выбранные папки
+                  ..clear()
+                  ..addAll(selectedFolderIds);
 
-                // Обновляем фотографию через PhotoBloc
                 context.read<PhotoBloc>().add(UpdatePhoto(photo));
                 Navigator.of(context).pop();
+                onFolderAdded(); // Вызываем коллбек для обновления родительского стейта
               },
               child: const Text('OK'),
             ),
@@ -89,9 +91,8 @@ class AddToFolderWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       icon: const Icon(Icons.folder, color: Colors.white),
-      onPressed: () =>
-          _showAddToFolderDialog(context), // Вызов метода по нажатию
-      tooltip: 'Add to Folder', // Подсказка при долгом нажатии
+      onPressed: () => _showAddToFolderDialog(context),
+      tooltip: 'Add to Folder',
     );
   }
 }

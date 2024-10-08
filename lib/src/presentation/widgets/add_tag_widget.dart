@@ -10,14 +10,18 @@ import 'package:uuid/uuid.dart';
 
 class AddTagWidget extends StatelessWidget {
   final Photo photo;
+  final VoidCallback onTagAdded; // Коллбек для обновления родительского стейта
 
-  const AddTagWidget({Key? key, required this.photo}) : super(key: key);
+  const AddTagWidget({
+    Key? key,
+    required this.photo,
+    required this.onTagAdded, // Передаем коллбек из родительского виджета
+  }) : super(key: key);
 
   void _showAddTagDialog(BuildContext context) {
     final TextEditingController _controller = TextEditingController();
     final tagBloc = context.read<TagBloc>();
 
-    // Проверяем, загружены ли теги
     if (tagBloc.state is! TagLoaded) {
       tagBloc.add(LoadTags());
     }
@@ -36,13 +40,11 @@ class AddTagWidget extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // Поле ввода для нового тега
                       TextField(
                         controller: _controller,
                         decoration: const InputDecoration(hintText: 'Tag Name'),
                       ),
                       const SizedBox(height: 16.0),
-                      // Отображение списка существующих тегов
                       Wrap(
                         spacing: 8.0,
                         runSpacing: 8.0,
@@ -59,19 +61,14 @@ class AddTagWidget extends StatelessWidget {
                               if (selected) {
                                 if (!photo.tagIds.contains(tag.id)) {
                                   photo.tagIds.add(tag.id);
-                                  context
-                                      .read<PhotoBloc>()
-                                      .add(UpdatePhoto(photo));
+                                  context.read<PhotoBloc>().add(UpdatePhoto(photo));
                                 }
                               } else {
                                 if (photo.tagIds.contains(tag.id)) {
                                   photo.tagIds.remove(tag.id);
-                                  context
-                                      .read<PhotoBloc>()
-                                      .add(UpdatePhoto(photo));
+                                  context.read<PhotoBloc>().add(UpdatePhoto(photo));
                                 }
                               }
-                              // Обновляем состояние диалога
                               (context as Element).markNeedsBuild();
                             },
                           );
@@ -97,31 +94,27 @@ class AddTagWidget extends StatelessWidget {
                         );
 
                         if (existingTag.id.isNotEmpty) {
-                          // Тег уже существует
                           if (!photo.tagIds.contains(existingTag.id)) {
                             photo.tagIds.add(existingTag.id);
                             context.read<PhotoBloc>().add(UpdatePhoto(photo));
                           }
                         } else {
-                          // Создаём новый тег
                           final newTag = Tag(
                             id: const Uuid().v4(),
                             name: tagName,
                             colorValue: Colors.blue.value,
                           );
                           tagBloc.add(AddTag(newTag));
-
-                          // Добавляем новый тег к фото
                           photo.tagIds.add(newTag.id);
                           context.read<PhotoBloc>().add(UpdatePhoto(photo));
                         }
                       }
 
                       Navigator.of(context).pop();
+                      onTagAdded(); // Вызываем коллбек для обновления родительского стейта
                     },
                     child: const Text('Add'),
                   ),
-                  
                 ],
               );
             } else if (tagState is TagLoading) {
@@ -138,9 +131,9 @@ class AddTagWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.label, color: Colors.white), // Иконка с тегом
-      onPressed: () => _showAddTagDialog(context), // Вызов метода по нажатию
-      tooltip: 'Add Tag', // Подсказка при долгом нажатии
+      icon: const Icon(Icons.label, color: Colors.white),
+      onPressed: () => _showAddTagDialog(context),
+      tooltip: 'Add Tag',
     );
   }
 }

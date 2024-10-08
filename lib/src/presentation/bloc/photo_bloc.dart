@@ -61,6 +61,7 @@ class PhotoBloc extends Bloc<PhotoEvent, PhotoState> {
   Future<void> _onUpdatePhoto(
       UpdatePhoto event, Emitter<PhotoState> emit) async {
     try {
+      print('UPDATE PHOTO');
       await photoRepository.updatePhoto(event.photo);
       add(LoadPhotos());
     } catch (e) {
