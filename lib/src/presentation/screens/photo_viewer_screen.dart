@@ -96,27 +96,26 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     );
   }
 
-void _deletePhoto(BuildContext context) {
-  BlocProvider.of<PhotoBloc>(context)
-      .add(DeletePhoto(widget.photos[_currentIndex].id));
+  void _deletePhoto(BuildContext context) {
+    BlocProvider.of<PhotoBloc>(context)
+        .add(DeletePhoto(widget.photos[_currentIndex].id));
 
-  setState(() {
-    widget.photos.removeAt(_currentIndex); // Убираем фото из списка
+    setState(() {
+      widget.photos.removeAt(_currentIndex); // Убираем фото из списка
 
-    // Проверяем, чтобы индекс не вышел за пределы списка после удаления
-    if (_currentIndex >= widget.photos.length) {
-      _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
-    }
+      // Проверяем, чтобы индекс не вышел за пределы списка после удаления
+      if (_currentIndex >= widget.photos.length) {
+        _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
+      }
 
-    // Если после удаления не осталось фотографий, можно закрыть экран
-    if (widget.photos.isEmpty) {
-      Navigator.of(context).pop();
-    } else {
-      _pageController.jumpToPage(_currentIndex); // Переключаем галерею
-    }
-  });
-}
-
+      // Если после удаления не осталось фотографий, можно закрыть экран
+      if (widget.photos.isEmpty) {
+        Navigator.of(context).pop();
+      } else {
+        _pageController.jumpToPage(_currentIndex); // Переключаем галерею
+      }
+    });
+  }
 
   void _toggleActions() {
     setState(() {
@@ -150,6 +149,50 @@ void _deletePhoto(BuildContext context) {
     final isSelected = _selectedPhotos.contains(currentPhoto);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: _showActions
+          ? AppBar(
+              title: Text(
+                '${_currentIndex + 1}/${widget.photos.length}, Added ${formatDate(currentPhoto.dateAdded)}',
+                style: const TextStyle(
+                  fontSize: 12.0, // Размер шрифта
+                ),
+              ),
+              actions: [
+                if (_selectPhotoMode)
+                  GestureDetector(
+                    onTap: () {
+                      _toggleSelection(currentPhoto);
+                    },
+                    child: Padding(
+                      padding:
+                          const EdgeInsets.only(right: 16.0), // Отступ справа
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          border: Border.all(
+                            color: isSelected ? Colors.blue : Colors.grey,
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected
+                            ? const Center(
+                                child: Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: Colors.blue,
+                                ),
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+              ],
+            )
+          : null,
       body: GestureDetector(
         onTap: _toggleActions,
         child: Stack(
@@ -178,66 +221,7 @@ void _deletePhoto(BuildContext context) {
               },
             ),
             // Чекбокс в верхнем левом углу
-            if (_selectPhotoMode)
-              Positioned(
-                top: 10,
-                left: 0, // Чекбокс теперь слева
-                child: GestureDetector(
-                  onTap: () {
-                    _toggleSelection(currentPhoto);
-                  },
-                  child: SafeArea(
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.white,
-                        border: Border.all(
-                          color: isSelected ? Colors.blue : Colors.grey,
-                          width: 2,
-                        ),
-                      ),
-                      child: isSelected
-                          ? const Center(
-                              child: Icon(
-                                Icons.check,
-                                size: 16,
-                                color: Colors.blue,
-                              ),
-                            )
-                          : null,
-                    ),
-                  ),
-                ),
-              ),
-            if (_showActions)
-              Positioned(
-                top: 16,
-                left: 40,
-                child: SafeArea(
-                  child: Text(
-                    '${_currentIndex + 1}/${widget.photos.length}, ${formatDate(currentPhoto.dateAdded)}', // Индекс и дата
-                    style: const TextStyle(
-                      fontSize: 10.0,
-                    ),
-                  ),
-                ),
-              ),
 
-            if (_showActions)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: SafeArea(
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                ),
-              ),
             if (_showActions)
               Positioned(
                 bottom: 0,
@@ -330,7 +314,7 @@ class ActionBar extends StatelessWidget {
                     icon: const Icon(Icons.close),
                     label: const Text('Cancel'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
+                      backgroundColor: const Color.fromARGB(255, 172, 46, 37),
                     ),
                   ),
                   ElevatedButton.icon(
@@ -338,7 +322,7 @@ class ActionBar extends StatelessWidget {
                     icon: const Icon(Icons.share),
                     label: const Text('Share'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: const Color.fromARGB(255, 35, 107, 166),
                     ),
                   ),
                 ],
