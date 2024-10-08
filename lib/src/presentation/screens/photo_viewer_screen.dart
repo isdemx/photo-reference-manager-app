@@ -194,14 +194,17 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final PhotoShareHelper _shareHelper = PhotoShareHelper();
 
     try {
-      await _shareHelper.shareMultiplePhotos(_selectedPhotos);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Фотографии успешно отправлены!')),
-      );
+      var shared = await _shareHelper.shareMultiplePhotos(_selectedPhotos);
+      if (shared) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Shared uccessfully'), duration: Duration(seconds: 1)),
+        );
+      }
+
       _clearSelection();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Ошибка при шаринге: $e')),
+        SnackBar(content: Text('Sharing error: $e')),
       );
     }
   }
