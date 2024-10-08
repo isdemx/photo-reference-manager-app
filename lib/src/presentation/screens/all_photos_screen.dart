@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:vibration/vibration.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -112,99 +114,35 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                         ),
                         SliverPadding(
                           padding: const EdgeInsets.all(8.0),
-                          sliver: _isPinterestLayout
-                              ? SliverMasonryGrid.count(
-                                  crossAxisCount: _columnCount,
-                                  mainAxisSpacing: 8.0,
-                                  crossAxisSpacing: 8.0,
-                                  childCount: photos.length,
-                                  itemBuilder: (context, index) {
-                                    final photo = photos[index];
-                                    return PhotoThumbnail(
-                                      photo: photo,
-                                      onPhotoTap: () {
-                                        Navigator.pushNamed(
-                                          context,
-                                          '/photo',
-                                          arguments: {
-                                            'photos': photos,
-                                            'index': index
-                                          },
-                                        );
-                                      },
-                                      onDeleteTap: () {
-                                        context
-                                            .read<PhotoBloc>()
-                                            .add(DeletePhoto(photo.id));
-                                      },
-                                      isPinterestLayout: true,
-                                    );
-                                  },
-                                )
-                              : SliverGrid(
-                                  gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: _columnCount,
-                                    mainAxisSpacing: 4.0,
-                                    crossAxisSpacing: 4.0,
-                                  ),
-                                  delegate: SliverChildBuilderDelegate(
-                                    (context, index) {
-                                      final photo = photos[index];
-                                      return PhotoThumbnail(
-                                        photo: photo,
-                                        onPhotoTap: () {
-                                          Navigator.pushNamed(
-                                            context,
-                                            '/photo',
-                                            arguments: {
-                                              'photos': photos,
-                                              'index': index
-                                            },
-                                          );
-                                        },
-                                        onDeleteTap: () {
-                                          context
-                                              .read<PhotoBloc>()
-                                              .add(DeletePhoto(photo.id));
-                                        },
-                                        isPinterestLayout: false,
-                                      );
-                                    },
-                                    childCount: photos.length,
-                                  ),
-                                ),
+                          sliver: PhotoGridView(
+                            photos: photos,
+                            pinterestView:
+                                _isPinterestLayout, // Логика для выбора типа сетки
+                            columnCount: _columnCount, // Количество колонок
+                            onPhotoTap: (photo, index) {
+                              Navigator.pushNamed(
+                                context,
+                                '/photo',
+                                arguments: {'photos': photos, 'index': index},
+                              );
+                            },
+                            onDeleteTap: (photo) {
+                              context
+                                  .read<PhotoBloc>()
+                                  .add(DeletePhoto(photo.id));
+                            },
+                          ),
                         ),
                       ],
                     ),
-                    Positioned(
-                      bottom: 16.0,
-                      left: 150.0,
-                      right: 50.0,
-                      child: Column(
-                        children: [
-                          Slider(
-                            value: _columnCount.toDouble(),
-                            inactiveColor: const Color.fromARGB(255, 0, 0, 0)
-                                .withOpacity(0.3),
-                            activeColor:
-                                const Color.fromARGB(255, 107, 107, 107)
-                                    .withOpacity(0.7),
-                            thumbColor: const Color.fromARGB(255, 117, 116, 116)
-                                .withOpacity(0.8),
-                            min: 2,
-                            max: 5,
-                            divisions: 3,
-                            label: 'Columns: $_columnCount',
-                            onChanged: (value) {
-                              setState(() {
-                                _columnCount = value.toInt();
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 1.0),
-                        ],
-                      ),
+                    ColumnSlider(
+                      initialCount: 3,
+                      columnCount: _columnCount,
+                      onChanged: (value) {
+                        setState(() {
+                          _columnCount = value;
+                        });
+                      },
                     ),
                   ],
                 ),

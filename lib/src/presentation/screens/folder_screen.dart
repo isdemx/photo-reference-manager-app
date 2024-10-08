@@ -1,11 +1,8 @@
-// lib/src/presentation/screens/folder_screen.dart
-
 import 'dart:io';
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:hive/hive.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
@@ -13,6 +10,8 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
@@ -27,6 +26,7 @@ class FolderScreen extends StatefulWidget {
 
 class _FolderScreenState extends State<FolderScreen> {
   bool _isPinterestLayout = false;
+  int _columnCount = 3; // начальное значение колонок
 
   void _showEditFolderDialog(BuildContext context, Folder folder) {
     final TextEditingController controller = TextEditingController();
@@ -65,7 +65,6 @@ class _FolderScreenState extends State<FolderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Инициализируем хелпер
     final PhotoShareHelper _shareHelper = PhotoShareHelper();
 
     return BlocProvider(
@@ -96,11 +95,8 @@ class _FolderScreenState extends State<FolderScreen> {
             IconButton(
               icon: const Icon(Icons.share),
               onPressed: () async {
-                // Получаем текущее состояние PhotoBloc
                 final photoState = context.read<PhotoBloc>().state;
-
                 if (photoState is PhotoLoaded) {
-                  // Фильтруем фотографии по папке
                   final List<Photo> photos = photoState.photos
                       .where(
                           (photo) => photo.folderIds.contains(widget.folder.id))
@@ -108,40 +104,18 @@ class _FolderScreenState extends State<FolderScreen> {
 
                   if (photos.isNotEmpty) {
                     try {
-                      // Вызываем хелпер для шаринга
-                      var shareResponse =
-                          await _shareHelper.shareMultiplePhotos(photos);
-                      // if (shareResponse) {
-                      //   ScaffoldMessenger.of(context).showSnackBar(
-                      //     SnackBar(
-                      //         content: Text('Photos shared suscessfully!')),
-                      //   );
-                      // }
+                      await _shareHelper.shareMultiplePhotos(photos);
                     } catch (e) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Error while sharing photos: $e')),
+                        SnackBar(
+                            content: Text('Error while sharing photos: $e')),
                       );
                     }
                   } else {
-                    // Показываем сообщение, если нет фотографий для шаринга
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('No photos for share')),
                     );
                   }
-                } else if (photoState is PhotoLoading) {
-                  // Показываем индикатор загрузки, если фотографии загружаются
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) =>
-                        Center(child: CircularProgressIndicator()),
-                  ).then((_) => Navigator.of(context)
-                      .pop()); // Закрываем диалог после загрузки
-                } else {
-                  // Показываем ошибку, если произошла ошибка при загрузке
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Ошибка при загрузке фотографий')),
-                  );
                 }
               },
             ),
@@ -160,38 +134,43 @@ class _FolderScreenState extends State<FolderScreen> {
                 return const Center(child: Text('No photos in this folder.'));
               }
 
-              return _isPinterestLayout
-                  ? MasonryGridView.count(
-                      padding: const EdgeInsets.all(4.0),
-                      crossAxisCount: 3,
-                      mainAxisSpacing: 16.0,
-                      crossAxisSpacing: 16.0,
-                      itemCount: photos.length,
-                      itemBuilder: (context, index) {
-                        return PhotoThumbnail(
-                          photos: photos,
-                          index: index,
-                          isPinterestLayout: true,
-                        );
-                      },
-                    )
-                  : GridView.builder(
-                      padding: const EdgeInsets.all(4.0),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        mainAxisSpacing: 4.0,
-                        crossAxisSpacing: 4.0,
+              return Stack(children: [
+                CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.all(8.0),
+                      sliver: PhotoGridView(
+                        photos: photos,
+                        pinterestView: _isPinterestLayout,
+                        columnCount: _columnCount,
+                        onPhotoTap: (photo, index) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PhotoViewerScreen(
+                                photos: photos,
+                                initialIndex: index,
+                              ),
+                            ),
+                          );
+                        },
+                        onDeleteTap: (photo) {
+                          context.read<PhotoBloc>().add(DeletePhoto(photo.id));
+                        },
                       ),
-                      itemCount: photos.length,
-                      itemBuilder: (context, index) {
-                        return PhotoThumbnail(
-                          photos: photos,
-                          index: index,
-                          isPinterestLayout: false,
-                        );
-                      },
-                    );
+                    ),
+                  ],
+                ),
+                ColumnSlider(
+                  initialCount: 4,
+                  columnCount: _columnCount,
+                  onChanged: (value) {
+                    setState(() {
+                      _columnCount = value;
+                    });
+                  },
+                ),
+              ]);
             } else {
               return const Center(child: Text('Failed to load photos.'));
             }
@@ -227,7 +206,6 @@ class PhotoThumbnail extends StatelessWidget {
     );
 
     if (isPinterestLayout) {
-      // В режиме Pinterest используем Image с автоматическим вычислением высоты
       imageWidget = ExtendedImage.file(
         File(fullPath),
         fit: BoxFit.cover,
@@ -236,7 +214,6 @@ class PhotoThumbnail extends StatelessWidget {
         clearMemoryCacheIfFailed: true,
       );
     } else {
-      // В стандартном режиме используем фиксированную ширину и высоту
       imageWidget = ExtendedImage.file(
         File(fullPath),
         fit: BoxFit.cover,
