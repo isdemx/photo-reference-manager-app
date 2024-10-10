@@ -85,7 +85,7 @@ class MainScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Refmana'),
+        title: const Text('Refma'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -240,6 +240,7 @@ class CategoryWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
+      shape: const Border(), // removes bordes somehow
       title: GestureDetector(
         onLongPress: () {
           // Здесь можно обрабатывать долгий тап на заголовок
@@ -317,7 +318,7 @@ class FolderWidget extends StatelessWidget {
         margin: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
           color: Color.fromARGB(255, 0, 0, 0), // Цвет фона
-          borderRadius: BorderRadius.circular(8.0), // Закругленные углы
+          borderRadius: BorderRadius.circular(4.0), // Закругленные углы
         ),
         clipBehavior:
             Clip.hardEdge, // Обрезка содержимого по границам контейнера
@@ -373,15 +374,15 @@ class FolderWidget extends StatelessWidget {
             // Отображаем название папки внизу
             Positioned(
               bottom: 0,
-              left: 0,
+              left: 10,
               right: 0,
               child: Container(
-                color: Colors.black54,
+                color: const Color.fromARGB(0, 177, 177, 177),
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: Text(
                   folder.name,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white),
+                  textAlign: TextAlign.left,
+                  style: const TextStyle(color: Color.fromRGBO(210, 209, 209, 1)),
                 ),
               ),
             ),

@@ -1,7 +1,6 @@
-// lib/src/presentation/screens/photo_viewer_screen.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
@@ -29,6 +28,7 @@ class PhotoViewerScreen extends StatefulWidget {
 
 class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   late PageController _pageController;
+  late ScrollController _thumbnailScrollController;
   late int _currentIndex;
   bool _showActions = true;
   bool _selectPhotoMode = false;
@@ -41,30 +41,33 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _currentIndex);
+    _thumbnailScrollController = ScrollController();
+
+    // Прокручиваем миниатюры к текущему индексу при запуске
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollToThumbnail(_currentIndex);
+    });
   }
 
   @override
   void dispose() {
-    // Сброс выбранных фотографий при уничтожении виджета
+    _pageController.dispose();
+    _thumbnailScrollController.dispose();
     _selectedPhotos.clear();
     super.dispose();
   }
 
   void _enableSelectPhotoMode() {
-    print('SETTTT bef $_selectPhotoMode');
     setState(() {
       _selectPhotoMode = true;
       // Добавляем текущую фотографию сразу при включении режима выбора
       _toggleSelection(widget.photos[_currentIndex]);
     });
-    print('SETTTT $_selectPhotoMode');
   }
 
   void _update() {
     setState(() {
-      // Здесь обновляем состояние
-      // Например, если у вас есть теги или папки, которые были добавлены,
-      // они будут перерендерены в виджете.
+      // Обновление состояния при добавлении тегов или папок
     });
   }
 
@@ -113,6 +116,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         Navigator.of(context).pop();
       } else {
         _pageController.jumpToPage(_currentIndex); // Переключаем галерею
+        _scrollToThumbnail(_currentIndex);
       }
     });
   }
@@ -120,6 +124,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   void _toggleActions() {
     setState(() {
       _showActions = !_showActions;
+      if (_showActions) {
+        // Показываем статус бар
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } else {
+        // Скрываем статус бар
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
     });
   }
 
@@ -142,6 +153,45 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
+  void _onThumbnailTap(int index) {
+    _pageController.jumpToPage(index);
+    setState(() {
+      _currentIndex = index;
+    });
+    _scrollToThumbnail(index);
+  }
+
+  void _scrollToThumbnail(int index) {
+    // final double screenWidth = MediaQuery.of(context).size.width;
+    // final double itemWidth = 50.0; // Ширина миниатюры
+    // final double offset =
+    //     index * itemWidth - (screenWidth / 2) + (itemWidth / 2);
+    // _thumbnailScrollController.animateTo(
+    //   offset.clamp(_thumbnailScrollController.position.minScrollExtent,
+    //       _thumbnailScrollController.position.maxScrollExtent),
+    //   duration: const Duration(milliseconds: 300),
+    //   curve: Curves.easeInOut,
+    // );
+  }
+
+  // Метод для обновления основного фото при прокрутке миниатюр
+  void _onThumbnailScroll() {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double itemWidth = 50.0; // Ширина миниатюры
+    final double scrollOffset = _thumbnailScrollController.offset;
+    final double centerPosition = scrollOffset + screenWidth / 2;
+
+    int index =
+        (centerPosition / itemWidth).floor().clamp(0, widget.photos.length - 1);
+
+    if (_currentIndex != index) {
+      _pageController.jumpToPage(index);
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final photos = widget.photos;
@@ -153,9 +203,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       appBar: _showActions
           ? AppBar(
               title: Text(
-                '${_currentIndex + 1}/${widget.photos.length}, Added ${formatDate(currentPhoto.dateAdded)}',
+                '${_currentIndex + 1}/${widget.photos.length}, ${formatDate(currentPhoto.dateAdded)}',
                 style: const TextStyle(
-                  fontSize: 12.0, // Размер шрифта
+                  fontSize: 14.0,
                 ),
               ),
               actions: [
@@ -165,8 +215,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       _toggleSelection(currentPhoto);
                     },
                     child: Padding(
-                      padding:
-                          const EdgeInsets.only(right: 16.0), // Отступ справа
+                      padding: const EdgeInsets.only(right: 16.0),
                       child: Container(
                         width: 32,
                         height: 32,
@@ -197,31 +246,78 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         onTap: _toggleActions,
         child: Stack(
           children: [
-            PageView.builder(
-              controller: _pageController,
-              itemCount: photos.length,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentIndex = index;
-                });
-              },
-              itemBuilder: (context, index) {
-                final photo = photos[index];
-                final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
-                return PhotoView(
-                  imageProvider: FileImage(File(fullPath)),
-                  errorBuilder: (context, error, stackTrace) {
-                    print('Error loading image: $error');
-                    return const Center(
-                      child:
-                          Icon(Icons.broken_image, size: 50, color: Colors.red),
-                    );
-                  },
-                );
-              },
+            Column(
+              children: [
+                // Основное фото
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    itemCount: photos.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentIndex = index;
+                      });
+                      _scrollToThumbnail(index);
+                    },
+                    itemBuilder: (context, index) {
+                      final photo = photos[index];
+                      final fullPath =
+                          PhotoPathHelper().getFullPath(photo.fileName);
+                      return PhotoView(
+                        imageProvider: FileImage(File(fullPath)),
+                        errorBuilder: (context, error, stackTrace) {
+                          print('Error loading image: $error');
+                          return const Center(
+                            child: Icon(Icons.broken_image,
+                                size: 50, color: Colors.red),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-            // Чекбокс в верхнем левом углу
+            // Фиксированные миниатюры
+            if (_showActions) // Галерея миниатюр
+              Positioned(
+                bottom: 120, // Зафиксировано вверху экрана
+                left: 0,
+                right: 0,
+                height: 50,
+                child: NotificationListener<ScrollNotification>(
+                  onNotification: (ScrollNotification scrollInfo) {
+                    if (scrollInfo is ScrollUpdateNotification) {
+                      _onThumbnailScroll();
+                    }
+                    return false;
+                  },
+                  child: ListView.builder(
+                    controller: _thumbnailScrollController,
+                    scrollDirection: Axis.horizontal,
+                    itemCount: photos.length,
+                    itemBuilder: (context, index) {
+                      final photo = photos[index];
+                      final fullPath =
+                          PhotoPathHelper().getFullPath(photo.fileName);
 
+                      return GestureDetector(
+                        onTap: () => _onThumbnailTap(index),
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          margin: const EdgeInsets.symmetric(horizontal: 1.0),
+                          child: Image.file(
+                            File(fullPath),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            // Actions
             if (_showActions)
               Positioned(
                 bottom: 0,
@@ -231,16 +327,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   photo: photos[_currentIndex],
                   isSelectionMode:
                       _selectedPhotos.isNotEmpty || _selectPhotoMode,
-                  enableSelectPhotoMode:
-                      _enableSelectPhotoMode, // Передаем метод для включения режима выбора
+                  enableSelectPhotoMode: _enableSelectPhotoMode,
                   onShare: () {
-                    _shareSelectedPhotos(); // Шаринг выбранных фото
+                    _shareSelectedPhotos();
                   },
                   update: _update,
-                  deletePhoto: () =>
-                      _confirmDelete(context), // Передаем функцию как указатель
+                  deletePhoto: () => _confirmDelete(context),
                   onCancel: () {
-                    _clearSelection(); // Сброс выбора фото
+                    _clearSelection();
                   },
                 ),
               ),
@@ -260,7 +354,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       if (shared) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Shared uccessfully'),
+              content: Text('Shared successfully'),
               duration: Duration(seconds: 1)),
         );
       }
@@ -279,9 +373,9 @@ class ActionBar extends StatelessWidget {
   final bool isSelectionMode;
   final VoidCallback onShare;
   final VoidCallback onCancel;
-  final VoidCallback enableSelectPhotoMode; // Новый параметр
-  final VoidCallback update; // Новый параметр
-  final VoidCallback deletePhoto; // Новый параметр
+  final VoidCallback enableSelectPhotoMode;
+  final VoidCallback update;
+  final VoidCallback deletePhoto;
 
   const ActionBar({
     Key? key,
@@ -352,8 +446,7 @@ class ActionBar extends StatelessWidget {
                   Expanded(
                     child: IconButton(
                       icon: const Icon(Icons.share, color: Colors.white),
-                      onPressed:
-                          enableSelectPhotoMode, // Вызываем метод из родительского виджета
+                      onPressed: enableSelectPhotoMode,
                       tooltip: 'Share Photos',
                     ),
                   ),
@@ -361,9 +454,8 @@ class ActionBar extends StatelessWidget {
                     child: IconButton(
                       icon: const Icon(Icons.delete,
                           color: Color.fromARGB(255, 120, 13, 13)),
-                      onPressed:
-                          deletePhoto, // Вызываем метод из родительского виджета
-                      tooltip: 'Share Photos',
+                      onPressed: deletePhoto,
+                      tooltip: 'Delete Photo',
                     ),
                   ),
                 ],

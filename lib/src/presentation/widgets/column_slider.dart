@@ -15,7 +15,7 @@ class ColumnSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      bottom: 16.0,
+      bottom: 26.0,
       left: 150.0,
       right: 50.0,
       child: Column(
