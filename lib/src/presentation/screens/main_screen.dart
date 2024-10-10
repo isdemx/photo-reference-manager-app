@@ -335,7 +335,7 @@ class FolderWidget extends StatelessWidget {
 
                   if (photos.isNotEmpty) {
                     // Получаем последнюю фотографию
-                    final lastPhoto = photos.last;
+                    final lastPhoto = photos.first;
                     final fullPath =
                         PhotoPathHelper().getFullPath(lastPhoto.fileName);
 
