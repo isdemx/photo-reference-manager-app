@@ -54,29 +54,123 @@ class MainScreen extends StatelessWidget {
     );
   }
 
+  void _confirmDeleteCategory(BuildContext context, Category category) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Category"),
+          content: const Text("Are you sure you want to delete this category?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Отмена
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                context.read<CategoryBloc>().add(DeleteCategory(category.id));
+                Navigator.of(context).pop(); // Закрываем диалог подтверждения
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditFolderDialog(BuildContext context, Folder folder) {
+    final TextEditingController _controller = TextEditingController();
+    _controller.text = folder.name;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Folder Name'),
+          content: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Folder Name'),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрываем диалог редактирования
+                _confirmDeleteFolder(
+                    context, folder); // Показываем диалог подтверждения
+              },
+            ),
+            TextButton(
+              onPressed: () {
+                final String newName = _controller.text.trim();
+                if (newName.isNotEmpty) {
+                  // Обновляем имя папки
+                  final updatedFolder = folder.copyWith(name: newName);
+                  context.read<FolderBloc>().add(UpdateFolder(updatedFolder));
+                  Navigator.of(context).pop(); // Закрываем диалог
+                }
+              },
+              child: const Text('OK'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Закрываем диалог
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteFolder(BuildContext context, Folder folder) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Folder"),
+          content: const Text("Are you sure you want to delete this folder?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Отмена
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                context.read<FolderBloc>().add(DeleteFolder(folder.id));
+                Navigator.of(context).pop(); // Закрываем диалог подтверждения
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _exportDatabase(BuildContext context) async {
     await exportDatabase(context);
   }
 
   Future<void> _importDatabase(BuildContext context) async {
     try {
-      // Импортируем базу данных
+      // Import the database
       await importDatabase(context);
 
-      // Обновляем состояние блоков
+      // Update the blocs
       context.read<PhotoBloc>().add(LoadPhotos());
       context.read<TagBloc>().add(LoadTags());
       context.read<CategoryBloc>().add(LoadCategories());
       context.read<FolderBloc>().add(LoadFolders());
 
-      // Показываем успешное уведомление
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Database imported succesfully')),
+        const SnackBar(content: Text('Database imported successfully')),
       );
     } catch (e) {
-      // Если произошла ошибка, показываем уведомление об ошибке
+      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not import databse')),
+        const SnackBar(content: Text('Could not import database')),
       );
     }
   }
@@ -90,7 +184,7 @@ class MainScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              // Открыть диалог добавления категории
+              // Open add category dialog
               _showAddCategoryDialog(context);
             },
           ),
@@ -112,27 +206,13 @@ class MainScreen extends StatelessWidget {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.label), // Иконка для тегов
+            icon: const Icon(Icons.label),
             onPressed: () {
-              Navigator.pushNamed(
-                  context, '/all_tags'); // Навигация на AllTagsScreen
+              Navigator.pushNamed(context, '/all_tags');
             },
-            tooltip: 'All Tags', // Подсказка при наведении
+            tooltip: 'All Tags',
           ),
-          // IconButton(
-          //   icon: const Icon(Icons.download),
-          //   onPressed: () {
-          //     _exportDatabase(context);
-          //   },
-          //   tooltip: 'Экспорт базы данных',
-          // ),
-          // IconButton(
-          //   icon: const Icon(Icons.upload),
-          //   onPressed: () {
-          //     _importDatabase(context);
-          //   },
-          //   tooltip: 'Импорт базы данных',
-          // ),
+          // Additional icons can be added here if needed
         ],
       ),
       body: BlocBuilder<CategoryBloc, CategoryState>(
@@ -140,7 +220,22 @@ class MainScreen extends StatelessWidget {
           if (categoryState is CategoryLoading) {
             return const Center(child: CircularProgressIndicator());
           } else if (categoryState is CategoryLoaded) {
-            final categories = categoryState.categories;
+            var categories = categoryState.categories;
+            // categories = [];
+
+            if (categories.isEmpty) {
+              // Display instructions when there are no categories
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Text(
+                    'Welcome to Refma!\n\nTo get started, add a category by pressing the "+" button in the app bar. Within a category, you can create folders to organize your photos.\n\nUse the upload button at the top to add photos, and the photo library button to view all your photos.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16.0),
+                  ),
+                ),
+              );
+            }
 
             return ListView.builder(
               itemCount: categories.length,
@@ -150,6 +245,7 @@ class MainScreen extends StatelessWidget {
               },
             );
           } else {
+            // Handle other states if necessary
             return const Center(child: Text('No categories available.'));
           }
         },
@@ -202,8 +298,7 @@ class CategoryWidget extends StatelessWidget {
 
   void _showEditCategoryDialog(BuildContext context, Category category) {
     final TextEditingController _controller = TextEditingController();
-    _controller.text =
-        category.name; 
+    _controller.text = category.name;
 
     showDialog(
       context: context,
@@ -215,11 +310,18 @@ class CategoryWidget extends StatelessWidget {
             decoration: const InputDecoration(hintText: 'Category Name'),
           ),
           actions: [
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрываем диалог редактирования
+                _confirmDeleteCategory(context, category); // Показываем диалог подтверждения
+              },
+            ),
             TextButton(
               onPressed: () {
                 final String newName = _controller.text.trim();
                 if (newName.isNotEmpty) {
-                  // Обновляем имя папки, если было введено новое
+                  // Обновляем имя категории
                   final updatedCategory = category.copyWith(name: newName);
                   context.read<CategoryBloc>().add(UpdateCategory(updatedCategory));
                   Navigator.of(context).pop(); // Закрываем диалог
@@ -237,15 +339,39 @@ class CategoryWidget extends StatelessWidget {
     );
   }
 
+  void _confirmDeleteCategory(BuildContext context, Category category) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Category"),
+          content: const Text("Are you sure you want to delete this category?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Отмена
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                context.read<CategoryBloc>().add(DeleteCategory(category.id));
+                Navigator.of(context).pop(); // Закрываем диалог подтверждения
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ExpansionTile(
-      shape: const Border(), // removes bordes somehow
+      shape: const Border(),
       title: GestureDetector(
         onLongPress: () {
-          // Здесь можно обрабатывать долгий тап на заголовок
+          // Открываем диалог редактирования категории
           _showEditCategoryDialog(context, category);
-          // Добавьте здесь нужное действие
         },
         child: Text(category.name),
       ),
@@ -280,7 +406,7 @@ class CategoryWidget extends StatelessWidget {
                 itemCount: folders.length,
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
-                  childAspectRatio: 1, // Установите соотношение сторон
+                  childAspectRatio: 1,
                 ),
                 itemBuilder: (context, index) {
                   final folder = folders[index];
@@ -302,6 +428,74 @@ class FolderWidget extends StatelessWidget {
 
   const FolderWidget({Key? key, required this.folder}) : super(key: key);
 
+  void _showEditFolderDialog(BuildContext context, Folder folder) {
+    final TextEditingController _controller = TextEditingController();
+    _controller.text = folder.name;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Folder Name'),
+          content: TextField(
+            controller: _controller,
+            decoration: const InputDecoration(hintText: 'Folder Name'),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрываем диалог редактирования
+                _confirmDeleteFolder(context, folder); // Показываем диалог подтверждения
+              },
+            ),
+            TextButton(
+              onPressed: () {
+                final String newName = _controller.text.trim();
+                if (newName.isNotEmpty) {
+                  // Обновляем имя папки
+                  final updatedFolder = folder.copyWith(name: newName);
+                  context.read<FolderBloc>().add(UpdateFolder(updatedFolder));
+                  Navigator.of(context).pop(); // Закрываем диалог
+                }
+              },
+              child: const Text('OK'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Закрываем диалог
+              child: const Text('Cancel'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDeleteFolder(BuildContext context, Folder folder) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Folder"),
+          content: const Text("Are you sure you want to delete this folder?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(), // Отмена
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                context.read<FolderBloc>().add(DeleteFolder(folder.id));
+                Navigator.of(context).pop(); // Закрываем диалог подтверждения
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Отображение виджета папки с изображением и названием
@@ -314,14 +508,17 @@ class FolderWidget extends StatelessWidget {
           arguments: folder,
         );
       },
+      onLongPress: () {
+        // Открываем диалог редактирования папки
+        _showEditFolderDialog(context, folder);
+      },
       child: Container(
         margin: const EdgeInsets.all(8.0),
         decoration: BoxDecoration(
-          color: Color.fromARGB(255, 0, 0, 0), // Цвет фона
-          borderRadius: BorderRadius.circular(4.0), // Закругленные углы
+          color: const Color.fromARGB(255, 0, 0, 0),
+          borderRadius: BorderRadius.circular(4.0),
         ),
-        clipBehavior:
-            Clip.hardEdge, // Обрезка содержимого по границам контейнера
+        clipBehavior: Clip.hardEdge,
         child: Stack(
           alignment: Alignment.center,
           children: [
@@ -341,7 +538,7 @@ class FolderWidget extends StatelessWidget {
 
                     return Image.file(
                       File(fullPath),
-                      fit: BoxFit.cover, // Фото заполняет весь контейнер
+                      fit: BoxFit.cover,
                       width: double.infinity,
                       height: double.infinity,
                     );
@@ -362,7 +559,7 @@ class FolderWidget extends StatelessWidget {
                   // Ошибка загрузки фотографий, показываем иконку папки
                   return Container(
                     color: Colors.grey[800],
-                    child: Icon(
+                    child: const Icon(
                       Icons.folder,
                       size: 50,
                       color: Colors.white,

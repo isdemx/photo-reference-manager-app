@@ -7,4 +7,5 @@ abstract class PhotoRepository {
   Future<List<Photo>> getPhotos();
   Future<void> deletePhoto(String id);
   Future<void> updatePhoto(Photo photo);
+  Future<void> clearTemporaryFiles();
 }

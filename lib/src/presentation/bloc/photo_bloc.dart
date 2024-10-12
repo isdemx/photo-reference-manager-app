@@ -17,6 +17,7 @@ class PhotoBloc extends Bloc<PhotoEvent, PhotoState> {
     on<PhotosAdded>(_onPhotosAdded);
     on<DeletePhoto>(_onDeletePhoto);
     on<UpdatePhoto>(_onUpdatePhoto);
+    on<ClearTemporaryFiles>(_onClearTemporaryFiles);
   }
 
   Future<void> _onLoadPhotos(LoadPhotos event, Emitter<PhotoState> emit) async {
@@ -66,6 +67,18 @@ class PhotoBloc extends Bloc<PhotoEvent, PhotoState> {
       add(LoadPhotos());
     } catch (e) {
       emit(const PhotoError('Failed to update photo'));
+    }
+  }
+
+  Future<void> _onClearTemporaryFiles(
+      ClearTemporaryFiles event, Emitter<PhotoState> emit) async {
+    print('_onClearTemporaryFiles');
+    try {
+      await photoRepository.clearTemporaryFiles();
+      print('Temporary files cleared');
+    } catch (e) {
+      print('Temporary files cleared ERROR: $e');
+      emit(const PhotoError('Failed to clear temporary files'));
     }
   }
 }

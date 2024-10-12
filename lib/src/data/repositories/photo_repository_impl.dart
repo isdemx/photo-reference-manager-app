@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:photographers_reference_app/src/data/utils/compress_photo_isolate.dart';
+import 'package:photographers_reference_app/src/data/utils/get_ios_temporary_directory.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/repositories/photo_repository.dart';
 
@@ -104,5 +105,31 @@ class PhotoRepositoryImpl implements PhotoRepository {
   @override
   Future<void> updatePhoto(Photo photo) async {
     await photo.save();
+  }
+
+  Future<void> clearTemporaryFiles() async {
+    final tempDir = await getIosTemporaryDirectory();
+    print('Temporary directory path: ${tempDir.path}');
+
+    if (await tempDir.exists()) {
+      try {
+        await for (var entity in tempDir.list(recursive: true)) {
+          try {
+            if (entity is File) {
+              await entity.delete();
+              print('Deleted file: ${entity.path}');
+            } else if (entity is Directory) {
+              await entity.delete(recursive: true);
+              print('Deleted directory: ${entity.path}');
+            }
+          } catch (e) {
+            print('Error deleting ${entity.path}: $e');
+          }
+        }
+        print('Temporary files deleted');
+      } catch (e) {
+        print('Error while deleting temporary files: $e');
+      }
+    }
   }
 }

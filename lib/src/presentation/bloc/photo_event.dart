@@ -46,3 +46,8 @@ class PhotosAdded extends PhotoEvent {
   @override
   List<Object> get props => [photos];
 }
+
+class ClearTemporaryFiles extends PhotoEvent {
+  @override
+  List<Object> get props => [];
+}
