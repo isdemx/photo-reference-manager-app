@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
@@ -8,7 +5,6 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
-import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class TagScreen extends StatefulWidget {
