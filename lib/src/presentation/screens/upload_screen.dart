@@ -33,96 +33,94 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Future<void> _uploadImages() async {
-  if (_images != null && _images!.isNotEmpty) {
-    setState(() {
-      _isUploading = true;
-      _uploadedCount = 0;
-      _stopRequested = false;
-    });
-
-    // Включаем Wakelock
-    WakelockPlus.enable();
-
-    final photoRepository =
-        RepositoryProvider.of<PhotoRepositoryImpl>(context);
-    List<Photo> addedPhotos = [];
-
-    for (var i = 0; i < _images!.length; i++) {
-      if (_stopRequested) {
-        break;
-      }
-
-      final image = _images![i];
-
-      final photo = Photo(
-        id: const Uuid().v4(),
-        path: image.path,
-        folderIds: [],
-        tagIds: [],
-        comment: '',
-        dateAdded: DateTime.now(),
-        sortOrder: 0,
-        fileName: path_package.basename(image.path),
-        isStoredInApp: true,
-      );
-
-      try {
-        // Добавляем фото в репозиторий (асинхронно)
-        await photoRepository.addPhoto(photo);
-
-        // Добавляем фото в список добавленных
-        addedPhotos.add(photo);
-
-        setState(() {
-          _uploadedCount++;
-        });
-      } catch (e) {
-        // Обработка ошибок при добавлении фото
-        print('Error adding photo: $e');
-      }
-    }
-
-    // Отключаем Wakelock
-    WakelockPlus.disable();
-
-    setState(() {
-      _isUploading = false;
-      if (_stopRequested) {
-        // Удаляем оставшиеся изображения из списка
-        _images = _images!.sublist(0, _uploadedCount);
-      } else {
-        _images = null;
-      }
-    });
-
-    // Обновляем состояние PhotoBloc
-    context.read<PhotoBloc>().add(LoadPhotos());
-
-    if (!_stopRequested) {
-      context.read<PhotoBloc>().add(PhotosAdded(addedPhotos));
-
-      // Показ лоадера на время удаления временных файлов
+    if (_images != null && _images!.isNotEmpty) {
       setState(() {
-        _isUploading = true;  // Включаем лоадер для удаления
+        _isUploading = true;
+        _uploadedCount = 0;
+        _stopRequested = false;
       });
 
-      print('Bef creal');
+      // Включаем Wakelock
+      WakelockPlus.enable();
 
-      context.read<PhotoBloc>().add(ClearTemporaryFiles());
+      final photoRepository =
+          RepositoryProvider.of<PhotoRepositoryImpl>(context);
+      List<Photo> addedPhotos = [];
 
-      print('Aft creal');
-      
+      for (var i = 0; i < _images!.length; i++) {
+        if (_stopRequested) {
+          break;
+        }
 
-      // Скрываем лоадер после удаления временных файлов
+        final image = _images![i];
+
+        final photo = Photo(
+          id: const Uuid().v4(),
+          path: image.path,
+          folderIds: [],
+          tagIds: [],
+          comment: '',
+          dateAdded: DateTime.now(),
+          sortOrder: 0,
+          fileName: path_package.basename(image.path),
+          isStoredInApp: true,
+        );
+
+        try {
+          // Добавляем фото в репозиторий (асинхронно)
+          await photoRepository.addPhoto(photo);
+
+          // Добавляем фото в список добавленных
+          addedPhotos.add(photo);
+
+          setState(() {
+            _uploadedCount++;
+          });
+        } catch (e) {
+          // Обработка ошибок при добавлении фото
+          print('Error adding photo: $e');
+        }
+      }
+
+      // Отключаем Wakelock
+      WakelockPlus.disable();
+
       setState(() {
         _isUploading = false;
+        if (_stopRequested) {
+          // Удаляем оставшиеся изображения из списка
+          _images = _images!.sublist(0, _uploadedCount);
+        } else {
+          _images = null;
+        }
       });
 
-      Navigator.pop(context);
+      // Обновляем состояние PhotoBloc
+      context.read<PhotoBloc>().add(LoadPhotos());
+
+      if (!_stopRequested) {
+        context.read<PhotoBloc>().add(PhotosAdded(addedPhotos));
+
+        // Показ лоадера на время удаления временных файлов
+        setState(() {
+          _isUploading = true; // Включаем лоадер для удаления
+        });
+
+        print('Bef creal');
+
+        context.read<PhotoBloc>().add(ClearTemporaryFiles());
+
+        print('Aft creal');
+
+        // Скрываем лоадер после удаления временных файлов
+        setState(() {
+          _isUploading = false;
+        });
+
+        Navigator.pop(context);
+      }
     }
   }
-}
-
 
   void _stopUpload() {
     setState(() {
@@ -173,9 +171,13 @@ class _UploadScreenState extends State<UploadScreen> {
                         },
                       ),
                     ),
-                    ElevatedButton(
-                      onPressed: _isUploading ? null : _uploadImages,
-                      child: const Text('Upload'),
+                    Padding(
+                      padding: const EdgeInsets.only(
+                          bottom: 50.0),
+                      child: ElevatedButton(
+                        onPressed: _isUploading ? null : _uploadImages,
+                        child: const Text('Upload'),
+                      ),
                     ),
                   ],
                 ),
