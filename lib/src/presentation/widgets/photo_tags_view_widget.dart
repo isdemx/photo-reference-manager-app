@@ -9,18 +9,23 @@ import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart'
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
-class PhotoTagsViewWidget extends StatelessWidget {
+class PhotoTagsViewWidget extends StatefulWidget {
   final Photo photo;
 
   const PhotoTagsViewWidget({Key? key, required this.photo}) : super(key: key);
 
+  @override
+  _PhotoTagsViewWidgetState createState() => _PhotoTagsViewWidgetState();
+}
+
+class _PhotoTagsViewWidgetState extends State<PhotoTagsViewWidget> {
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<TagBloc, TagState>(
       builder: (context, tagState) {
         if (tagState is TagLoaded) {
           final tags = tagState.tags
-              .where((tag) => photo.tagIds.contains(tag.id))
+              .where((tag) => widget.photo.tagIds.contains(tag.id))
               .toList();
 
           return SingleChildScrollView(
@@ -58,9 +63,11 @@ class PhotoTagsViewWidget extends StatelessWidget {
                       visualDensity: VisualDensity(
                           horizontal: -2.0, vertical: -2.0), // Настройка плотности для уменьшения высоты
                       onDeleted: () {
-                        // Удаление тега из фотографии
-                        photo.tagIds.remove(tag.id);
-                        context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                        setState(() {
+                          // Удаление тега из фотографии и обновление состояния
+                          widget.photo.tagIds.remove(tag.id);
+                          context.read<PhotoBloc>().add(UpdatePhoto(widget.photo));
+                        });
                       },
                     ),
                   ),

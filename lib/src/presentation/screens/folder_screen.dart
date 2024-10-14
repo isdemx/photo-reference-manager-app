@@ -55,14 +55,13 @@ class _FolderScreenState extends State<FolderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    
-    return BlocProvider(
-      create: (context) => PhotoBloc(
-        photoRepository: PhotoRepositoryImpl(Hive.box('photos')),
-      )..add(LoadPhotos()),
+    return BlocProvider.value(
+      value:
+          BlocProvider.of<PhotoBloc>(context), // Используем существующий блок
       child: Scaffold(
         body: BlocBuilder<PhotoBloc, PhotoState>(
           builder: (context, photoState) {
+            print('IPDATE FOLDER');
             if (photoState is PhotoLoading) {
               return const Center(child: CircularProgressIndicator());
             } else if (photoState is PhotoLoaded) {
@@ -71,20 +70,24 @@ class _FolderScreenState extends State<FolderScreen> {
                   .toList();
 
               if (photos.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text('No photos in this folder.'),
-                      const SizedBox(
-                          height: 20), // Отступ между текстом и кнопкой
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/upload');
-                        },
-                        child: const Text('Upload'),
-                      ),
-                    ],
+                return Scaffold(
+                  appBar: AppBar(
+                    title: Text(widget.folder.name),
+                  ),
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('No photos in this folder.'),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pushNamed(context, '/upload');
+                          },
+                          child: const Text('Upload'),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }

@@ -34,19 +34,21 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   bool _isPinterestLayout = false;
   final PhotoShareHelper _shareHelper = PhotoShareHelper();
 
-  Future<void> _onShareTap(BuildContext context, List<Photo> photos) async {
+  Future<bool> _onShareTap(BuildContext context, List<Photo> photos) async {
     if (photos.isNotEmpty) {
       try {
-        await _shareHelper.shareMultiplePhotos(photos);
+        return await _shareHelper.shareMultiplePhotos(photos);
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error while sharing photos: $e')),
         );
+        return false;
       }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('No photos for share')),
       );
+      return false;
     }
   }
 
@@ -108,13 +110,18 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     );
   }
 
-  void _onSelectedAddToFolderPressed() {
-    // Пустой метод для кнопки "add to folder"
-  }
-
   Future<void> _onSelectedSharePressed(BuildContext context) async {
-    await _onShareTap(context, _selectedPhotos);
-    _turnMultiSelectModeOff();
+    bool shareResult = await _onShareTap(context, _selectedPhotos);
+    if (shareResult) {
+      _turnMultiSelectModeOff();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Images were sucessfully shared'),
+          duration:
+              Duration(milliseconds: 1000), // Продолжительность 0.5 секунды
+        ),
+      );
+    }
   }
 
   void _onDeletePressed(BuildContext context, List<Photo> photos) {
@@ -289,12 +296,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     onFolderAdded: () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text('Photos added'),
+                          content: Text('Applied'),
                           duration: Duration(
                               milliseconds:
-                                  500), // Продолжительность 0.5 секунды
+                                  1000), // Продолжительность 0.5 секунды
                         ),
                       );
+                      _turnMultiSelectModeOff();
                     },
                   ),
                   IconButton(
@@ -302,7 +310,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     onPressed: () => _onSelectedSharePressed(context),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Color.fromARGB(255, 120, 13, 13)),
+                    icon: const Icon(Icons.delete,
+                        color: Color.fromARGB(255, 120, 13, 13)),
                     onPressed: () => _onDeletePressed(context, _selectedPhotos),
                   ),
                 ],
