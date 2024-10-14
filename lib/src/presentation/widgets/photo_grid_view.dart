@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
@@ -29,7 +30,7 @@ class PhotoGridView extends StatefulWidget {
 
 class _PhotoGridViewState extends State<PhotoGridView> {
   bool _isMultiSelect = false;
-  List<Photo> _selectedPhotos = [];
+  final List<Photo> _selectedPhotos = [];
   int _columnCount = 3; // Начальное значение колонок
   bool _isPinterestLayout = false;
   final PhotoShareHelper _shareHelper = PhotoShareHelper();
@@ -39,15 +40,11 @@ class _PhotoGridViewState extends State<PhotoGridView> {
       try {
         return await _shareHelper.shareMultiplePhotos(photos);
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error while sharing photos: $e')),
-        );
+        CustomSnackBar.showError(context, 'Error while sharing photos: $e');
         return false;
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No photos for share')),
-      );
+      CustomSnackBar.showError(context, 'No photos for share');
       return false;
     }
   }
@@ -114,13 +111,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     bool shareResult = await _onShareTap(context, _selectedPhotos);
     if (shareResult) {
       _turnMultiSelectModeOff();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Images were sucessfully shared'),
-          duration:
-              Duration(milliseconds: 1000), // Продолжительность 0.5 секунды
-        ),
-      );
+      CustomSnackBar.showSuccess(context, 'Images were sucessfully shared');
     }
   }
 
@@ -294,14 +285,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                   AddToFolderWidget(
                     photos: _selectedPhotos,
                     onFolderAdded: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Applied'),
-                          duration: Duration(
-                              milliseconds:
-                                  1000), // Продолжительность 0.5 секунды
-                        ),
-                      );
+                      CustomSnackBar.showSuccess(context, 'Applied');
                       _turnMultiSelectModeOff();
                     },
                   ),

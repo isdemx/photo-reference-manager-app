@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
@@ -350,18 +351,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     try {
       var shared = await _shareHelper.shareMultiplePhotos(_selectedPhotos);
       if (shared) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Shared successfully'),
-              duration: Duration(seconds: 1)),
-        );
+        CustomSnackBar.showSuccess(context, 'Shared successfully');
       }
 
       _clearSelection();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sharing error: $e')),
-      );
+      CustomSnackBar.showError(context, 'Sharing error: $e');
     }
   }
 }

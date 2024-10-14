@@ -7,6 +7,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:uuid/uuid.dart';
 
@@ -207,18 +208,14 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
           BlocListener<TagBloc, TagState>(
             listener: (context, state) {
               if (state is TagError) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.message)),
-                );
+                CustomSnackBar.showError(context, state.message);
               }
             },
           ),
           BlocListener<PhotoBloc, PhotoState>(
             listener: (context, state) {
               if (state is PhotoError) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.message)),
-                );
+                CustomSnackBar.showError(context, state.message);
               }
             },
           ),

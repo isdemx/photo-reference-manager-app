@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class PhotoActionsService {
@@ -17,14 +18,10 @@ class PhotoActionsService {
     try {
       var shared = await shareHelper.shareMultiplePhotos(photos);
       if (shared) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Shared successfully'), duration: Duration(seconds: 1)),
-        );
+        CustomSnackBar.showSuccess(context, 'Shared successfully');
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sharing error: $e')),
-      );
+      CustomSnackBar.showError(context, 'Sharing error: $e');
     }
   }
 
