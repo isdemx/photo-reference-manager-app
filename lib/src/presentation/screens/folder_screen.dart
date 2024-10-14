@@ -131,7 +131,22 @@ class _FolderScreenState extends State<FolderScreen> {
                   .toList();
 
               if (photos.isEmpty) {
-                return const Center(child: Text('No photos in this folder.'));
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text('No photos in this folder.'),
+                      const SizedBox(
+                          height: 20), // Отступ между текстом и кнопкой
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/upload');
+                        },
+                        child: const Text('Upload'),
+                      ),
+                    ],
+                  ),
+                );
               }
 
               return Stack(children: [
