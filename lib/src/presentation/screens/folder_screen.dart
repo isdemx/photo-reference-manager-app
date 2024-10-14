@@ -93,6 +93,7 @@ class _FolderScreenState extends State<FolderScreen> {
 
               return PhotoGridView(
                 title: '${widget.folder.name} (${photos.length})',
+                showShareBtn: true,
                 photos: photos,
                 actionFromParent: IconButton(
                   icon: const Icon(Icons.edit),

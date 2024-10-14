@@ -12,12 +12,14 @@ class PhotoGridView extends StatefulWidget {
   final List<Photo> photos;
   final Widget? actionFromParent;
   final String title;
+  final bool? showShareBtn;
 
   const PhotoGridView({
     Key? key,
     required this.photos,
     this.actionFromParent,
     required this.title,
+    this.showShareBtn,
   }) : super(key: key);
 
   @override
@@ -102,7 +104,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
 
   @override
   Widget build(BuildContext context) {
-
     String titleText = widget.title;
     return Stack(children: [
       CustomScrollView(
@@ -112,8 +113,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
             pinned: true,
             title: Row(
               children: [
-                if (widget.actionFromParent != null) widget.actionFromParent!,
                 Expanded(child: Text(titleText)),
+                if (widget.actionFromParent != null) widget.actionFromParent!,
               ],
             ),
             actions: [
@@ -129,28 +130,30 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     ? 'Switch to Grid View'
                     : 'Switch to Pinterest View',
               ),
-              IconButton(
-                icon: const Icon(Icons.share),
-                onPressed: () async {
-                  final photoState = context.read<PhotoBloc>().state;
-                  if (photoState is PhotoLoaded) {
-                    if (widget.photos.isNotEmpty) {
-                      try {
-                        await _shareHelper.shareMultiplePhotos(widget.photos);
-                      } catch (e) {
+              if (widget.showShareBtn == true)
+                IconButton(
+                  icon: const Icon(Icons.share),
+                  onPressed: () async {
+                    final photoState = context.read<PhotoBloc>().state;
+                    if (photoState is PhotoLoaded) {
+                      if (widget.photos.isNotEmpty) {
+                        try {
+                          await _shareHelper.shareMultiplePhotos(widget.photos);
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Error while sharing photos: $e')),
+                          );
+                        }
+                      } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text('Error while sharing photos: $e')),
+                          SnackBar(content: Text('No photos for share')),
                         );
                       }
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('No photos for share')),
-                      );
                     }
-                  }
-                },
-              ),
+                  },
+                ),
             ],
           ),
           SliverPadding(
