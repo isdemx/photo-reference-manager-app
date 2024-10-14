@@ -14,7 +14,6 @@ import 'package:photographers_reference_app/src/presentation/screens/upload_scre
 import 'package:photographers_reference_app/src/presentation/widgets/category_widget.dart';
 import 'package:photographers_reference_app/src/utils/export_database.dart';
 import 'package:photographers_reference_app/src/utils/import_database.dart';
-import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:uuid/uuid.dart';
 
 class MainScreen extends StatelessWidget {
@@ -201,13 +200,26 @@ class MainScreen extends StatelessWidget {
 
             if (categories.isEmpty) {
               // Display instructions when there are no categories
-              return const Center(
+              return Center(
                 child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: Text(
-                    'Welcome to Refma!\n\nTo get started, add a category by pressing the "+" button in the app bar. Within a category, you can create folders to organize your photos.\n\nUse the upload button at the top to add photos, and the photo library button to view all your photos.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 16.0),
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Text(
+                        'Welcome to Refma!\n\nTo get started, upload your first photo using the "Upload" button below. You can also create categories and folders to organize your photos efficiently.\n\nUse the "+" button in the app bar to create new category, and within each category, you can add folders to manage your collection.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16.0),
+                      ),
+                      const SizedBox(
+                          height: 20), // Отступ между текстом и кнопкой
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/upload');
+                        },
+                        child: const Text('Upload'),
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -229,5 +241,3 @@ class MainScreen extends StatelessWidget {
     );
   }
 }
-
-
