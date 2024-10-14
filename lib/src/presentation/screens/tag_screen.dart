@@ -3,7 +3,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class TagScreen extends StatefulWidget {
   final Tag tag;
@@ -15,12 +14,9 @@ class TagScreen extends StatefulWidget {
 }
 
 class _TagScreenState extends State<TagScreen> {
-  bool _isPinterestLayout = false;
-  int _columnCount = 3; // начальное количество колонок
 
   @override
   Widget build(BuildContext context) {
-    final PhotoShareHelper _shareHelper = PhotoShareHelper();
 
     return Scaffold(
       body: BlocBuilder<PhotoBloc, PhotoState>(

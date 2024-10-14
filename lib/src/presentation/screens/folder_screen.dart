@@ -7,7 +7,6 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class FolderScreen extends StatefulWidget {
   final Folder folder;
@@ -56,8 +55,7 @@ class _FolderScreenState extends State<FolderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final PhotoShareHelper _shareHelper = PhotoShareHelper();
-
+    
     return BlocProvider(
       create: (context) => PhotoBloc(
         photoRepository: PhotoRepositoryImpl(Hive.box('photos')),

@@ -117,10 +117,10 @@ class PhotoRepositoryImpl implements PhotoRepository {
           try {
             if (entity is File) {
               await entity.delete();
-              print('Deleted file: ${entity.path}');
+              print('Deleted cache file');
             } else if (entity is Directory) {
               await entity.delete(recursive: true);
-              print('Deleted directory: ${entity.path}');
+              print('Deleted cache directory');
             }
           } catch (e) {
             print('Error deleting ${entity.path}: $e');

@@ -4,6 +4,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
 import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
@@ -33,8 +34,24 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   bool _isPinterestLayout = false;
   final PhotoShareHelper _shareHelper = PhotoShareHelper();
 
-  void _onDeleteTap(context, photo) {
-    context.read<PhotoBloc>().add(DeletePhoto(photo.id));
+  Future<void> _onShareTap(BuildContext context, List<Photo> photos) async {
+    if (photos.isNotEmpty) {
+      try {
+        await _shareHelper.shareMultiplePhotos(photos);
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error while sharing photos: $e')),
+        );
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No photos for share')),
+      );
+    }
+  }
+
+  void _onPhotoDelete(BuildContext context, Photo photo) {
+    BlocProvider.of<PhotoBloc>(context).add(DeletePhoto(photo.id));
   }
 
   void _onPhotoTap(BuildContext context, int index) {
@@ -79,118 +96,123 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     });
   }
 
-  void _onViewPressed() {
-    // Пустой метод для кнопки "view"
+  void _onSelectedViewPressed() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PhotoViewerScreen(
+          photos: _selectedPhotos,
+          initialIndex: 0,
+        ),
+      ),
+    );
   }
 
-  void _onAddToFolderPressed() {
+  void _onSelectedAddToFolderPressed() {
     // Пустой метод для кнопки "add to folder"
   }
 
-  void _onSharePressed() {
-    // Пустой метод для кнопки "share"
+  Future<void> _onSelectedSharePressed(BuildContext context) async {
+    await _onShareTap(context, _selectedPhotos);
+    _turnMultiSelectModeOff();
   }
 
-  void _onDeletePressed() {
-    // Пустой метод для кнопки "delete"
+  void _onDeletePressed(BuildContext context, List<Photo> photos) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirm Deletion'),
+          content:
+              const Text('Are you sure you want to delete these pictures?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Закрыть диалог без удаления
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                // Если подтверждено, удаляем фотографии
+                for (var photo in photos) {
+                  _onPhotoDelete(context, photo);
+                }
+                Navigator.of(context).pop(); // Закрыть диалог после удаления
+                _turnMultiSelectModeOff();
+              },
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  void _onDonePressed() {
+  void _turnMultiSelectModeOff() {
     setState(() {
       _isMultiSelect = false;
       _selectedPhotos.clear(); // Очистка списка после выхода из мультиселекта
     });
   }
 
+  void _onDonePressed() {
+    _turnMultiSelectModeOff();
+  }
+
   @override
   Widget build(BuildContext context) {
     String titleText = widget.title;
-    return Stack(children: [
-      CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            backgroundColor: Colors.black.withOpacity(0.5),
-            pinned: true,
-            title: Row(
-              children: [
-                Expanded(child: Text(titleText)),
-                if (widget.actionFromParent != null) widget.actionFromParent!,
-              ],
-            ),
-            actions: [
-              IconButton(
-                icon:
-                    Icon(_isPinterestLayout ? Icons.grid_on : Icons.dashboard),
-                onPressed: () {
-                  setState(() {
-                    _isPinterestLayout = !_isPinterestLayout;
-                  });
-                },
-                tooltip: _isPinterestLayout
-                    ? 'Switch to Grid View'
-                    : 'Switch to Pinterest View',
-              ),
-              if (widget.showShareBtn == true)
-                IconButton(
-                  icon: const Icon(Icons.share),
-                  onPressed: () async {
-                    final photoState = context.read<PhotoBloc>().state;
-                    if (photoState is PhotoLoaded) {
-                      if (widget.photos.isNotEmpty) {
-                        try {
-                          await _shareHelper.shareMultiplePhotos(widget.photos);
-                        } catch (e) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content:
-                                    Text('Error while sharing photos: $e')),
-                          );
-                        }
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('No photos for share')),
-                        );
-                      }
-                    }
-                  },
+    return Stack(
+      children: [
+        CustomScrollView(
+          slivers: [
+            SliverAppBar(
+                backgroundColor: Colors.black.withOpacity(0.5),
+                pinned: true,
+                title: Row(
+                  children: [
+                    Expanded(child: Text(titleText)),
+                  ],
                 ),
-            ],
-          ),
-          SliverPadding(
-              padding: const EdgeInsets.all(8.0),
-              sliver: _isPinterestLayout
-                  ? SliverMasonryGrid.count(
-                      crossAxisCount: _columnCount,
-                      mainAxisSpacing: 8.0,
-                      crossAxisSpacing: 8.0,
-                      childCount: widget.photos.length,
-                      itemBuilder: (context, index) {
-                        final photo = widget.photos[index];
-                        return Container(
-                          decoration: BoxDecoration(
-                            border: _isMultiSelect &&
-                                    _selectedPhotos.contains(photo)
-                                ? Border.all(color: Colors.white, width: 3.0)
-                                : null, // Добавляем белую рамку, если выполняются условия
-                          ),
-                          child: PhotoThumbnail(
-                            photo: photo,
-                            onPhotoTap: () => _onPhotoTap(context, index),
-                            isPinterestLayout: true,
-                            onLongPress: () =>
-                                _onThumbnailLongPress(context, photo),
-                          ),
-                        );
-                      },
-                    )
-                  : SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                actions: !_isMultiSelect
+                    ? [
+                        if (widget.actionFromParent != null)
+                          widget.actionFromParent!,
+                        IconButton(
+                          icon: Icon(_isPinterestLayout
+                              ? Icons.grid_on
+                              : Icons.dashboard),
+                          onPressed: () {
+                            setState(() {
+                              _isPinterestLayout = !_isPinterestLayout;
+                            });
+                          },
+                          tooltip: _isPinterestLayout
+                              ? 'Switch to Grid View'
+                              : 'Switch to Pinterest View',
+                        ),
+                        if (widget.showShareBtn == true)
+                          IconButton(
+                              icon: const Icon(Icons.share),
+                              onPressed: () =>
+                                  _onShareTap(context, widget.photos)),
+                      ]
+                    : [
+                        IconButton(
+                          icon: const Icon(Icons.done),
+                          onPressed: _onDonePressed,
+                        )
+                      ]),
+            SliverPadding(
+                padding: const EdgeInsets.all(8.0),
+                sliver: _isPinterestLayout
+                    ? SliverMasonryGrid.count(
                         crossAxisCount: _columnCount,
-                        mainAxisSpacing: 4.0,
-                        crossAxisSpacing: 4.0,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
+                        mainAxisSpacing: 8.0,
+                        crossAxisSpacing: 8.0,
+                        childCount: widget.photos.length,
+                        itemBuilder: (context, index) {
                           final photo = widget.photos[index];
                           return Container(
                             decoration: BoxDecoration(
@@ -202,112 +224,92 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                             child: PhotoThumbnail(
                               photo: photo,
                               onPhotoTap: () => _onPhotoTap(context, index),
-                              isPinterestLayout: false,
+                              isPinterestLayout: true,
                               onLongPress: () =>
                                   _onThumbnailLongPress(context, photo),
                             ),
                           );
                         },
-                        childCount: widget.photos.length,
-                      ),
-                    )),
-        ],
-      ),
-      ColumnSlider(
-        initialCount: 3,
-        columnCount: _columnCount,
-        onChanged: (value) {
-          setState(() {
-            _columnCount = value;
-          });
-        },
-      ),
-    ]);
+                      )
+                    : SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _columnCount,
+                          mainAxisSpacing: 4.0,
+                          crossAxisSpacing: 4.0,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final photo = widget.photos[index];
+                            return Container(
+                              decoration: BoxDecoration(
+                                border: _isMultiSelect &&
+                                        _selectedPhotos.contains(photo)
+                                    ? Border.all(
+                                        color: Colors.white, width: 3.0)
+                                    : null, // Добавляем белую рамку, если выполняются условия
+                              ),
+                              child: PhotoThumbnail(
+                                photo: photo,
+                                onPhotoTap: () => _onPhotoTap(context, index),
+                                isPinterestLayout: false,
+                                onLongPress: () =>
+                                    _onThumbnailLongPress(context, photo),
+                              ),
+                            );
+                          },
+                          childCount: widget.photos.length,
+                        ),
+                      )),
+          ],
+        ),
+        ColumnSlider(
+          initialCount: 3,
+          columnCount: _columnCount,
+          onChanged: (value) {
+            setState(() {
+              _columnCount = value;
+            });
+          },
+        ),
+        if (_isMultiSelect)
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              color: Colors.black54,
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.remove_red_eye, color: Colors.white),
+                    onPressed: _onSelectedViewPressed,
+                  ),
+                  AddToFolderWidget(
+                    photos: _selectedPhotos,
+                    onFolderAdded: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Photos added'),
+                          duration: Duration(
+                              milliseconds:
+                                  500), // Продолжительность 0.5 секунды
+                        ),
+                      );
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.share, color: Colors.white),
+                    onPressed: () => _onSelectedSharePressed(context),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Color.fromARGB(255, 120, 13, 13)),
+                    onPressed: () => _onDeletePressed(context, _selectedPhotos),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }
-
-// class _PhotoGridViewState extends State<PhotoGridView> {
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: _isMultiSelect
-//           ? AppBar(
-//               leading: IconButton(
-//                 icon: const Icon(Icons.done),
-//                 onPressed: _onDonePressed,
-//               ),
-//               title: Text('${_selectedPhotos.length} selected'),
-//             )
-//           : null, // Если multiselect = false, AppBar не отображается
-//       body: Stack(
-//         children: [
-//           _isPinterestLayout
-//               ? SliverMasonryGrid.count(
-//                   crossAxisCount: widget.columnCount,
-//                   mainAxisSpacing: 8.0,
-//                   crossAxisSpacing: 8.0,
-//                   childCount: widget.photos.length,
-//                   itemBuilder: (context, index) {
-//                     final photo = widget.photos[index];
-//                     return PhotoThumbnail(
-//                       photo: photo,
-//                       onPhotoTap: () => _onPhotoTap(context, index),
-//                       isPinterestLayout: true,
-//                       onLongPress: () => _onThumbnailLongPress(context, photo),
-//                     );
-//                   },
-//                 )
-//               : SliverGrid(
-//                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-//                     crossAxisCount: widget.columnCount,
-//                     mainAxisSpacing: 4.0,
-//                     crossAxisSpacing: 4.0,
-//                   ),
-//                   delegate: SliverChildBuilderDelegate(
-//                     (context, index) {
-//                       final photo = widget.photos[index];
-//                       return PhotoThumbnail(
-//                         photo: photo,
-//                         onPhotoTap: () => _onPhotoTap(context, index),
-//                         isPinterestLayout: false,
-//                         onLongPress: () => _onThumbnailLongPress(context, photo),
-//                       );
-//                     },
-//                     childCount: widget.photos.length,
-//                   ),
-//                 ),
-//           if (_isMultiSelect)
-//             Align(
-//               alignment: Alignment.bottomCenter,
-//               child: Container(
-//                 color: Colors.black54,
-//                 padding: const EdgeInsets.symmetric(vertical: 8.0),
-//                 child: Row(
-//                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-//                   children: [
-//                     IconButton(
-//                       icon: const Icon(Icons.remove_red_eye, color: Colors.white),
-//                       onPressed: _onViewPressed,
-//                     ),
-//                     IconButton(
-//                       icon: const Icon(Icons.folder, color: Colors.white),
-//                       onPressed: _onAddToFolderPressed,
-//                     ),
-//                     IconButton(
-//                       icon: const Icon(Icons.share, color: Colors.white),
-//                       onPressed: _onSharePressed,
-//                     ),
-//                     IconButton(
-//                       icon: const Icon(Icons.delete, color: Colors.white),
-//                       onPressed: _onDeletePressed,
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ),
-//         ],
-//       ),
-//     );
-//   }
-// }

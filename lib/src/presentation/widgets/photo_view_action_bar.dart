@@ -72,10 +72,8 @@ class ActionBar extends StatelessWidget {
                   const SizedBox(width: 8.0),
                   Expanded(
                     child: AddToFolderWidget(
-                      photo: photo,
-                      onFolderAdded: () {
-                        update();
-                      },
+                      photos: [photo],
+                      onFolderAdded: update,
                     ),
                   ),
                   const SizedBox(width: 8.0),

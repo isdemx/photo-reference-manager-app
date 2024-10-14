@@ -7,14 +7,14 @@ import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.da
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 
 class AddToFolderWidget extends StatelessWidget {
-  final Photo photo;
+  final List<Photo> photos; // Массив фотографий
   final VoidCallback
       onFolderAdded; // Коллбек для обновления родительского стейта
 
   const AddToFolderWidget({
     Key? key,
-    required this.photo,
-    required this.onFolderAdded, // Передаем коллбек из родительского виджета
+    required this.photos, // Передаем массив фотографий
+    required this.onFolderAdded, // Коллбек
   }) : super(key: key);
 
   void _showAddToFolderDialog(BuildContext context) {
@@ -30,14 +30,18 @@ class AddToFolderWidget extends StatelessWidget {
               final existingFolderIds =
                   folders.map((folder) => folder.id).toSet();
 
-              // Инициализируем выбранные папки, оставляя только существующие
-              final selectedFolderIds = Set<String>.from(photo.folderIds)
-                ..retainAll(existingFolderIds);
+              // Собираем ID папок для всех фотографий
+              final Set<String> commonFolderIds =
+                  Set<String>.from(photos.first.folderIds);
+              for (var photo in photos.skip(1)) {
+                commonFolderIds
+                    .retainAll(photo.folderIds); // Оставляем только общие папки
+              }
 
               return StatefulBuilder(
                 builder: (context, setState) {
                   return AlertDialog(
-                    title: const Text('Add to Folder'),
+                    title: const Text('Add Photos to Folder'),
                     content: SizedBox(
                       width: double.maxFinite,
                       child: ListView.builder(
@@ -45,18 +49,46 @@ class AddToFolderWidget extends StatelessWidget {
                         itemCount: folders.length,
                         itemBuilder: (context, index) {
                           final folder = folders[index];
-                          final isSelected =
-                              selectedFolderIds.contains(folder.id);
+
+                          // Проверяем статус для папки: все фото добавлены, частично или ни одно
+                          bool allSelected = true;
+                          bool noneSelected = true;
+
+                          for (var photo in photos) {
+                            if (!photo.folderIds.contains(folder.id)) {
+                              allSelected = false;
+                            } else {
+                              noneSelected = false;
+                            }
+                          }
+
+                          var isSelected = allSelected
+                              ? true
+                              : noneSelected
+                                  ? false
+                                  : null; // null для частичного состояния (тире)
 
                           return CheckboxListTile(
                             title: Text(folder.name),
                             value: isSelected,
+                            tristate:
+                                true, // Включаем тире для частичного состояния
                             onChanged: (bool? value) {
                               setState(() {
+                                // Если значение true, добавляем фото в папку
+
                                 if (value == true) {
-                                  selectedFolderIds.add(folder.id);
-                                } else {
-                                  selectedFolderIds.remove(folder.id);
+                                  for (var photo in photos) {
+                                    photo.folderIds.add(
+                                        folder.id); // Добавляем фото в папку
+                                  }
+                                }
+                                // Если false, удаляем фото из папки
+                                else {
+                                  for (var photo in photos) {
+                                    photo.folderIds.remove(
+                                        folder.id); // Убираем фото из папки
+                                  }
                                 }
                               });
                             },
@@ -71,12 +103,14 @@ class AddToFolderWidget extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () {
-                          // Обновляем список папок в фото, оставляя только существующие
-                          photo.folderIds
-                            ..clear()
-                            ..addAll(selectedFolderIds);
-
-                          context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                          // Обновляем список папок для каждой фотографии
+                          for (var photo in photos) {
+                            photo.folderIds.removeWhere(
+                                (id) => !existingFolderIds.contains(id));
+                            context
+                                .read<PhotoBloc>()
+                                .add(UpdatePhoto(photo)); // Обновляем фото
+                          }
                           Navigator.of(context).pop();
                           onFolderAdded(); // Вызываем коллбек для обновления родительского стейта
                         },
@@ -102,7 +136,7 @@ class AddToFolderWidget extends StatelessWidget {
     return IconButton(
       icon: const Icon(Icons.folder, color: Colors.white),
       onPressed: () => _showAddToFolderDialog(context),
-      tooltip: 'Add to Folder',
+      tooltip: 'Add Photos to Folder',
     );
   }
 }
