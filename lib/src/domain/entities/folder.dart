@@ -19,6 +19,9 @@ class Folder extends HiveObject {
   @HiveField(4)
   DateTime dateCreated;
 
+  @HiveField(6)
+  String? avatarPath; // Путь к аватару
+
   @HiveField(5)
   int sortOrder;
 
@@ -29,6 +32,7 @@ class Folder extends HiveObject {
     required this.photoIds,
     required this.dateCreated,
     required this.sortOrder,
+    this.avatarPath
   });
 
   // Метод copyWith
@@ -39,6 +43,7 @@ class Folder extends HiveObject {
     List<String>? photoIds,
     DateTime? dateCreated,
     int? sortOrder,
+    String? avatarPath, // Новое поле
   }) {
     return Folder(
       id: id ?? this.id,
@@ -47,6 +52,7 @@ class Folder extends HiveObject {
       photoIds: photoIds ?? this.photoIds,
       dateCreated: dateCreated ?? this.dateCreated,
       sortOrder: sortOrder ?? this.sortOrder,
+      avatarPath: avatarPath ?? this.avatarPath, // Новое поле
     );
   }
 }

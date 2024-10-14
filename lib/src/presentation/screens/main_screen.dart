@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
@@ -154,7 +155,47 @@ class MainScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Refma'),
+        title: FutureBuilder<PackageInfo>(
+          future: PackageInfo.fromPlatform(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.done &&
+                snapshot.hasData) {
+              final packageInfo = snapshot.data!;
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment:
+                    CrossAxisAlignment.end, // Центрируем по нижнему краю
+                children: [
+                  Image.asset(
+                    'assets/refma-logo.png', // Ваш логотип
+                    height: 30, // Уменьшенный размер логотипа
+                  ),
+                  const SizedBox(width: 5), // Отступ между логотипом и версией
+                  Padding(
+                    padding: const EdgeInsets.only(
+                        left: 5.0), // Отступ слева для версии
+                    child: Align(
+                      alignment:
+                          Alignment.bottomLeft, // Выравнивание по нижнему краю
+                      child: Text(
+                        'v${packageInfo.version}',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 10.0, // Маленький шрифт для версии
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            } else {
+              return Image.asset(
+                'assets/refma-logo.png', // Логотип при загрузке версии
+                height: 40, // Задайте нужный размер логотипа
+              );
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),

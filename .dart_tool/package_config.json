@@ -525,7 +525,7 @@
     },
     {
       "name": "package_info_plus",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_info_plus-8.0.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_info_plus-8.0.3",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -896,7 +896,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-10-12T20:32:42.959219Z",
+  "generated": "2024-10-14T09:27:51.194925Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",
