@@ -9,14 +9,14 @@ import 'package:vibration/vibration.dart';
 class PhotoThumbnail extends StatefulWidget {
   final Photo photo;
   final VoidCallback onPhotoTap;
-  final VoidCallback onDeleteTap;
+  final VoidCallback onLongPress;
   final bool isPinterestLayout;
 
   const PhotoThumbnail({
     Key? key,
     required this.photo,
     required this.onPhotoTap,
-    required this.onDeleteTap,
+    required this.onLongPress,
     required this.isPinterestLayout,
   }) : super(key: key);
 
@@ -71,33 +71,11 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
               duration: 10, pattern: [0, 10], intensities: [0, 255]);
         }
 
-        setState(() {
-          _showDeleteIcon = true;
-        });
+        widget.onLongPress();
       },
       child: Stack(
         children: [
-          imageWidget,
-          if (_showDeleteIcon)
-            Positioned(
-              top: 8,
-              right: 8,
-              child: GestureDetector(
-                onTap: widget.onDeleteTap,
-                child: Container(
-                  padding: const EdgeInsets.all(4.0),
-                  decoration: const BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 24.0,
-                  ),
-                ),
-              ),
-            ),
+          imageWidget
         ],
       ),
     );
