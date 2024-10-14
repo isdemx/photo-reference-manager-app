@@ -85,20 +85,6 @@ class _TagScreenState extends State<TagScreen> {
                         photos: photos,
                         pinterestView: _isPinterestLayout,
                         columnCount: _columnCount,
-                        onPhotoTap: (photo, index) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PhotoViewerScreen(
-                                photos: photos,
-                                initialIndex: index,
-                              ),
-                            ),
-                          );
-                        },
-                        onDeleteTap: (photo) {
-                          context.read<PhotoBloc>().add(DeletePhoto(photo.id));
-                        },
                       ),
                     ),
                   ],

@@ -1,23 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
 
 class PhotoGridView extends StatelessWidget {
   final List<Photo> photos;
   final bool pinterestView;
   final int columnCount;
-  final Function(Photo photo, int index) onPhotoTap;
-  final Function(Photo photo) onDeleteTap;
 
   const PhotoGridView({
     Key? key,
     required this.photos,
     required this.pinterestView,
     required this.columnCount,
-    required this.onPhotoTap,
-    required this.onDeleteTap,
   }) : super(key: key);
+
+  void _onPhotoTap(context, index) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PhotoViewerScreen(
+          photos: photos,
+          initialIndex: index,
+        ),
+      ),
+    );
+  }
+
+  void _onDeleteTap(context, photo) {
+    context.read<PhotoBloc>().add(DeletePhoto(photo.id));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -31,8 +45,8 @@ class PhotoGridView extends StatelessWidget {
               final photo = photos[index];
               return PhotoThumbnail(
                 photo: photo,
-                onPhotoTap: () => onPhotoTap(photo, index),
-                onDeleteTap: () => onDeleteTap(photo),
+                onPhotoTap: () => _onPhotoTap(context, index),
+                onDeleteTap: () => _onDeleteTap(context, photo),
                 isPinterestLayout: true,
               );
             },
@@ -48,8 +62,8 @@ class PhotoGridView extends StatelessWidget {
                 final photo = photos[index];
                 return PhotoThumbnail(
                   photo: photo,
-                  onPhotoTap: () => onPhotoTap(photo, index),
-                  onDeleteTap: () => onDeleteTap(photo),
+                  onPhotoTap: () => _onPhotoTap(context, index),
+                  onDeleteTap: () => _onDeleteTap(context, photo),
                   isPinterestLayout: false,
                 );
               },

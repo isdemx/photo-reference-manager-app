@@ -119,18 +119,6 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                             pinterestView:
                                 _isPinterestLayout, // Логика для выбора типа сетки
                             columnCount: _columnCount, // Количество колонок
-                            onPhotoTap: (photo, index) {
-                              Navigator.pushNamed(
-                                context,
-                                '/photo',
-                                arguments: {'photos': photos, 'index': index},
-                              );
-                            },
-                            onDeleteTap: (photo) {
-                              context
-                                  .read<PhotoBloc>()
-                                  .add(DeletePhoto(photo.id));
-                            },
                           ),
                         ),
                       ],
