@@ -28,8 +28,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   late int _currentIndex;
   bool _showActions = true;
   bool _selectPhotoMode = false;
+  bool isInitScrolling =
+      true; // Флаг для отключения обновления главной картинки
 
-  // Список выбранных фотографий для шаринга
   final List<Photo> _selectedPhotos = [];
 
   @override
@@ -41,8 +42,30 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
     // Прокручиваем миниатюры к текущему индексу при запуске
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToThumbnail(_currentIndex);
+      _scrollThumbnailsToCenter(_currentIndex).then((_) {
+        // После прокрутки сбрасываем флаг, чтобы главная картинка снова обновлялась
+        setState(() {
+          isInitScrolling = false;
+        });
+      });
     });
+  }
+
+  Future<void> _scrollThumbnailsToCenter(int index) async {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double itemWidth = 30.0; // Ширина одной миниатюры
+
+    // Рассчитываем отступ, чтобы текущая миниатюра оказалась в центре
+    final double offset =
+        (index * itemWidth - (screenWidth / 2) + (itemWidth / 2)) + (screenWidth / 2) ;
+
+    // Прокручиваем миниатюры к нужной позиции с центрированием
+    await _thumbnailScrollController.animateTo(
+      offset.clamp(_thumbnailScrollController.position.minScrollExtent,
+          _thumbnailScrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -147,19 +170,24 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   // Метод для обновления основного фото при прокрутке миниатюр
   void _onThumbnailScroll() {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double itemWidth = 50.0; // Ширина миниатюры
-    final double scrollOffset = _thumbnailScrollController.offset;
-    final double centerPosition = scrollOffset + screenWidth / 2;
+    if (!isInitScrolling) {
+      // Только если не в процессе инициализации
+      final double screenWidth = MediaQuery.of(context).size.width;
+      final double itemWidth = 30.0; // Ширина миниатюры
+      final double scrollOffset = _thumbnailScrollController.offset;
+      final double centerPosition =
+          (scrollOffset + screenWidth / 2) - (screenWidth / 2) ;
 
-    int index =
-        (centerPosition / itemWidth).floor().clamp(0, widget.photos.length - 1);
+      int index = (centerPosition / itemWidth)
+          .floor()
+          .clamp(0, widget.photos.length - 1);
 
-    if (_currentIndex != index) {
-      _pageController.jumpToPage(index);
-      setState(() {
-        _currentIndex = index;
-      });
+      if (_currentIndex != index) {
+        _pageController.jumpToPage(index);
+        setState(() {
+          _currentIndex = index;
+        });
+      }
     }
   }
 
@@ -249,35 +277,44 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 ),
               ],
             ),
-            // Фиксированные миниатюры
-            if (_showActions) // Галерея миниатюр
+            // Галерея миниатюр
+            if (_showActions)
               Positioned(
-                bottom: 120, // Зафиксировано вверху экрана
+                bottom: 120,
                 left: 0,
                 right: 0,
                 height: 50,
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (ScrollNotification scrollInfo) {
                     if (scrollInfo is ScrollUpdateNotification) {
-                      _onThumbnailScroll();
+                      _onThumbnailScroll(); // Отслеживаем прокрутку и обновляем большую фотографию
                     }
                     return false;
                   },
                   child: ListView.builder(
                     controller: _thumbnailScrollController,
                     scrollDirection: Axis.horizontal,
-                    itemCount: photos.length,
+                    itemCount: widget.photos.length + 2, // Добавляем паддинги
                     itemBuilder: (context, index) {
-                      final photo = photos[index];
+                      if (index == 0 || index == widget.photos.length + 1) {
+                        return SizedBox(
+                          width: MediaQuery.of(context).size.width *
+                              0.5, // Паддинг в начале и конце
+                        );
+                      }
+
+                      final photo = widget.photos[
+                          index - 1]; // Корректируем индекс для доступа к фото
                       final fullPath =
                           PhotoPathHelper().getFullPath(photo.fileName);
 
                       return GestureDetector(
-                        onTap: () => _onThumbnailTap(index),
+                        onTap: () =>
+                            _onThumbnailTap(index - 1), // Меняем фото при клике
                         child: Container(
-                          width: 50,
+                          width: 30,
                           height: 50,
-                          margin: const EdgeInsets.symmetric(horizontal: 1.0),
+                          margin: const EdgeInsets.symmetric(horizontal: 0.0),
                           child: Image.file(
                             File(fullPath),
                             fit: BoxFit.cover,
@@ -288,6 +325,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   ),
                 ),
               ),
+
             // Actions
             if (_showActions)
               Positioned(

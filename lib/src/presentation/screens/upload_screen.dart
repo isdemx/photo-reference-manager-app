@@ -7,7 +7,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
-import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -28,9 +27,11 @@ class _UploadScreenState extends State<UploadScreen> {
 
   void _pickImages() async {
     final images = await _picker.pickMultiImage();
-    setState(() {
-      _images = images;
-    });
+    if (images.isNotEmpty) {
+      setState(() {
+        _images = images;
+      });
+    }
   }
 
   Future<void> _uploadImages() async {
@@ -46,7 +47,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
       final photoRepository =
           RepositoryProvider.of<PhotoRepositoryImpl>(context);
-      List<Photo> addedPhotos = [];
+      // List<Photo> addedPhotos = [];
 
       for (var i = 0; i < _images!.length; i++) {
         if (_stopRequested) {
@@ -72,7 +73,7 @@ class _UploadScreenState extends State<UploadScreen> {
           await photoRepository.addPhoto(photo);
 
           // Добавляем фото в список добавленных
-          addedPhotos.add(photo);
+          // addedPhotos.add(photo);
 
           setState(() {
             _uploadedCount++;
@@ -102,7 +103,7 @@ class _UploadScreenState extends State<UploadScreen> {
       context.read<PhotoBloc>().add(LoadPhotos());
 
       if (!_stopRequested) {
-        context.read<PhotoBloc>().add(PhotosAdded(addedPhotos));
+        // context.read<PhotoBloc>().add(PhotosAdded(addedPhotos));
 
         // Показ лоадера на время удаления временных файлов
         setState(() {
@@ -122,7 +123,6 @@ class _UploadScreenState extends State<UploadScreen> {
 
         // Navigator.pop(context);
         Navigator.pushNamed(context, '/all_photos');
-
       }
     }
   }
@@ -177,8 +177,7 @@ class _UploadScreenState extends State<UploadScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.only(
-                          bottom: 50.0),
+                      padding: const EdgeInsets.only(bottom: 50.0),
                       child: ElevatedButton(
                         onPressed: _isUploading ? null : _uploadImages,
                         child: const Text('Upload'),

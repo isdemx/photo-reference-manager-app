@@ -34,7 +34,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                 );
               }
 
-              print('New state $_filterNotRef');
+              print('photoState.photos len ${photoState.photos.length}');
 
               final List<Photo> photosFiltered = _filterNotRef
                   ? photoState.photos.where((photo) {
@@ -44,6 +44,8 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                       });
                     }).toList()
                   : photoState.photos;
+
+              print('photosFiltered len ${photosFiltered.length}');
 
               return Scaffold(
                   body: PhotoGridView(
