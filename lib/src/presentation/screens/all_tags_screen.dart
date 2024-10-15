@@ -2,14 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
-import 'package:uuid/uuid.dart';
+import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
+import 'package:vibration/vibration.dart';
 
 class AllTagsScreen extends StatefulWidget {
   const AllTagsScreen({Key? key}) : super(key: key);
@@ -21,170 +21,9 @@ class AllTagsScreen extends StatefulWidget {
 class _AllTagsScreenState extends State<AllTagsScreen> {
   Map<String, int> tagPhotoCounts = {};
 
-  void _showAddTagDialog(BuildContext context) {
-    final TextEditingController _controller = TextEditingController();
-    final tagBloc = context.read<TagBloc>();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Add tag'),
-          content: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(hintText: 'Tag name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final String tagName = _controller.text.trim();
-                if (tagName.isNotEmpty) {
-                  final newTag = Tag(
-                    id: const Uuid().v4(),
-                    name: tagName,
-                    colorValue: Colors.blue.value,
-                  );
-                  tagBloc.add(AddTag(newTag));
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Add'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showDeleteConfirmationDialog(BuildContext context, Tag tag) {
-    final tagBloc = context.read<TagBloc>();
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Delete tag'),
-          content: Text('Are you sure wnat to delete "${tag.name}" tag?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                tagBloc.add(DeleteTag(tag.id));
-                Navigator.of(context).pop();
-              },
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showColorPickerDialog(BuildContext context, Tag tag) {
-    Color pickerColor = Color(tag.colorValue);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Color for "${tag.name}" tag'),
-          content: SingleChildScrollView(
-            child: ColorPicker(
-              pickerColor: pickerColor,
-              onColorChanged: (Color color) {
-                pickerColor = color;
-              },
-              pickerAreaHeightPercent: 0.8,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final updatedTag = Tag(
-                  id: tag.id,
-                  name: tag.name,
-                  colorValue: pickerColor.value,
-                );
-                context.read<TagBloc>().add(UpdateTag(updatedTag));
-                Navigator.of(context).pop();
-              },
-              child: const Text('Ok'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showEditTagDialog(BuildContext context, Tag tag) {
-    final TextEditingController _controller =
-        TextEditingController(text: tag.name);
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit tag'),
-          content: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(hintText: 'Tag name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final String tagName = _controller.text.trim();
-                if (tagName.isNotEmpty) {
-                  final updatedTag = Tag(
-                    id: tag.id,
-                    name: tagName,
-                    colorValue: tag.colorValue,
-                  );
-                  context.read<TagBloc>().add(UpdateTag(updatedTag));
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Ok'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Map<String, int> _computeTagPhotoCounts(List<Tag> tags, List<Photo> photos) {
-    final Map<String, int> counts = {};
-    for (var tag in tags) {
-      counts[tag.id] = 0;
-    }
-    for (var photo in photos) {
-      for (var tagId in photo.tagIds) {
-        if (counts.containsKey(tagId)) {
-          counts[tagId] = counts[tagId]! + 1;
-        }
-      }
-    }
-    return counts;
-  }
-
   @override
   void initState() {
     super.initState();
-    // Инициализируем загрузку тегов и фотографий
     context.read<TagBloc>().add(LoadTags());
     context.read<PhotoBloc>().add(LoadPhotos());
   }
@@ -198,7 +37,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              _showAddTagDialog(context);
+              TagsHelpers.showAddTagDialog(context);
             },
           ),
         ],
@@ -231,7 +70,8 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                 return const Center(child: CircularProgressIndicator());
               } else if (photoState is PhotoLoaded) {
                 final photos = photoState.photos;
-                tagPhotoCounts = _computeTagPhotoCounts(tags, photos);
+                tagPhotoCounts =
+                    TagsHelpers.computeTagPhotoCounts(tags, photos);
                 final sortedTags = List<Tag>.from(tags);
                 sortedTags.sort((a, b) {
                   final countA = tagPhotoCounts[a.id] ?? 0;
@@ -257,7 +97,8 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                           );
                         },
                         onLongPress: () {
-                          _showColorPickerDialog(context, tag);
+                          vibrate();
+                          TagsHelpers.showColorPickerDialog(context, tag);
                         },
                         child: CircleAvatar(
                           backgroundColor: Color(tag.colorValue),
@@ -272,17 +113,18 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                       title: GestureDetector(
                         onTap: () {
                           tag.name != 'Not Ref'
-                              ? _showEditTagDialog(context, tag)
+                              ? TagsHelpers.showEditTagDialog(context, tag)
                               : null;
                         },
                         child: Text(tag.name),
                       ),
-                      subtitle: Text('$photoCount photo'),
+                      subtitle: Text('$photoCount images'),
                       trailing: tag.name != 'Not Ref'
                           ? IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () {
-                                _showDeleteConfirmationDialog(context, tag);
+                                TagsHelpers.showDeleteConfirmationDialog(
+                                    context, tag);
                               },
                             )
                           : null,
@@ -292,7 +134,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
               } else if (photoState is PhotoError) {
                 return Center(child: Text('Error: ${photoState.message}'));
               } else {
-                return const Center(child: Text('Caanot load photos'));
+                return const Center(child: Text('Caanot load images'));
               }
             } else if (tagState is TagError) {
               return Center(child: Text('Error: ${tagState.message}'));

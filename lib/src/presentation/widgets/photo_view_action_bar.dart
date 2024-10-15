@@ -10,7 +10,6 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onShare;
   final VoidCallback onCancel;
   final VoidCallback enableSelectPhotoMode;
-  final VoidCallback update;
   final VoidCallback deletePhoto;
 
   const ActionBar({
@@ -20,7 +19,6 @@ class ActionBar extends StatelessWidget {
     required this.onShare,
     required this.onCancel,
     required this.enableSelectPhotoMode,
-    required this.update,
     required this.deletePhoto,
   }) : super(key: key);
 
@@ -64,16 +62,13 @@ class ActionBar extends StatelessWidget {
                   Expanded(
                     child: AddTagWidget(
                       photo: photo,
-                      onTagAdded: () {
-                        update();
-                      },
                     ),
                   ),
                   const SizedBox(width: 8.0),
                   Expanded(
                     child: AddToFolderWidget(
                       photos: [photo],
-                      onFolderAdded: update,
+                      onFolderAdded: () {},
                     ),
                   ),
                   const SizedBox(width: 8.0),
@@ -81,7 +76,7 @@ class ActionBar extends StatelessWidget {
                     child: IconButton(
                       icon: const Icon(Icons.share, color: Colors.white),
                       onPressed: enableSelectPhotoMode,
-                      tooltip: 'Share Photos',
+                      tooltip: 'Share Images',
                     ),
                   ),
                   Expanded(
@@ -89,7 +84,7 @@ class ActionBar extends StatelessWidget {
                       icon: const Icon(Icons.delete,
                           color: Color.fromARGB(255, 120, 13, 13)),
                       onPressed: deletePhoto,
-                      tooltip: 'Delete Photo',
+                      tooltip: 'Delete Image',
                     ),
                   ),
                 ],

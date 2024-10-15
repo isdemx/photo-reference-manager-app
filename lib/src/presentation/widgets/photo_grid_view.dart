@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
+import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 
 class PhotoGridView extends StatefulWidget {
   final List<Photo> photos;
@@ -33,25 +32,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   final List<Photo> _selectedPhotos = [];
   int _columnCount = 3; // Начальное значение колонок
   bool _isPinterestLayout = false;
-  final PhotoShareHelper _shareHelper = PhotoShareHelper();
-
-  Future<bool> _onShareTap(BuildContext context, List<Photo> photos) async {
-    if (photos.isNotEmpty) {
-      try {
-        return await _shareHelper.shareMultiplePhotos(photos);
-      } catch (e) {
-        CustomSnackBar.showError(context, 'Error while sharing photos: $e');
-        return false;
-      }
-    } else {
-      CustomSnackBar.showError(context, 'No photos for share');
-      return false;
-    }
-  }
-
-  void _onPhotoDelete(BuildContext context, Photo photo) {
-    BlocProvider.of<PhotoBloc>(context).add(DeletePhoto(photo.id));
-  }
 
   void _onPhotoTap(BuildContext context, int index) {
     if (_isMultiSelect) {
@@ -70,7 +50,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   void _onThumbnailLongPress(BuildContext context, Photo photo) {
-    print('SERT MUL');
     setState(() {
       _isMultiSelect = true;
     });
@@ -108,43 +87,18 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   Future<void> _onSelectedSharePressed(BuildContext context) async {
-    bool shareResult = await _onShareTap(context, _selectedPhotos);
-    if (shareResult) {
+    bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
+    if (res) {
       _turnMultiSelectModeOff();
-      CustomSnackBar.showSuccess(context, 'Images were sucessfully shared');
     }
   }
 
-  void _onDeletePressed(BuildContext context, List<Photo> photos) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Confirm Deletion'),
-          content:
-              const Text('Are you sure you want to delete these pictures?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Закрыть диалог без удаления
-              },
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                // Если подтверждено, удаляем фотографии
-                for (var photo in photos) {
-                  _onPhotoDelete(context, photo);
-                }
-                Navigator.of(context).pop(); // Закрыть диалог после удаления
-                _turnMultiSelectModeOff();
-              },
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> _onDeletePressed(
+      BuildContext context, List<Photo> photos) async {
+    var res = await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
+    if (res) {
+      _turnMultiSelectModeOff();
+    }
   }
 
   void _turnMultiSelectModeOff() {
@@ -188,13 +142,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                           },
                           tooltip: _isPinterestLayout
                               ? 'Switch to Grid View'
-                              : 'Switch to Pinterest View',
+                              : 'Switch to Masonry View',
                         ),
                         if (widget.showShareBtn == true)
                           IconButton(
                               icon: const Icon(Icons.share),
-                              onPressed: () =>
-                                  _onShareTap(context, widget.photos)),
+                              onPressed: () => ImagesHelpers.sharePhotos(
+                                  context, _selectedPhotos))
                       ]
                     : [
                         IconButton(
@@ -220,12 +174,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                                   : null, // Добавляем белую рамку, если выполняются условия
                             ),
                             child: PhotoThumbnail(
-                              photo: photo,
-                              onPhotoTap: () => _onPhotoTap(context, index),
-                              isPinterestLayout: true,
-                              onLongPress: () =>
-                                  _onThumbnailLongPress(context, photo),
-                            ),
+                                photo: photo,
+                                onPhotoTap: () => _onPhotoTap(context, index),
+                                isPinterestLayout: true,
+                                onLongPress: () => {
+                                      vibrate(),
+                                      _onThumbnailLongPress(context, photo),
+                                    }),
                           );
                         },
                       )
@@ -247,12 +202,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                                     : null, // Добавляем белую рамку, если выполняются условия
                               ),
                               child: PhotoThumbnail(
-                                photo: photo,
-                                onPhotoTap: () => _onPhotoTap(context, index),
-                                isPinterestLayout: false,
-                                onLongPress: () =>
-                                    _onThumbnailLongPress(context, photo),
-                              ),
+                                  photo: photo,
+                                  onPhotoTap: () => _onPhotoTap(context, index),
+                                  isPinterestLayout: false,
+                                  onLongPress: () => {
+                                        vibrate(),
+                                        _onThumbnailLongPress(context, photo),
+                                      }),
                             );
                           },
                           childCount: widget.photos.length,

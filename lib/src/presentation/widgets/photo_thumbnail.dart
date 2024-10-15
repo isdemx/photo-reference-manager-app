@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:vibration/vibration.dart';
 
@@ -66,11 +67,7 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
         }
       },
       onLongPress: () async {
-        if (await Vibration.hasVibrator() ?? false) {
-          Vibration.vibrate(
-              duration: 10, pattern: [0, 10], intensities: [0, 255]);
-        }
-
+        vibrate();
         widget.onLongPress();
       },
       child: Stack(

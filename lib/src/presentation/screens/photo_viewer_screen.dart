@@ -1,15 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
-import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -64,60 +61,28 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  void _update() {
-    setState(() {
-      // Обновление состояния при добавлении тегов или папок
-    });
-  }
+  Future<void> _deleteImageWithConfirmation(BuildContext context) async {
+    var res = await ImagesHelpers.deleteImagesWithConfirmation(
+        context, [widget.photos[_currentIndex]]);
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Delete Photo"),
-          content: const Text("Are you sure you want to delete this photo?"),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Закрыть диалог
-              },
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                // Удалить фото и закрыть диалог
-                _deletePhoto(context);
-                Navigator.of(context).pop(); // Закрыть диалог
-              },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
+    if (res) {
+      setState(() {
+        widget.photos.removeAt(_currentIndex); // Убираем фото из списка
 
-  void _deletePhoto(BuildContext context) {
-    BlocProvider.of<PhotoBloc>(context)
-        .add(DeletePhoto(widget.photos[_currentIndex].id));
+        // Проверяем, чтобы индекс не вышел за пределы списка после удаления
+        if (_currentIndex >= widget.photos.length) {
+          _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
+        }
 
-    setState(() {
-      widget.photos.removeAt(_currentIndex); // Убираем фото из списка
-
-      // Проверяем, чтобы индекс не вышел за пределы списка после удаления
-      if (_currentIndex >= widget.photos.length) {
-        _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
-      }
-
-      // Если после удаления не осталось фотографий, можно закрыть экран
-      if (widget.photos.isEmpty) {
-        Navigator.of(context).pop();
-      } else {
-        _pageController.jumpToPage(_currentIndex); // Переключаем галерею
-        _scrollToThumbnail(_currentIndex);
-      }
-    });
+        // Если после удаления не осталось фотографий, можно закрыть экран
+        if (widget.photos.isEmpty) {
+          Navigator.of(context).pop();
+        } else {
+          _pageController.jumpToPage(_currentIndex); // Переключаем галерею
+          _scrollToThumbnail(_currentIndex);
+        }
+      });
+    }
   }
 
   void _toggleActions() {
@@ -158,6 +123,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       _currentIndex = index;
     });
     _scrollToThumbnail(index);
+  }
+
+  void _shareSelectedPhotos() async {
+    var res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
+    if (res) {
+      _clearSelection();
+    }
   }
 
   void _scrollToThumbnail(int index) {
@@ -330,8 +302,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   onShare: () {
                     _shareSelectedPhotos();
                   },
-                  update: _update,
-                  deletePhoto: () => _confirmDelete(context),
+                  deletePhoto: () => _deleteImageWithConfirmation(context),
                   onCancel: () {
                     _clearSelection();
                   },
@@ -342,23 +313,4 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       ),
     );
   }
-
-  void _shareSelectedPhotos() async {
-    if (_selectedPhotos.isEmpty) return;
-
-    final PhotoShareHelper _shareHelper = PhotoShareHelper();
-
-    try {
-      var shared = await _shareHelper.shareMultiplePhotos(_selectedPhotos);
-      if (shared) {
-        CustomSnackBar.showSuccess(context, 'Shared successfully');
-      }
-
-      _clearSelection();
-    } catch (e) {
-      CustomSnackBar.showError(context, 'Sharing error: $e');
-    }
-  }
 }
-
-

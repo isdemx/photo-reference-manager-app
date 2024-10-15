@@ -29,7 +29,7 @@ class _TagScreenState extends State<TagScreen> {
                 .toList();
 
             if (photos.isEmpty) {
-              return const Center(child: Text('No photos with this tag.'));
+              return const Center(child: Text('No images with this tag.'));
             }
 
             return PhotoGridView(
@@ -37,7 +37,7 @@ class _TagScreenState extends State<TagScreen> {
                 title: 'Tag "${widget.tag.name}"',
                 showShareBtn: true);
           } else {
-            return const Center(child: Text('Failed to load photos.'));
+            return const Center(child: Text('Failed to load images.'));
           }
         },
       ),

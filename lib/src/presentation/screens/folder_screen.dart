@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive/hive.dart';
-import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
 
 class FolderScreen extends StatefulWidget {
@@ -18,41 +16,6 @@ class FolderScreen extends StatefulWidget {
 }
 
 class _FolderScreenState extends State<FolderScreen> {
-  void _showEditFolderDialog(BuildContext context, Folder folder) {
-    final TextEditingController controller = TextEditingController();
-    controller.text = folder.name;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Folder Name'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'Folder Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final String newName = controller.text.trim();
-                if (newName.isNotEmpty) {
-                  final updatedFolder = folder.copyWith(name: newName);
-                  context.read<FolderBloc>().add(UpdateFolder(updatedFolder));
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider.value(
@@ -61,7 +24,6 @@ class _FolderScreenState extends State<FolderScreen> {
       child: Scaffold(
         body: BlocBuilder<PhotoBloc, PhotoState>(
           builder: (context, photoState) {
-            print('IPDATE FOLDER');
             if (photoState is PhotoLoading) {
               return const Center(child: CircularProgressIndicator());
             } else if (photoState is PhotoLoaded) {
@@ -78,13 +40,35 @@ class _FolderScreenState extends State<FolderScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('No photos in this folder.'),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 14.0), // Горизонтальный паддинг
+                          child: const Text(
+                            'No images in this folder. You can upload new images or select from the "All Images" section.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12
+                            )
+                          ),
+                        ),
                         const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pushNamed(context, '/upload');
-                          },
-                          child: const Text('Upload'),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/upload');
+                              },
+                              child: const Text('Upload'),
+                            ),
+                            const SizedBox(width: 20), // Отступ между кнопками
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/all_photos');
+                              },
+                              child: const Text('All Images'),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -99,12 +83,12 @@ class _FolderScreenState extends State<FolderScreen> {
                 actionFromParent: IconButton(
                   icon: const Icon(Icons.edit),
                   onPressed: () {
-                    _showEditFolderDialog(context, widget.folder);
+                    FoldersHelpers.showEditFolderDialog(context, widget.folder);
                   },
                 ),
               );
             } else {
-              return const Center(child: Text('Failed to load photos.'));
+              return const Center(child: Text('Failed to load images.'));
             }
           },
         ),

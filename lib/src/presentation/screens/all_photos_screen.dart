@@ -28,9 +28,9 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
               if (photoState.photos.isEmpty) {
                 return Scaffold(
                   appBar: AppBar(
-                    title: const Text('All photos'),
+                    title: const Text('All images'),
                   ),
-                  body: const Center(child: Text('No photos available.')),
+                  body: const Center(child: Text('No images available.')),
                 );
               }
 
@@ -47,7 +47,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
 
               return Scaffold(
                   body: PhotoGridView(
-                title: 'All Photos (${photosFiltered.length})',
+                title: 'All images (${photosFiltered.length})',
                 photos: photosFiltered,
                 actionFromParent: GestureDetector(
                   onTap: () {
@@ -77,7 +77,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                 ),
               ));
             } else {
-              return const Center(child: Text('Failed to load photos.'));
+              return const Center(child: Text('Failed to load images.'));
             }
           },
         );

@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -76,9 +77,11 @@ class _UploadScreenState extends State<UploadScreen> {
           setState(() {
             _uploadedCount++;
           });
+
+          // vibrate();
         } catch (e) {
           // Обработка ошибок при добавлении фото
-          print('Error adding photo: $e');
+          print('Error adding image: $e');
         }
       }
 
@@ -117,7 +120,9 @@ class _UploadScreenState extends State<UploadScreen> {
           _isUploading = false;
         });
 
-        Navigator.pop(context);
+        // Navigator.pop(context);
+        Navigator.pushNamed(context, '/all_photos');
+
       }
     }
   }
@@ -139,7 +144,7 @@ class _UploadScreenState extends State<UploadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Upload Photos'),
+        title: const Text('Upload Images'),
       ),
       body: _images == null
           ? Center(
