@@ -7,6 +7,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/images_help
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -114,9 +115,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       if (_showActions) {
         // Показываем статус бар
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        WakelockPlus.disable();
       } else {
         // Скрываем статус бар
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        WakelockPlus.enable();
+
       }
     });
   }
