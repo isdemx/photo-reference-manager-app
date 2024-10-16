@@ -680,6 +680,48 @@
       "languageVersion": "2.18"
     },
     {
+      "name": "shared_preferences",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences-2.3.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "shared_preferences_android",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_android-2.3.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "shared_preferences_foundation",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "shared_preferences_linux",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_linux-2.4.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "shared_preferences_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_platform_interface-2.4.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.2"
+    },
+    {
+      "name": "shared_preferences_web",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_web-2.4.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "shared_preferences_windows",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_windows-2.4.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
       "name": "shelf",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shelf-1.4.1",
       "packageUri": "lib/",
@@ -896,7 +938,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-10-15T17:37:53.967753Z",
+  "generated": "2024-10-16T12:25:40.778930Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

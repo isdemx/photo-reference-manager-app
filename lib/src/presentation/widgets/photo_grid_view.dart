@@ -8,6 +8,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/add_to_fold
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PhotoGridView extends StatefulWidget {
   final List<Photo> photos;
@@ -32,6 +33,12 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   final List<Photo> _selectedPhotos = [];
   int _columnCount = 3; // Начальное значение колонок
   bool _isPinterestLayout = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences(); // Загружаем значения при инициализации
+  }
 
   void _onPhotoTap(BuildContext context, int index) {
     if (_isMultiSelect) {
@@ -112,6 +119,35 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     _turnMultiSelectModeOff();
   }
 
+  Future<void> _loadPreferences() async {
+    
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _columnCount = prefs.getInt('columnCount') ?? 3;
+      _isPinterestLayout = prefs.getBool('isPinterestLayout') ?? false;
+    });
+  }
+
+  Future<void> _savePreferences() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('columnCount', _columnCount);
+    await prefs.setBool('isPinterestLayout', _isPinterestLayout);
+  }
+
+  void _togglePinterestLayout() {
+    setState(() {
+      _isPinterestLayout = !_isPinterestLayout;
+      _savePreferences(); // Сохраняем при изменении
+    });
+  }
+
+  void _updateColumnCount(int value) {
+    setState(() {
+      _columnCount = value;
+      _savePreferences(); // Сохраняем при изменении
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     String titleText = widget.title;
@@ -135,11 +171,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                           icon: Icon(_isPinterestLayout
                               ? Icons.grid_on
                               : Icons.dashboard),
-                          onPressed: () {
-                            setState(() {
-                              _isPinterestLayout = !_isPinterestLayout;
-                            });
-                          },
+                          onPressed: _togglePinterestLayout,
                           tooltip: _isPinterestLayout
                               ? 'Switch to Grid View'
                               : 'Switch to Masonry View',
@@ -217,13 +249,9 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           ],
         ),
         ColumnSlider(
-          initialCount: 3,
+          initialCount: _columnCount,
           columnCount: _columnCount,
-          onChanged: (value) {
-            setState(() {
-              _columnCount = value;
-            });
-          },
+          onChanged: (value) => _updateColumnCount(value),
         ),
         if (_isMultiSelect)
           Align(
