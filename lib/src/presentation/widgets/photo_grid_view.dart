@@ -4,6 +4,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
@@ -273,6 +274,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                       _turnMultiSelectModeOff();
                     },
                   ),
+                  // AddTagWidget(photo: _selectedPhotos[0]),
                   IconButton(
                     icon: const Icon(Icons.share, color: Colors.white),
                     onPressed: () => _onSelectedSharePressed(context),
