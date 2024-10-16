@@ -185,7 +185,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                       ]
                     : [
                         IconButton(
-                          icon: const Icon(Icons.done),
+                          icon: const Icon(Icons.cancel),
                           onPressed: _onDonePressed,
                         )
                       ]),
