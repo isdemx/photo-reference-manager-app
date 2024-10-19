@@ -1,17 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -33,8 +29,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   late int _currentIndex;
   bool _showActions = true;
   bool _selectPhotoMode = false;
+  bool isInitScrolling =
+      true; // Флаг для отключения обновления главной картинки
 
-  // Список выбранных фотографий для шаринга
   final List<Photo> _selectedPhotos = [];
 
   @override
@@ -46,8 +43,30 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
     // Прокручиваем миниатюры к текущему индексу при запуске
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToThumbnail(_currentIndex);
+      _scrollThumbnailsToCenter(_currentIndex).then((_) {
+        // После прокрутки сбрасываем флаг, чтобы главная картинка снова обновлялась
+        setState(() {
+          isInitScrolling = false;
+        });
+      });
     });
+  }
+
+  Future<void> _scrollThumbnailsToCenter(int index) async {
+    final double screenWidth = MediaQuery.of(context).size.width;
+    final double itemWidth = 30.0; // Ширина одной миниатюры
+
+    // Рассчитываем отступ, чтобы текущая миниатюра оказалась в центре
+    final double offset =
+        (index * itemWidth - (screenWidth / 2) + (itemWidth / 2)) + (screenWidth / 2) ;
+
+    // Прокручиваем миниатюры к нужной позиции с центрированием
+    await _thumbnailScrollController.animateTo(
+      offset.clamp(_thumbnailScrollController.position.minScrollExtent,
+          _thumbnailScrollController.position.maxScrollExtent),
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
 
   @override
@@ -66,60 +85,28 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  void _update() {
-    setState(() {
-      // Обновление состояния при добавлении тегов или папок
-    });
-  }
+  Future<void> _deleteImageWithConfirmation(BuildContext context) async {
+    var res = await ImagesHelpers.deleteImagesWithConfirmation(
+        context, [widget.photos[_currentIndex]]);
 
-  void _confirmDelete(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Delete Photo"),
-          content: const Text("Are you sure you want to delete this photo?"),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Закрыть диалог
-              },
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                // Удалить фото и закрыть диалог
-                _deletePhoto(context);
-                Navigator.of(context).pop(); // Закрыть диалог
-              },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
+    if (res) {
+      setState(() {
+        widget.photos.removeAt(_currentIndex); // Убираем фото из списка
 
-  void _deletePhoto(BuildContext context) {
-    BlocProvider.of<PhotoBloc>(context)
-        .add(DeletePhoto(widget.photos[_currentIndex].id));
+        // Проверяем, чтобы индекс не вышел за пределы списка после удаления
+        if (_currentIndex >= widget.photos.length) {
+          _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
+        }
 
-    setState(() {
-      widget.photos.removeAt(_currentIndex); // Убираем фото из списка
-
-      // Проверяем, чтобы индекс не вышел за пределы списка после удаления
-      if (_currentIndex >= widget.photos.length) {
-        _currentIndex = widget.photos.length - 1; // Ставим на предыдущее фото
-      }
-
-      // Если после удаления не осталось фотографий, можно закрыть экран
-      if (widget.photos.isEmpty) {
-        Navigator.of(context).pop();
-      } else {
-        _pageController.jumpToPage(_currentIndex); // Переключаем галерею
-        _scrollToThumbnail(_currentIndex);
-      }
-    });
+        // Если после удаления не осталось фотографий, можно закрыть экран
+        if (widget.photos.isEmpty) {
+          Navigator.of(context).pop();
+        } else {
+          _pageController.jumpToPage(_currentIndex); // Переключаем галерею
+          _scrollToThumbnail(_currentIndex);
+        }
+      });
+    }
   }
 
   void _toggleActions() {
@@ -128,9 +115,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       if (_showActions) {
         // Показываем статус бар
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        WakelockPlus.disable();
       } else {
         // Скрываем статус бар
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        WakelockPlus.enable();
+
       }
     });
   }
@@ -162,6 +152,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     _scrollToThumbnail(index);
   }
 
+  void _shareSelectedPhotos() async {
+    var res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
+    if (res) {
+      _clearSelection();
+    }
+  }
+
   void _scrollToThumbnail(int index) {
     // final double screenWidth = MediaQuery.of(context).size.width;
     // final double itemWidth = 50.0; // Ширина миниатюры
@@ -177,19 +174,24 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   // Метод для обновления основного фото при прокрутке миниатюр
   void _onThumbnailScroll() {
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final double itemWidth = 50.0; // Ширина миниатюры
-    final double scrollOffset = _thumbnailScrollController.offset;
-    final double centerPosition = scrollOffset + screenWidth / 2;
+    if (!isInitScrolling) {
+      // Только если не в процессе инициализации
+      final double screenWidth = MediaQuery.of(context).size.width;
+      final double itemWidth = 30.0; // Ширина миниатюры
+      final double scrollOffset = _thumbnailScrollController.offset;
+      final double centerPosition =
+          (scrollOffset + screenWidth / 2) - (screenWidth / 2) ;
 
-    int index =
-        (centerPosition / itemWidth).floor().clamp(0, widget.photos.length - 1);
+      int index = (centerPosition / itemWidth)
+          .floor()
+          .clamp(0, widget.photos.length - 1);
 
-    if (_currentIndex != index) {
-      _pageController.jumpToPage(index);
-      setState(() {
-        _currentIndex = index;
-      });
+      if (_currentIndex != index) {
+        _pageController.jumpToPage(index);
+        setState(() {
+          _currentIndex = index;
+        });
+      }
     }
   }
 
@@ -279,35 +281,44 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 ),
               ],
             ),
-            // Фиксированные миниатюры
-            if (_showActions) // Галерея миниатюр
+            // Галерея миниатюр
+            if (_showActions)
               Positioned(
-                bottom: 120, // Зафиксировано вверху экрана
+                bottom: 120,
                 left: 0,
                 right: 0,
                 height: 50,
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (ScrollNotification scrollInfo) {
                     if (scrollInfo is ScrollUpdateNotification) {
-                      _onThumbnailScroll();
+                      _onThumbnailScroll(); // Отслеживаем прокрутку и обновляем большую фотографию
                     }
                     return false;
                   },
                   child: ListView.builder(
                     controller: _thumbnailScrollController,
                     scrollDirection: Axis.horizontal,
-                    itemCount: photos.length,
+                    itemCount: widget.photos.length + 2, // Добавляем паддинги
                     itemBuilder: (context, index) {
-                      final photo = photos[index];
+                      if (index == 0 || index == widget.photos.length + 1) {
+                        return SizedBox(
+                          width: MediaQuery.of(context).size.width *
+                              0.5, // Паддинг в начале и конце
+                        );
+                      }
+
+                      final photo = widget.photos[
+                          index - 1]; // Корректируем индекс для доступа к фото
                       final fullPath =
                           PhotoPathHelper().getFullPath(photo.fileName);
 
                       return GestureDetector(
-                        onTap: () => _onThumbnailTap(index),
+                        onTap: () =>
+                            _onThumbnailTap(index - 1), // Меняем фото при клике
                         child: Container(
-                          width: 50,
+                          width: 30,
                           height: 50,
-                          margin: const EdgeInsets.symmetric(horizontal: 1.0),
+                          margin: const EdgeInsets.symmetric(horizontal: 0.0),
                           child: Image.file(
                             File(fullPath),
                             fit: BoxFit.cover,
@@ -318,6 +329,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   ),
                 ),
               ),
+
             // Actions
             if (_showActions)
               Positioned(
@@ -332,8 +344,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   onShare: () {
                     _shareSelectedPhotos();
                   },
-                  update: _update,
-                  deletePhoto: () => _confirmDelete(context),
+                  deletePhoto: () => _deleteImageWithConfirmation(context),
                   onCancel: () {
                     _clearSelection();
                   },
@@ -344,29 +355,4 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       ),
     );
   }
-
-  void _shareSelectedPhotos() async {
-    if (_selectedPhotos.isEmpty) return;
-
-    final PhotoShareHelper _shareHelper = PhotoShareHelper();
-
-    try {
-      var shared = await _shareHelper.shareMultiplePhotos(_selectedPhotos);
-      if (shared) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Shared successfully'),
-              duration: Duration(seconds: 1)),
-        );
-      }
-
-      _clearSelection();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Sharing error: $e')),
-      );
-    }
-  }
 }
-
-

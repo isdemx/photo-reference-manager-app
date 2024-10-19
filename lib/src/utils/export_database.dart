@@ -47,7 +47,7 @@ Future<void> exportDatabase(BuildContext context) async {
     print('Export encoder closed');
 
     Navigator.of(context).pop(); // Close the loader
-
+    
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Database successfully exported to $backupFilePath'),

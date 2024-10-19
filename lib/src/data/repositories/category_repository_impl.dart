@@ -16,7 +16,12 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<List<Category>> getCategories() async {
-    return categoryBox.values.toList();
+    final categories = categoryBox.values.toList();
+
+    // Сортировка категорий по sortOrder перед возвратом
+    categories.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    return categories;
   }
 
   @override
@@ -26,7 +31,6 @@ class CategoryRepositoryImpl implements CategoryRepository {
 
   @override
   Future<void> updateCategory(Category category) async {
-    print('SAVEEE');
     try {
       await categoryBox.put(category.id, category);
       print('Category SAVED');

@@ -1,19 +1,10 @@
-import 'dart:io';
-
-import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:hive/hive.dart';
-import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
-import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
-import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 
 class FolderScreen extends StatefulWidget {
   final Folder folder;
@@ -25,102 +16,12 @@ class FolderScreen extends StatefulWidget {
 }
 
 class _FolderScreenState extends State<FolderScreen> {
-  bool _isPinterestLayout = false;
-  int _columnCount = 3; // начальное значение колонок
-
-  void _showEditFolderDialog(BuildContext context, Folder folder) {
-    final TextEditingController controller = TextEditingController();
-    controller.text = folder.name;
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Folder Name'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'Folder Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final String newName = controller.text.trim();
-                if (newName.isNotEmpty) {
-                  final updatedFolder = folder.copyWith(name: newName);
-                  context.read<FolderBloc>().add(UpdateFolder(updatedFolder));
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final PhotoShareHelper _shareHelper = PhotoShareHelper();
-
-    return BlocProvider(
-      create: (context) => PhotoBloc(
-        photoRepository: PhotoRepositoryImpl(Hive.box('photos')),
-      )..add(LoadPhotos()),
+    return BlocProvider.value(
+      value:
+          BlocProvider.of<PhotoBloc>(context), // Используем существующий блок
       child: Scaffold(
-        appBar: AppBar(
-          title: Text(widget.folder.name),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                _showEditFolderDialog(context, widget.folder);
-              },
-            ),
-            IconButton(
-              icon: Icon(_isPinterestLayout ? Icons.grid_on : Icons.dashboard),
-              onPressed: () {
-                setState(() {
-                  _isPinterestLayout = !_isPinterestLayout;
-                });
-              },
-              tooltip: _isPinterestLayout
-                  ? 'Switch to Grid View'
-                  : 'Switch to Pinterest View',
-            ),
-            IconButton(
-              icon: const Icon(Icons.share),
-              onPressed: () async {
-                final photoState = context.read<PhotoBloc>().state;
-                if (photoState is PhotoLoaded) {
-                  final List<Photo> photos = photoState.photos
-                      .where(
-                          (photo) => photo.folderIds.contains(widget.folder.id))
-                      .toList();
-
-                  if (photos.isNotEmpty) {
-                    try {
-                      await _shareHelper.shareMultiplePhotos(photos);
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                            content: Text('Error while sharing photos: $e')),
-                      );
-                    }
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('No photos for share')),
-                    );
-                  }
-                }
-              },
-            ),
-          ],
-        ),
         body: BlocBuilder<PhotoBloc, PhotoState>(
           builder: (context, photoState) {
             if (photoState is PhotoLoading) {
@@ -131,113 +32,67 @@ class _FolderScreenState extends State<FolderScreen> {
                   .toList();
 
               if (photos.isEmpty) {
-                return const Center(child: Text('No photos in this folder.'));
+                return Scaffold(
+                  appBar: AppBar(
+                    title: Text(widget.folder.name),
+                  ),
+                  body: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 14.0), // Горизонтальный паддинг
+                          child: const Text(
+                            'No images in this folder. You can upload new images or select from the "All Images" section.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12
+                            )
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/upload');
+                              },
+                              child: const Text('Upload'),
+                            ),
+                            const SizedBox(width: 20), // Отступ между кнопками
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/all_photos');
+                              },
+                              child: const Text('All Images'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
               }
 
-              return Stack(children: [
-                CustomScrollView(
-                  slivers: [
-                    SliverPadding(
-                      padding: const EdgeInsets.all(8.0),
-                      sliver: PhotoGridView(
-                        photos: photos,
-                        pinterestView: _isPinterestLayout,
-                        columnCount: _columnCount,
-                        onPhotoTap: (photo, index) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PhotoViewerScreen(
-                                photos: photos,
-                                initialIndex: index,
-                              ),
-                            ),
-                          );
-                        },
-                        onDeleteTap: (photo) {
-                          context.read<PhotoBloc>().add(DeletePhoto(photo.id));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                ColumnSlider(
-                  initialCount: 4,
-                  columnCount: _columnCount,
-                  onChanged: (value) {
-                    setState(() {
-                      _columnCount = value;
-                    });
+              return PhotoGridView(
+                title: '${widget.folder.name} (${photos.length})',
+                showShareBtn: true,
+                photos: photos,
+                actionFromParent: IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () {
+                    FoldersHelpers.showEditFolderDialog(context, widget.folder);
                   },
                 ),
-              ]);
+              );
             } else {
-              return const Center(child: Text('Failed to load photos.'));
+              return const Center(child: Text('Failed to load images.'));
             }
           },
         ),
       ),
-    );
-  }
-}
-
-class PhotoThumbnail extends StatelessWidget {
-  final List<Photo> photos;
-  final int index;
-  final bool isPinterestLayout;
-
-  const PhotoThumbnail({
-    Key? key,
-    required this.photos,
-    required this.index,
-    required this.isPinterestLayout,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final photo = photos[index];
-    final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
-
-    Widget imageWidget = ExtendedImage.file(
-      File(fullPath),
-      enableMemoryCache: true,
-      clearMemoryCacheIfFailed: true,
-      fit: BoxFit.cover,
-    );
-
-    if (isPinterestLayout) {
-      imageWidget = ExtendedImage.file(
-        File(fullPath),
-        fit: BoxFit.cover,
-        cacheWidth: 200,
-        enableMemoryCache: true,
-        clearMemoryCacheIfFailed: true,
-      );
-    } else {
-      imageWidget = ExtendedImage.file(
-        File(fullPath),
-        fit: BoxFit.cover,
-        cacheWidth: 200,
-        width: double.infinity,
-        height: double.infinity,
-        enableMemoryCache: true,
-        clearMemoryCacheIfFailed: true,
-      );
-    }
-
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PhotoViewerScreen(
-              photos: photos,
-              initialIndex: index,
-            ),
-          ),
-        );
-      },
-      child: imageWidget,
     );
   }
 }
