@@ -1,15 +1,26 @@
 // lib/src/presentation/screens/main_screen.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/categories_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/category_widget.dart';
 
-class MainScreen extends StatelessWidget {
+class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
+
+  @override
+  _MainScreenState createState() => _MainScreenState();
+}
+
+class _MainScreenState extends State<MainScreen> {
+  int logoTapCount = 0;
+  Timer? _tapTimer;
 
   @override
   Widget build(BuildContext context) {
@@ -21,28 +32,89 @@ class MainScreen extends StatelessWidget {
             if (snapshot.connectionState == ConnectionState.done &&
                 snapshot.hasData) {
               final packageInfo = snapshot.data!;
+
               return Row(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment:
                     CrossAxisAlignment.end, // Центрируем по нижнему краю
                 children: [
-                  Image.asset(
-                    'assets/refma-logo.png', // Ваш логотип
-                    height: 30, // Уменьшенный размер логотипа
-                  ),
-                  const SizedBox(width: 5), // Отступ между логотипом и версией
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 5.0,
+                  GestureDetector(
+                    onTap: () {
+                      logoTapCount++;
+                      _tapTimer?.cancel();
+                      _tapTimer = Timer(const Duration(seconds: 1), () {
+                        logoTapCount = 0;
+                      });
+
+                      if (logoTapCount >= 3) {
+                        context
+                            .read<SessionBloc>()
+                            .add(ToggleShowPrivateEvent());
+                        logoTapCount = 0;
+                        _tapTimer?.cancel();
+
+                        final showPrivate =
+                            context.read<SessionBloc>().state.showPrivate;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              showPrivate
+                                  ? 'Private mode enabled'
+                                  : 'Private mode disabled',
+                              style: const TextStyle(
+                                  color: Colors.white), // Белый цвет текста
+                              textAlign:
+                                  TextAlign.center, // Центрирование текста
+                            ),
+                            duration: const Duration(seconds: 1),
+                            backgroundColor: Colors.purple, // Фиолетовый фон
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius:
+                                  BorderRadius.circular(10), // Скругленные углы
+                            ),
+                            elevation:
+                                10, // Добавим тень для эффекта всплывания
+                            
+                          ),
+                        );
+                      }
+                    },
+                    child: BlocBuilder<SessionBloc, SessionState>(
+                      builder: (context, sessionState) {
+                        final bool showPrivate = sessionState.showPrivate;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 2, vertical: 2),
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: showPrivate
+                                  ? Colors.purple
+                                  : Colors.transparent,
+                              width: 1.0, // Толщина рамки
+                            ),
+                            borderRadius: BorderRadius.circular(
+                                8.0), // Скругленные углы для рамки
+                          ),
+                          child: Image.asset(
+                            'assets/refma-logo.png', // Ваш логотип
+                            height: 30, // Уменьшенный размер логотипа
+                          ),
+                        );
+                      },
                     ),
+                  ),
+                  const SizedBox(width: 5),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 5.0),
                     child: Align(
-                      alignment:
-                          Alignment.bottomLeft, // Выравнивание по нижнему краю
+                      alignment: Alignment.bottomLeft,
                       child: Text(
                         'v${packageInfo.version}',
                         style: const TextStyle(
                           color: Colors.grey,
-                          fontSize: 10.0, // Маленький шрифт для версии
+                          fontSize: 10.0,
                         ),
                       ),
                     ),
@@ -52,7 +124,7 @@ class MainScreen extends StatelessWidget {
             } else {
               return Image.asset(
                 'assets/refma-logo.png', // Логотип при загрузке версии
-                height: 40, // Задайте нужный размер логотипа
+                height: 40,
               );
             }
           },
@@ -89,7 +161,6 @@ class MainScreen extends StatelessWidget {
             },
             tooltip: 'All Tags',
           ),
-          // Additional icons can be added here if needed
         ],
       ),
       body: BlocBuilder<CategoryBloc, CategoryState>(
@@ -98,10 +169,8 @@ class MainScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           } else if (categoryState is CategoryLoaded) {
             var categories = categoryState.categories;
-            // categories = [];
 
             if (categories.isEmpty) {
-              // Display instructions when there are no categories
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
@@ -135,7 +204,6 @@ class MainScreen extends StatelessWidget {
               },
             );
           } else {
-            // Handle other states if necessary
             return const Center(child: Text('No categories available.'));
           }
         },

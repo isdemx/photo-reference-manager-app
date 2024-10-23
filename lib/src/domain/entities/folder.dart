@@ -25,6 +25,9 @@ class Folder extends HiveObject {
   @HiveField(5)
   int sortOrder;
 
+  @HiveField(7)
+  bool? isPrivate;
+
   Folder({
     required this.id,
     required this.name,
@@ -32,6 +35,7 @@ class Folder extends HiveObject {
     required this.photoIds,
     required this.dateCreated,
     required this.sortOrder,
+    this.isPrivate,
     this.avatarPath
   });
 
@@ -43,6 +47,7 @@ class Folder extends HiveObject {
     List<String>? photoIds,
     DateTime? dateCreated,
     int? sortOrder,
+    bool? isPrivate,
     String? avatarPath, // Новое поле
   }) {
     return Folder(
@@ -52,6 +57,7 @@ class Folder extends HiveObject {
       photoIds: photoIds ?? this.photoIds,
       dateCreated: dateCreated ?? this.dateCreated,
       sortOrder: sortOrder ?? this.sortOrder,
+      isPrivate: isPrivate ?? this.isPrivate,
       avatarPath: avatarPath ?? this.avatarPath, // Новое поле
     );
   }

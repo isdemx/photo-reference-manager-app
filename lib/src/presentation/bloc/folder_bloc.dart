@@ -32,9 +32,12 @@ class FolderBloc extends Bloc<FolderEvent, FolderState> {
   Future<void> _onAddFolder(
       AddFolder event, Emitter<FolderState> emit) async {
     try {
+      print('start add folder');
       await folderRepository.addFolder(event.folder);
+      print('add folder - ready');
       add(LoadFolders());
     } catch (e) {
+      print('add folder, false');
       emit(const FolderError('Failed to add folder'));
     }
   }

@@ -181,36 +181,57 @@ class CategoriesHelpers {
 
   static void showAddFolderDialog(BuildContext context, Category category) {
     final TextEditingController _controller = TextEditingController();
+    bool _isPrivate = false; // Переменная для отслеживания состояния чекбокса
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Add Folder'),
-          content: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(hintText: 'Folder Name'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                final String name = _controller.text.trim();
-                if (name.isNotEmpty) {
-                  final Folder folder = Folder(
-                    id: const Uuid().v4(),
-                    name: name,
-                    categoryId: category.id,
-                    photoIds: [],
-                    dateCreated: DateTime.now(),
-                    sortOrder: 0,
-                  );
-                  context.read<FolderBloc>().add(AddFolder(folder));
-                  Navigator.of(context).pop();
-                }
-              },
-              child: const Text('Add'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Add Folder'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _controller,
+                    decoration: const InputDecoration(hintText: 'Folder Name'),
+                  ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    title: const Text('Is Private (3 taps on logo to show)'),
+                    value: _isPrivate,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isPrivate = value ?? false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    final String name = _controller.text.trim();
+                    if (name.isNotEmpty) {
+                      final Folder folder = Folder(
+                        id: const Uuid().v4(),
+                        name: name,
+                        categoryId: category.id,
+                        photoIds: [],
+                        dateCreated: DateTime.now(),
+                        isPrivate: _isPrivate, // Используем значение чекбокса
+                        sortOrder: 0,
+                      );
+                      context.read<FolderBloc>().add(AddFolder(folder));
+                      Navigator.of(context).pop();
+                    }
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

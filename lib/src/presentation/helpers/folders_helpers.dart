@@ -35,44 +35,72 @@ class FoldersHelpers {
   }
 
   static void showEditFolderDialog(BuildContext context, Folder folder) {
-    final TextEditingController _controller = TextEditingController();
-    _controller.text = folder.name;
+    final TextEditingController _controller =
+        TextEditingController(text: folder.name);
+    bool _isPrivate = folder.isPrivate ??
+        false; // Инициализация на основе текущего значения isPrivate
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Folder Name'),
-          content: TextField(
-            controller: _controller,
-            decoration: const InputDecoration(hintText: 'Folder Name'),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: () {
-                Navigator.of(context).pop(); // Закрываем диалог редактирования
-                deleteFolderAfterConfirmation(
-                    context, folder); // Показываем диалог подтверждения
-              },
-            ),
-            TextButton(
-              onPressed: () {
-                final String newName = _controller.text.trim();
-                if (newName.isNotEmpty) {
-                  // Обновляем имя папки
-                  final updatedFolder = folder.copyWith(name: newName);
-                  context.read<FolderBloc>().add(UpdateFolder(updatedFolder));
-                  Navigator.of(context).pop(); // Закрываем диалог
-                }
-              },
-              child: const Text('OK'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(), // Закрываем диалог
-              child: const Text('Cancel'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Edit Folder Name'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _controller,
+                    decoration: const InputDecoration(hintText: 'Folder Name'),
+                  ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    title: const Text('Is Private (3 taps on logo to show'),
+                    value: _isPrivate,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isPrivate = value ?? false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () {
+                    Navigator.of(context)
+                        .pop(); // Закрываем диалог редактирования
+                    deleteFolderAfterConfirmation(
+                        context, folder); // Показываем диалог подтверждения
+                  },
+                ),
+                TextButton(
+                  onPressed: () {
+                    final String newName = _controller.text.trim();
+                    if (newName.isNotEmpty) {
+                      // Обновляем имя папки и флаг приватности
+                      final updatedFolder = folder.copyWith(
+                        name: newName,
+                        isPrivate: _isPrivate,
+                      );
+                      context
+                          .read<FolderBloc>()
+                          .add(UpdateFolder(updatedFolder));
+                      Navigator.of(context).pop(); // Закрываем диалог
+                    }
+                  },
+                  child: const Text('OK'),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      Navigator.of(context).pop(), // Закрываем диалог
+                  child: const Text('Cancel'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

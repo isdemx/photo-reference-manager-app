@@ -15,6 +15,7 @@ import 'package:photographers_reference_app/src/domain/entities/user_settings.da
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/screens/all_photos_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/all_tags_screen.dart';
@@ -114,23 +115,29 @@ class PhotographersReferenceApp extends StatelessWidget {
         providers: [
           BlocProvider<CategoryBloc>(
             create: (context) => CategoryBloc(
-              categoryRepository: RepositoryProvider.of<CategoryRepositoryImpl>(context),
+              categoryRepository:
+                  RepositoryProvider.of<CategoryRepositoryImpl>(context),
             )..add(LoadCategories()),
           ),
           BlocProvider<FolderBloc>(
             create: (context) => FolderBloc(
-              folderRepository: RepositoryProvider.of<FolderRepositoryImpl>(context),
+              folderRepository:
+                  RepositoryProvider.of<FolderRepositoryImpl>(context),
             )..add(LoadFolders()),
           ),
           BlocProvider<PhotoBloc>(
             create: (context) => PhotoBloc(
-              photoRepository: RepositoryProvider.of<PhotoRepositoryImpl>(context),
+              photoRepository:
+                  RepositoryProvider.of<PhotoRepositoryImpl>(context),
             )..add(LoadPhotos()),
           ),
           BlocProvider<TagBloc>(
             create: (context) => TagBloc(
               tagRepository: RepositoryProvider.of<TagRepositoryImpl>(context),
             )..add(LoadTags()),
+          ),
+          BlocProvider<SessionBloc>(
+            create: (context) => SessionBloc(),
           ),
         ],
         child: MaterialApp(
