@@ -58,15 +58,18 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
     // Рассчитываем отступ, чтобы текущая миниатюра оказалась в центре
     final double offset =
-        (index * itemWidth - (screenWidth / 2) + (itemWidth / 2)) + (screenWidth / 2) ;
+        (index * itemWidth - (screenWidth / 2) + (itemWidth / 2)) +
+            (screenWidth / 2);
 
-    // Прокручиваем миниатюры к нужной позиции с центрированием
-    await _thumbnailScrollController.animateTo(
-      offset.clamp(_thumbnailScrollController.position.minScrollExtent,
-          _thumbnailScrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    // Используем jumpTo для мгновенного скролла
+    if (_thumbnailScrollController.hasClients) {
+      _thumbnailScrollController.jumpTo(
+        offset.clamp(
+          _thumbnailScrollController.position.minScrollExtent,
+          _thumbnailScrollController.position.maxScrollExtent,
+        ),
+      );
+    }
   }
 
   @override
@@ -116,11 +119,17 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         // Показываем статус бар
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
         WakelockPlus.disable();
+
+        // Используем addPostFrameCallback, чтобы дождаться полной отрисовки виджетов
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_thumbnailScrollController.hasClients) {
+            _scrollThumbnailsToCenter(_currentIndex);
+          }
+        });
       } else {
         // Скрываем статус бар
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
         WakelockPlus.enable();
-
       }
     });
   }
@@ -180,7 +189,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       final double itemWidth = 30.0; // Ширина миниатюры
       final double scrollOffset = _thumbnailScrollController.offset;
       final double centerPosition =
-          (scrollOffset + screenWidth / 2) - (screenWidth / 2) ;
+          (scrollOffset + screenWidth / 2) - (screenWidth / 2);
 
       int index = (centerPosition / itemWidth)
           .floor()

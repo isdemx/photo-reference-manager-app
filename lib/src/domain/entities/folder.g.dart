@@ -23,13 +23,15 @@ class FolderAdapter extends TypeAdapter<Folder> {
       photoIds: (fields[3] as List).cast<String>(),
       dateCreated: fields[4] as DateTime,
       sortOrder: fields[5] as int,
+      isPrivate: fields[7] as bool?,
+      avatarPath: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Folder obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -40,8 +42,12 @@ class FolderAdapter extends TypeAdapter<Folder> {
       ..write(obj.photoIds)
       ..writeByte(4)
       ..write(obj.dateCreated)
+      ..writeByte(6)
+      ..write(obj.avatarPath)
       ..writeByte(5)
-      ..write(obj.sortOrder);
+      ..write(obj.sortOrder)
+      ..writeByte(7)
+      ..write(obj.isPrivate);
   }
 
   @override

@@ -1,5 +1,3 @@
-// lib/src/presentation/screens/all_tags_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
@@ -9,7 +7,6 @@ import 'package:photographers_reference_app/src/presentation/helpers/custom_snac
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
-import 'package:vibration/vibration.dart';
 
 class AllTagsScreen extends StatefulWidget {
   const AllTagsScreen({Key? key}) : super(key: key);
@@ -66,17 +63,21 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
             } else if (tagState is TagLoaded) {
               final tags = tagState.tags;
               final photoState = context.watch<PhotoBloc>().state;
+
               if (photoState is PhotoLoading) {
                 return const Center(child: CircularProgressIndicator());
               } else if (photoState is PhotoLoaded) {
                 final photos = photoState.photos;
-                tagPhotoCounts =
-                    TagsHelpers.computeTagPhotoCounts(tags, photos);
+
+                // Обновляем подсчет фотографий для каждого тега
+                tagPhotoCounts = _computeTagPhotoCounts(tags, photos);
+
+                // Сортируем теги, но не скрываем теги с нулем фотографий
                 final sortedTags = List<Tag>.from(tags);
                 sortedTags.sort((a, b) {
                   final countA = tagPhotoCounts[a.id] ?? 0;
                   final countB = tagPhotoCounts[b.id] ?? 0;
-                  return countB.compareTo(countA);
+                  return countB.compareTo(countA); // Сортируем по количеству фото
                 });
 
                 return ListView.builder(
@@ -86,7 +87,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                     final photoCount = tagPhotoCounts[tag.id] ?? 0;
 
                     return ListTile(
-                      key: ValueKey(tag.id), // Добавляем уникальный ключ
+                      key: ValueKey(tag.id), // Уникальный ключ для каждого тега
                       leading: InkWell(
                         onTap: () {
                           Navigator.push(
@@ -134,16 +135,35 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
               } else if (photoState is PhotoError) {
                 return Center(child: Text('Error: ${photoState.message}'));
               } else {
-                return const Center(child: Text('Caanot load images'));
+                return const Center(child: Text('Cannot load images.'));
               }
             } else if (tagState is TagError) {
               return Center(child: Text('Error: ${tagState.message}'));
             } else {
-              return const Center(child: Text('Caanot load tags'));
+              return const Center(child: Text('Cannot load tags.'));
             }
           },
         ),
       ),
     );
+  }
+
+  // Функция для подсчета количества фотографий для каждого тега
+  Map<String, int> _computeTagPhotoCounts(List<Tag> tags, List photos) {
+    final Map<String, int> counts = {};
+
+    for (var tag in tags) {
+      // Инициализируем количество фотографий для каждого тега как 0
+      counts[tag.id] = 0;
+
+      // Считаем, сколько фотографий связано с каждым тегом
+      for (var photo in photos) {
+        if (photo.tagIds.contains(tag.id)) {
+          counts[tag.id] = (counts[tag.id] ?? 0) + 1;
+        }
+      }
+    }
+
+    return counts;
   }
 }

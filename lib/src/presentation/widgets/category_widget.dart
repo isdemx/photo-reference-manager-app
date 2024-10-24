@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/categories_helpers.dart';
@@ -17,7 +18,11 @@ class CategoryWidget extends StatelessWidget {
     return BlocBuilder<SessionBloc, SessionState>(
       builder: (context, sessionState) {
         final showPrivate = sessionState.showPrivate;
-        print('sessionState ${sessionState}');
+
+        // Пропускаем приватные категории, если showPrivate = false
+        if (!showPrivate && (category.isPrivate == true)) {
+          return const SizedBox.shrink(); // Не показываем категорию
+        }
 
         return ExpansionTile(
           shape: const Border(),
@@ -28,7 +33,12 @@ class CategoryWidget extends StatelessWidget {
             },
             child: Text(category.name),
           ),
-          initiallyExpanded: true,
+          initiallyExpanded: category.collapsed != true, // Если collapsed != true, категория раскрыта
+          onExpansionChanged: (isExpanded) {
+            // Отправляем событие обновления категории при изменении состояния (сворачивание/разворачивание)
+            final updatedCategory = category.copyWith(collapsed: !isExpanded);
+            context.read<CategoryBloc>().add(UpdateCategory(updatedCategory));
+          },
           trailing: IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {

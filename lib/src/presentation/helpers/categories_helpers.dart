@@ -46,94 +46,113 @@ class CategoriesHelpers {
   static void showEditCategoryDialog(BuildContext context, Category category) {
     final TextEditingController controller = TextEditingController();
     controller.text = category.name;
+    bool _isPrivate = category.isPrivate ?? false;
 
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text('Edit Category'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'Category Name'),
-          ),
-          actions: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Кнопка для перемещения категории вверх
-                IconButton(
-                  icon: const Icon(Icons.arrow_upward),
-                  onPressed: () {
-                    final categories = context.read<CategoryBloc>().state;
-                    if (categories is CategoryLoaded) {
-                      final sortedCategories = sortCategories(
-                        categories: categories.categories,
-                        categoryId: category.id,
-                        move: 'up',
-                      );
-                      // Обновляем все категории с новыми сортировками
-                      for (var updatedCategory in sortedCategories) {
-                        context
-                            .read<CategoryBloc>()
-                            .add(UpdateCategory(updatedCategory));
-                      }
-                    }
-                    Navigator.of(context).pop();
-                  },
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Edit Category'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: controller,
+                    decoration:
+                        const InputDecoration(hintText: 'Category Name'),
+                  ),
+                  const SizedBox(height: 16.0),
+                  CheckboxListTile(
+                    title: const Text('Is Private'),
+                    value: _isPrivate,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _isPrivate = value ?? false;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    // Кнопка для перемещения категории вверх
+                    IconButton(
+                      icon: const Icon(Icons.arrow_upward),
+                      onPressed: () {
+                        final categories = context.read<CategoryBloc>().state;
+                        if (categories is CategoryLoaded) {
+                          final sortedCategories = sortCategories(
+                            categories: categories.categories,
+                            categoryId: category.id,
+                            move: 'up',
+                          );
+                          // Обновляем все категории с новыми сортировками
+                          for (var updatedCategory in sortedCategories) {
+                            context
+                                .read<CategoryBloc>()
+                                .add(UpdateCategory(updatedCategory));
+                          }
+                        }
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // Кнопка для перемещения категории вниз
+                    IconButton(
+                      icon: const Icon(Icons.arrow_downward),
+                      onPressed: () {
+                        final categories = context.read<CategoryBloc>().state;
+                        if (categories is CategoryLoaded) {
+                          final sortedCategories = sortCategories(
+                            categories: categories.categories,
+                            categoryId: category.id,
+                            move: 'down',
+                          );
+                          // Обновляем все категории с новыми сортировками
+                          for (var updatedCategory in sortedCategories) {
+                            context
+                                .read<CategoryBloc>()
+                                .add(UpdateCategory(updatedCategory));
+                          }
+                        }
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                    // Кнопка для удаления категории
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () {
+                        Navigator.of(context)
+                            .pop(); // Закрываем диалог редактирования
+                        confirmDeleteCategory(context,
+                            category); // Показываем диалог подтверждения
+                      },
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        final String newName = controller.text.trim();
+                        if (newName.isNotEmpty) {
+                          // Обновляем имя категории и isPrivate
+                          final updatedCategory = category.copyWith(
+                            name: newName,
+                            isPrivate: _isPrivate,
+                          );
+                          context
+                              .read<CategoryBloc>()
+                              .add(UpdateCategory(updatedCategory));
+                          Navigator.of(context).pop(); // Закрываем диалог
+                        }
+                      },
+                      child: const Text('OK'),
+                    ),
+                  ],
                 ),
-                // Кнопка для перемещения категории вниз
-                IconButton(
-                  icon: const Icon(Icons.arrow_downward),
-                  onPressed: () {
-                    final categories = context.read<CategoryBloc>().state;
-                    if (categories is CategoryLoaded) {
-                      final sortedCategories = sortCategories(
-                        categories: categories.categories,
-                        categoryId: category.id,
-                        move: 'down',
-                      );
-                      // Обновляем все категории с новыми сортировками
-                      for (var updatedCategory in sortedCategories) {
-                        context
-                            .read<CategoryBloc>()
-                            .add(UpdateCategory(updatedCategory));
-                      }
-                    }
-                    Navigator.of(context).pop();
-                  },
-                ),
-                // Кнопка для удаления категории
-                IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
-                  onPressed: () {
-                    Navigator.of(context)
-                        .pop(); // Закрываем диалог редактирования
-                    confirmDeleteCategory(
-                        context, category); // Показываем диалог подтверждения
-                  },
-                ),
-                TextButton(
-                  onPressed: () {
-                    final String newName = controller.text.trim();
-                    if (newName.isNotEmpty) {
-                      // Обновляем имя категории
-                      final updatedCategory = category.copyWith(name: newName);
-                      context
-                          .read<CategoryBloc>()
-                          .add(UpdateCategory(updatedCategory));
-                      Navigator.of(context).pop(); // Закрываем диалог
-                    }
-                  },
-                  child: const Text('OK'),
-                ),
-                // TextButton(
-                //   onPressed: () =>
-                //       Navigator.of(context).pop(), // Закрываем диалог
-                //   child: const Text('Cancel'),
-                // ),
               ],
-            ),
-          ],
+            );
+          },
         );
       },
     );

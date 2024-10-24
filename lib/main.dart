@@ -38,6 +38,11 @@ void main() async {
   Hive.registerAdapter(TagAdapter());
   Hive.registerAdapter(UserSettingsAdapter());
 
+  // Init Not Ref tag
+  final tagBox = await Hive.openBox<Tag>('tags');
+  final tagRepository = TagRepositoryImpl(tagBox);
+  await tagRepository.initializeDefaultTags();
+
   runApp(MyApp());
 }
 

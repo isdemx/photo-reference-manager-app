@@ -16,7 +16,13 @@ class FolderRepositoryImpl implements FolderRepository {
 
   @override
   Future<List<Folder>> getFolders() async {
-    return folderBox.values.toList();
+    final folders = folderBox.values.toList();
+
+    folders.forEach((folder) {
+      print('Folder name: ${folder.name}, isPrivate: ${folder.isPrivate}');
+    });
+
+    return folders;
   }
 
   @override
@@ -28,7 +34,7 @@ class FolderRepositoryImpl implements FolderRepository {
   Future<void> updateFolder(Folder folder) async {
     try {
       await folderBox.put(folder.id, folder);
-      print('Folder SAVED');
+      print('Folder SAVED ${folder.isPrivate}');
     } catch (e) {
       print('Error saving folder: $e');
       rethrow;

@@ -21,13 +21,15 @@ class CategoryAdapter extends TypeAdapter<Category> {
       name: fields[1] as String,
       folderIds: (fields[2] as List).cast<String>(),
       sortOrder: fields[3] as int,
+      isPrivate: fields[4] as bool?,
+      collapsed: fields[5] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Category obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -35,7 +37,11 @@ class CategoryAdapter extends TypeAdapter<Category> {
       ..writeByte(2)
       ..write(obj.folderIds)
       ..writeByte(3)
-      ..write(obj.sortOrder);
+      ..write(obj.sortOrder)
+      ..writeByte(4)
+      ..write(obj.isPrivate)
+      ..writeByte(5)
+      ..write(obj.collapsed);
   }
 
   @override
