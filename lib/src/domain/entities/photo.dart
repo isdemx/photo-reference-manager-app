@@ -33,6 +33,9 @@ class Photo extends HiveObject {
   @HiveField(8)
   String fileName; // Храните только имя файла
 
+  @HiveField(9)
+  final Map<String, double>? geoLocation; // Новое поле для геолокации
+
   Photo({
     required this.id,
     required this.path,
@@ -43,10 +46,11 @@ class Photo extends HiveObject {
     required this.dateAdded,
     required this.sortOrder,
     this.isStoredInApp = false,
+    this.geoLocation,
   });
 
   @override
   String toString() {
-    return 'Photo{id: $id, fileName: "$fileName", isStoredInApp: $isStoredInApp, tagIds: $tagIds, folderIds: $folderIds}';
+    return 'Photo{id: $id, fileName: "$fileName", geoLocation: $geoLocation, isStoredInApp: $isStoredInApp, tagIds: $tagIds, folderIds: $folderIds}';
   }
 }

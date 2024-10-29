@@ -10,11 +10,11 @@
 		</data>
 		<key>flutter_assets/AssetManifest.bin</key>
 		<data>
-		C3P3EBHSTWaxyW47TH6Hk1RUB8s=
+		XEgWJQuhd6cHnvf8Cd5SA0MLMn8=
 		</data>
 		<key>flutter_assets/AssetManifest.json</key>
 		<data>
-		JXGzFPU3IJNvaNgzj+ah5cT39oM=
+		W4oCedwuvK0j+PT1r4BrqgwiURc=
 		</data>
 		<key>flutter_assets/FontManifest.json</key>
 		<data>
@@ -22,7 +22,7 @@
 		</data>
 		<key>flutter_assets/NOTICES.Z</key>
 		<data>
-		xTuFRHGNqNWLKqpsMxOzvLtq+aI=
+		oDQfbOTH4e4wQcOcrJ60bexHtm0=
 		</data>
 		<key>flutter_assets/assets/refma-logo.png</key>
 		<data>
@@ -38,11 +38,15 @@
 		</data>
 		<key>flutter_assets/kernel_blob.bin</key>
 		<data>
-		nQtHhNMpLepkUDfLjr2CpxJgnCo=
+		SCyC496Ixptp7WWSHQq6m2dn3yo=
 		</data>
 		<key>flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf</key>
 		<data>
 		Bvk+P1ykE1PGRdktwgwDyz6AOqM=
+		</data>
+		<key>flutter_assets/packages/flutter_map/lib/assets/flutter_map_logo.png</key>
+		<data>
+		kUCCgXRmQ7Ql3lxXrdQuoudq1L8=
 		</data>
 		<key>flutter_assets/packages/wakelock_plus/assets/no_sleep.js</key>
 		<data>
@@ -63,14 +67,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			r0gvMBRJwg83Z+O3uaTT/FPwvihCpa/cL5NZGId7hjw=
+			VLS/MoPciA1u6wQiB4n1W273zx8wLUmBV4ZYrty2GiE=
 			</data>
 		</dict>
 		<key>flutter_assets/AssetManifest.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			pHsGg+/RSWkm3JmOe/U4Vs/duTAPCIZCrOmOEe1vCRE=
+			++9ir+JHw04KDNeNPhhN2vWQ6DYH5YovTEdfC8uXN48=
 			</data>
 		</dict>
 		<key>flutter_assets/FontManifest.json</key>
@@ -84,7 +88,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			X+w0yP6PDAFo1m7qId008gnpCLoWnsVGYg7i+zYCGhg=
+			VzYLsNql787PxpwyW5nuZDk3Qm+6GD5OmhIvKWvbVSw=
 			</data>
 		</dict>
 		<key>flutter_assets/assets/refma-logo.png</key>
@@ -112,7 +116,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			d6hmg2CexWZXtj8IdxxrZzbEzvYirqQ3Q9Mn7ZV4zlA=
+			25eV58m9AUyBp6bv6nVP9+tJl2L7U5z7ygwAUM+OoDw=
 			</data>
 		</dict>
 		<key>flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf</key>
@@ -120,6 +124,13 @@
 			<key>hash2</key>
 			<data>
 			Z8RP6Rg7AC553ef2l34piGYcmj5KPF/OloeH79vtgjw=
+			</data>
+		</dict>
+		<key>flutter_assets/packages/flutter_map/lib/assets/flutter_map_logo.png</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			YFGuQvtQWTGoM+WPkgmp+WZppNDks/BvbYLN4SoOBAE=
 			</data>
 		</dict>
 		<key>flutter_assets/packages/wakelock_plus/assets/no_sleep.js</key>

@@ -26,13 +26,14 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       dateAdded: fields[5] as DateTime,
       sortOrder: fields[6] as int,
       isStoredInApp: fields[7] as bool,
+      geoLocation: (fields[9] as Map?)?.cast<String, double>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Photo obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       ..writeByte(7)
       ..write(obj.isStoredInApp)
       ..writeByte(8)
-      ..write(obj.fileName);
+      ..write(obj.fileName)
+      ..writeByte(9)
+      ..write(obj.geoLocation);
   }
 
   @override

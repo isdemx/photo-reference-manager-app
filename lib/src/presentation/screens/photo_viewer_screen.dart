@@ -6,6 +6,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
+import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -54,7 +55,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   Future<void> _scrollThumbnailsToCenter(int index) async {
     final double screenWidth = MediaQuery.of(context).size.width;
-    final double itemWidth = 30.0; // Ширина одной миниатюры
+    const double itemWidth = 30.0; // Ширина одной миниатюры
 
     // Рассчитываем отступ, чтобы текущая миниатюра оказалась в центре
     final double offset =
@@ -89,8 +90,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Future<void> _deleteImageWithConfirmation(BuildContext context) async {
-    var res = await ImagesHelpers.deleteImagesWithConfirmation(
-        context, [widget.photos[_currentIndex]]);
+    List<Photo> photos =
+        _selectPhotoMode ? _selectedPhotos : [widget.photos[_currentIndex]];
+    var res = await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
 
     if (res) {
       setState(() {
@@ -186,7 +188,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     if (!isInitScrolling) {
       // Только если не в процессе инициализации
       final double screenWidth = MediaQuery.of(context).size.width;
-      final double itemWidth = 30.0; // Ширина миниатюры
+      const double itemWidth = 30.0; // Ширина миниатюры
       final double scrollOffset = _thumbnailScrollController.offset;
       final double centerPosition =
           (scrollOffset + screenWidth / 2) - (screenWidth / 2);
@@ -256,6 +258,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           : null,
       body: GestureDetector(
         onTap: _toggleActions,
+        onLongPress: () => {vibrate(), _enableSelectPhotoMode()},
         child: Stack(
           children: [
             Column(
@@ -278,7 +281,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       return PhotoView(
                         imageProvider: FileImage(File(fullPath)),
                         errorBuilder: (context, error, stackTrace) {
-                          print('Error loading image: $error');
                           return const Center(
                             child: Icon(Icons.broken_image,
                                 size: 50, color: Colors.red),
@@ -347,6 +349,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 right: 0,
                 child: ActionBar(
                   photo: photos[_currentIndex],
+                  photos: photos,
                   isSelectionMode:
                       _selectedPhotos.isNotEmpty || _selectPhotoMode,
                   enableSelectPhotoMode: _enableSelectPhotoMode,
@@ -354,6 +357,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     _shareSelectedPhotos();
                   },
                   deletePhoto: () => _deleteImageWithConfirmation(context),
+                  onAddToFolder: () => null,
                   onCancel: () {
                     _clearSelection();
                   },

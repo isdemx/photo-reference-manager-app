@@ -59,6 +59,10 @@ dependencies:
   package_info_plus: ^8.0.3
   shared_preferences: ^2.3.2
   get: ^4.6.6
+  exif: ^3.3.0
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+  geolocator: ^13.0.1
 
 
 dev_dependencies:

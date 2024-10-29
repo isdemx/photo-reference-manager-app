@@ -158,6 +158,12 @@
       "languageVersion": "3.1"
     },
     {
+      "name": "dart_earcut",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dart_earcut-1.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "dart_style",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dart_style-2.3.6",
       "packageUri": "lib/",
@@ -184,6 +190,12 @@
     {
       "name": "equatable",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/equatable-2.0.5",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "exif",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/exif-3.3.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -278,6 +290,12 @@
       "languageVersion": "3.1"
     },
     {
+      "name": "flutter_map",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_map-7.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "flutter_native_splash",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.1",
       "packageUri": "lib/",
@@ -318,6 +336,42 @@
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/frontend_server_client-4.0.0",
       "packageUri": "lib/",
       "languageVersion": "3.0"
+    },
+    {
+      "name": "geolocator",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator-13.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
+      "name": "geolocator_android",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_android-4.6.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
+      "name": "geolocator_apple",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.7",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
+      "name": "geolocator_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_platform_interface-4.2.4",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
+    },
+    {
+      "name": "geolocator_web",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_web-4.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "geolocator_windows",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_windows-0.2.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.15"
     },
     {
       "name": "get",
@@ -464,6 +518,12 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "latlong2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/latlong2-0.9.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "leak_tracker",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/leak_tracker-10.0.5",
       "packageUri": "lib/",
@@ -488,6 +548,18 @@
       "languageVersion": "3.1"
     },
     {
+      "name": "lists",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/lists-1.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "logger",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/logger-2.4.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.17"
+    },
+    {
       "name": "logging",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/logging-1.2.0",
       "packageUri": "lib/",
@@ -508,6 +580,12 @@
     {
       "name": "meta",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/meta-1.15.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "mgrs_dart",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/mgrs_dart-2.0.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -650,8 +728,20 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "polylabel",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/polylabel-1.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.13"
+    },
+    {
       "name": "pool",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/pool-1.5.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "proj4dart",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/proj4dart-2.1.0",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -818,6 +908,12 @@
       "languageVersion": "2.17"
     },
     {
+      "name": "unicode",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/unicode-0.3.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "universal_io",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/universal_io-2.2.2",
       "packageUri": "lib/",
@@ -920,6 +1016,12 @@
       "languageVersion": "3.4"
     },
     {
+      "name": "wkt_parser",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/wkt_parser-2.0.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "xdg_directories",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/xdg_directories-1.0.4",
       "packageUri": "lib/",
@@ -944,7 +1046,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-10-24T11:47:00.479749Z",
+  "generated": "2024-10-28T23:22:12.284180Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

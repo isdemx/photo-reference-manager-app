@@ -1,5 +1,6 @@
 // lib/src/presentation/screens/upload_screen.dart
 
+import 'package:exif/exif.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -34,6 +35,73 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  Future<Map<String, double>?> _getGeoLocation(String imagePath) async {
+    final bytes = await File(imagePath).readAsBytes();
+    final tags = await readExifFromBytes(bytes);
+
+    if (tags.containsKey('GPS GPSLatitude') &&
+        tags.containsKey('GPS GPSLongitude')) {
+      final latitude =
+          (tags['GPS GPSLatitude']?.values as IfdValues?)?.toList();
+      final longitude =
+          (tags['GPS GPSLongitude']?.values as IfdValues?)?.toList();
+
+      final latitudeRef = tags['GPS GPSLatitudeRef']?.printable;
+      final longitudeRef = tags['GPS GPSLongitudeRef']?.printable;
+
+      if (latitude != null && longitude != null) {
+        print('latitude $latitude');
+        print('longitude $longitude');
+        final lat = _toDecimalDegrees(latitude, latitudeRef);
+        final lon = _toDecimalDegrees(longitude, longitudeRef);
+
+        print('add locatrion: lat: $lat, lon: $lon');
+
+        return {'lat': lat, 'lon': lon};
+      }
+    }
+    return null;
+  }
+
+  double _toDecimalDegrees(List values, String? ref) {
+    double degrees = 0.0, minutes = 0.0, seconds = 0.0;
+
+    // Преобразование значения в double для каждого компонента
+    if (values.isNotEmpty) {
+      degrees = _toDouble(values[0]);
+      minutes = _toDouble(values[1]) / 60;
+      seconds = _toDouble(values[2]) / 3600;
+    }
+
+    double decimal = degrees + minutes + seconds;
+
+    // Инверсия для южной или западной полушарий
+    if (ref == 'S' || ref == 'W') {
+      decimal = -decimal;
+    }
+
+    print('decimal $decimal');
+
+    return decimal;
+  }
+
+  double _toDouble(dynamic value) {
+    print('_toDouble $value, type: ${value.runtimeType}'); // Для отладки типа
+
+    if (value is Ratio) {
+      // Проверка, является ли значение типом Ratio
+      return value.numerator /
+          value.denominator; // Вычисляем значение как дробь
+    } else if (value is int) {
+      return value.toDouble();
+    } else if (value is double) {
+      return value;
+    }
+
+    print('Unhandled value type: ${value.runtimeType}');
+    return 0.0; // Значение по умолчанию
+  }
+
   Future<void> _uploadImages() async {
     if (_images != null && _images!.isNotEmpty) {
       setState(() {
@@ -42,19 +110,17 @@ class _UploadScreenState extends State<UploadScreen> {
         _stopRequested = false;
       });
 
-      // Включаем Wakelock
-      WakelockPlus.enable();
+      WakelockPlus.enable(); // Включаем Wakelock
 
       final photoRepository =
           RepositoryProvider.of<PhotoRepositoryImpl>(context);
-      // List<Photo> addedPhotos = [];
 
       for (var i = 0; i < _images!.length; i++) {
-        if (_stopRequested) {
-          break;
-        }
+        if (_stopRequested) break;
 
         final image = _images![i];
+        final geoLocation =
+            await _getGeoLocation(image.path); // Получаем геолокацию
 
         final photo = Photo(
           id: const Uuid().v4(),
@@ -66,62 +132,43 @@ class _UploadScreenState extends State<UploadScreen> {
           sortOrder: 0,
           fileName: path_package.basename(image.path),
           isStoredInApp: true,
+          geoLocation: geoLocation, // Сохраняем геолокацию, если доступна
         );
 
         try {
-          // Добавляем фото в репозиторий (асинхронно)
           await photoRepository.addPhoto(photo);
-
-          // Добавляем фото в список добавленных
-          // addedPhotos.add(photo);
-
           setState(() {
             _uploadedCount++;
           });
-
-          // vibrate();
         } catch (e) {
-          // Обработка ошибок при добавлении фото
           print('Error adding image: $e');
         }
       }
 
-      // Отключаем Wakelock
-      WakelockPlus.disable();
+      WakelockPlus.disable(); // Отключаем Wakelock
 
       setState(() {
         _isUploading = false;
         if (_stopRequested) {
-          // Удаляем оставшиеся изображения из списка
           _images = _images!.sublist(0, _uploadedCount);
         } else {
           _images = null;
         }
       });
 
-      // Обновляем состояние PhotoBloc
       context.read<PhotoBloc>().add(LoadPhotos());
 
       if (!_stopRequested) {
-        // context.read<PhotoBloc>().add(PhotosAdded(addedPhotos));
-
-        // Показ лоадера на время удаления временных файлов
         setState(() {
           _isUploading = true; // Включаем лоадер для удаления
         });
 
-        print('Bef creal');
-
         context.read<PhotoBloc>().add(ClearTemporaryFiles());
 
-        print('Aft creal');
-
-        // Скрываем лоадер после удаления временных файлов
         setState(() {
           _isUploading = false;
         });
 
-        // Navigator.pop(context);
         Navigator.pushNamed(context, '/all_photos');
       }
     }
@@ -135,8 +182,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
   @override
   void dispose() {
-    // На случай, если Wakelock остался включенным
-    WakelockPlus.disable();
+    WakelockPlus.disable(); // На случай, если Wakelock остался включенным
     super.dispose();
   }
 

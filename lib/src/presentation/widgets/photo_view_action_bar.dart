@@ -2,25 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/map_with_photos.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
 
 class ActionBar extends StatelessWidget {
   final Photo photo;
+  final List<Photo> photos;
   final bool isSelectionMode;
   final VoidCallback onShare;
   final VoidCallback onCancel;
   final VoidCallback enableSelectPhotoMode;
   final VoidCallback deletePhoto;
+  final VoidCallback onAddToFolder;
 
   const ActionBar({
-    Key? key,
+    super.key,
     required this.photo,
+    required this.photos,
     required this.isSelectionMode,
     required this.onShare,
     required this.onCancel,
     required this.enableSelectPhotoMode,
     required this.deletePhoto,
-  }) : super(key: key);
+    required this.onAddToFolder,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +58,14 @@ class ActionBar extends StatelessWidget {
                       backgroundColor: const Color.fromARGB(255, 35, 107, 166),
                     ),
                   ),
+                  ElevatedButton.icon(
+                    onPressed: deletePhoto,
+                    icon: const Icon(Icons.delete),
+                    label: const Text('Delete'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 237, 75, 6),
+                    ),
+                  ),
                 ],
               )
             else
@@ -72,11 +85,42 @@ class ActionBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8.0),
+                  // Expanded(
+                  //   child: IconButton(
+                  //     icon: const Icon(Icons.share, color: Colors.white),
+                  //     onPressed: enableSelectPhotoMode,
+                  //     tooltip: 'Share Images',
+                  //   ),
+                  // ),
                   Expanded(
                     child: IconButton(
-                      icon: const Icon(Icons.share, color: Colors.white),
-                      onPressed: enableSelectPhotoMode,
-                      tooltip: 'Share Images',
+                      icon: Icon(
+                        Icons.location_on,
+                        color: photo.geoLocation != null
+                            ? Colors.blue
+                            : Colors.grey, // серый, если нет геолокации
+                      ),
+                      onPressed: () {
+                        if (photos.any((photo) => photo.geoLocation != null)) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PhotoMapWidget(
+                                photos: photos,
+                                activePhoto: photo,
+                              ),
+                            ),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                  'No location data available for photos.'),
+                            ),
+                          );
+                        }
+                      },
+                      tooltip: 'View Photos on Map',
                     ),
                   ),
                   Expanded(
