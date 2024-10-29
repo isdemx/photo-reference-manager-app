@@ -42,21 +42,16 @@ class _UploadScreenState extends State<UploadScreen> {
     if (tags.containsKey('GPS GPSLatitude') &&
         tags.containsKey('GPS GPSLongitude')) {
       final latitude =
-          (tags['GPS GPSLatitude']?.values as IfdValues?)?.toList();
+          (tags['GPS GPSLatitude']?.values)?.toList();
       final longitude =
-          (tags['GPS GPSLongitude']?.values as IfdValues?)?.toList();
+          (tags['GPS GPSLongitude']?.values)?.toList();
 
       final latitudeRef = tags['GPS GPSLatitudeRef']?.printable;
       final longitudeRef = tags['GPS GPSLongitudeRef']?.printable;
 
       if (latitude != null && longitude != null) {
-        print('latitude $latitude');
-        print('longitude $longitude');
         final lat = _toDecimalDegrees(latitude, latitudeRef);
         final lon = _toDecimalDegrees(longitude, longitudeRef);
-
-        print('add locatrion: lat: $lat, lon: $lon');
-
         return {'lat': lat, 'lon': lon};
       }
     }
@@ -80,13 +75,10 @@ class _UploadScreenState extends State<UploadScreen> {
       decimal = -decimal;
     }
 
-    print('decimal $decimal');
-
     return decimal;
   }
 
   double _toDouble(dynamic value) {
-    print('_toDouble $value, type: ${value.runtimeType}'); // Для отладки типа
 
     if (value is Ratio) {
       // Проверка, является ли значение типом Ratio
@@ -97,8 +89,6 @@ class _UploadScreenState extends State<UploadScreen> {
     } else if (value is double) {
       return value;
     }
-
-    print('Unhandled value type: ${value.runtimeType}');
     return 0.0; // Значение по умолчанию
   }
 

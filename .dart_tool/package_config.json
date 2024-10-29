@@ -380,6 +380,12 @@
       "languageVersion": "2.15"
     },
     {
+      "name": "get_thumbnail_video",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/get_thumbnail_video-0.6.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "glob",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/glob-2.1.2",
       "packageUri": "lib/",
@@ -1046,7 +1052,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-10-28T23:22:12.284180Z",
+  "generated": "2024-10-29T00:17:30.598656Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",
