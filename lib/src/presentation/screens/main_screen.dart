@@ -63,12 +63,12 @@ class _MainScreenState extends State<MainScreen> {
                                   ? 'Private mode enabled'
                                   : 'Private mode disabled',
                               style: const TextStyle(
-                                  color: Colors.white), // Белый цвет текста
+                                  color: Color.fromARGB(255, 190, 190, 190)), // Белый цвет текста
                               textAlign:
                                   TextAlign.center, // Центрирование текста
                             ),
                             duration: const Duration(seconds: 1),
-                            backgroundColor: Colors.purple, // Фиолетовый фон
+                            backgroundColor: const Color.fromARGB(255, 47, 47, 47), // Фиолетовый фон
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
                               borderRadius:
@@ -90,7 +90,7 @@ class _MainScreenState extends State<MainScreen> {
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: showPrivate
-                                  ? Colors.purple
+                                  ? const Color.fromARGB(255, 82, 82, 82)
                                   : Colors.transparent,
                               width: 1.0, // Толщина рамки
                             ),
