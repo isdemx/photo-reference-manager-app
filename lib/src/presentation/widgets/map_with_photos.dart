@@ -10,8 +10,7 @@ class PhotoMapWidget extends StatefulWidget {
   final List<Photo> photos; // Список фото с данными геолокации
   final Photo? activePhoto; // Активное фото для центрирования
 
-  const PhotoMapWidget({Key? key, required this.photos, this.activePhoto})
-      : super(key: key);
+  const PhotoMapWidget({super.key, required this.photos, this.activePhoto});
 
   @override
   _PhotoMapWidgetState createState() => _PhotoMapWidgetState();

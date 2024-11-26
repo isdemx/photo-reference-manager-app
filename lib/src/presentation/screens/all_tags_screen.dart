@@ -9,7 +9,7 @@ import 'package:photographers_reference_app/src/presentation/screens/tag_screen.
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 
 class AllTagsScreen extends StatefulWidget {
-  const AllTagsScreen({Key? key}) : super(key: key);
+  const AllTagsScreen({super.key});
 
   @override
   _AllTagsScreenState createState() => _AllTagsScreenState();
@@ -88,47 +88,42 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
 
                     return ListTile(
                       key: ValueKey(tag.id), // Уникальный ключ для каждого тега
-                      leading: InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => TagScreen(tag: tag),
-                            ),
-                          );
-                        },
-                        onLongPress: () {
-                          vibrate();
-                          TagsHelpers.showColorPickerDialog(context, tag);
-                        },
-                        child: CircleAvatar(
-                          backgroundColor: Color(tag.colorValue),
-                          child: Text(
-                            tag.name.isNotEmpty
-                                ? tag.name[0].toUpperCase()
-                                : '',
-                            style: const TextStyle(color: Colors.white),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TagScreen(tag: tag),
                           ),
+                        );
+                      },
+                      leading: CircleAvatar(
+                        backgroundColor: Color(tag.colorValue),
+                        child: Text(
+                          tag.name.isNotEmpty ? tag.name[0].toUpperCase() : '',
+                          style: const TextStyle(color: Colors.white),
                         ),
                       ),
-                      title: GestureDetector(
-                        onTap: () {
-                          tag.name != 'Not Ref'
-                              ? TagsHelpers.showEditTagDialog(context, tag)
-                              : null;
-                        },
-                        child: Text(tag.name),
-                      ),
+                      title: Text(tag.name),
                       subtitle: Text('$photoCount images'),
-                      trailing: tag.name != 'Not Ref'
-                          ? IconButton(
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (tag.name != 'Not Ref')
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Color.fromARGB(255, 216, 216, 216)),
+                              onPressed: () {
+                                TagsHelpers.showEditTagDialog(context, tag);
+                              },
+                            ),
+                          if (tag.name != 'Not Ref')
+                            IconButton(
                               icon: const Icon(Icons.delete, color: Colors.red),
                               onPressed: () {
-                                TagsHelpers.showDeleteConfirmationDialog(
-                                    context, tag);
+                                TagsHelpers.showDeleteConfirmationDialog(context, tag);
                               },
-                            )
-                          : null,
+                            ),
+                        ],
+                      ),
                     );
                   },
                 );

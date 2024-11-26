@@ -28,7 +28,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
               if (photoState.photos.isEmpty) {
                 return Scaffold(
                   appBar: AppBar(
-                    title: const Text('All images'),
+                    title: const Text('Images'),
                   ),
                   body: const Center(child: Text('No images available.')),
                 );
@@ -49,7 +49,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
 
               return Scaffold(
                 body: PhotoGridView(
-                  title: 'All images (${photosFiltered.length})',
+                  title: 'Images (${photosFiltered.length})',
                   photos: photosFiltered,
                   tags: tags, // Передаём список тегов
                   actionFromParent: GestureDetector(

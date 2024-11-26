@@ -10,7 +10,7 @@ class PhotoShareHelper {
 
   /// Шаринг одной фотографии
   Future<bool> shareSinglePhoto(Photo photo) async {
-    final String fullPath = await _pathHelper.getFullPath(photo.fileName);
+    final String fullPath = _pathHelper.getFullPath(photo.fileName);
     final File file = File(fullPath);
     
     if (await file.exists()) {
@@ -35,7 +35,7 @@ class PhotoShareHelper {
     List<XFile> xFiles = [];
     
     for (var photo in photos) {
-      final String fullPath = await _pathHelper.getFullPath(photo.fileName);
+      final String fullPath = _pathHelper.getFullPath(photo.fileName);
       final File file = File(fullPath);
       
       if (await file.exists()) {

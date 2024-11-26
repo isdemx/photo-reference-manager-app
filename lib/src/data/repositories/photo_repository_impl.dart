@@ -107,6 +107,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
     await photo.save();
   }
 
+  @override
   Future<void> clearTemporaryFiles() async {
     final tempDir = await getIosTemporaryDirectory();
     print('Temporary directory path: ${tempDir.path}');

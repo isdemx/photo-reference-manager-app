@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 class PhotoViewerOverlay extends StatefulWidget {
   final Widget child;
 
-  const PhotoViewerOverlay({Key? key, required this.child}) : super(key: key);
+  const PhotoViewerOverlay({super.key, required this.child});
 
   @override
   _PhotoViewerOverlayState createState() => _PhotoViewerOverlayState();
@@ -27,7 +27,7 @@ class _PhotoViewerOverlayState extends State<PhotoViewerOverlay> {
           setState(() {
             _opacity = 0.0;
           });
-          Future.delayed(Duration(milliseconds: 300), () {
+          Future.delayed(const Duration(milliseconds: 300), () {
             Navigator.of(context).pop(); // Закрываем виджет после анимации
           });
         } else {

@@ -10,7 +10,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_
 class FolderScreen extends StatefulWidget {
   final Folder folder;
 
-  const FolderScreen({Key? key, required this.folder}) : super(key: key);
+  const FolderScreen({super.key, required this.folder});
 
   @override
   _FolderScreenState createState() => _FolderScreenState();
@@ -66,7 +66,7 @@ class _FolderScreenState extends State<FolderScreen> {
                                   onPressed: () {
                                     Navigator.pushNamed(context, '/all_photos');
                                   },
-                                  child: const Text('All Images'),
+                                  child: const Text('Images'),
                                 ),
                               ],
                             ),
@@ -77,6 +77,7 @@ class _FolderScreenState extends State<FolderScreen> {
                   }
 
                   return PhotoGridView(
+                    showFilter: false,
                     tags: tagState.tags, // Передаём список тегов
                     title: '${widget.folder.name} (${photos.length})',
                     showShareBtn: true,

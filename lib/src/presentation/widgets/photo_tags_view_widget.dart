@@ -12,7 +12,7 @@ import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 class PhotoTagsViewWidget extends StatefulWidget {
   final Photo photo;
 
-  const PhotoTagsViewWidget({Key? key, required this.photo}) : super(key: key);
+  const PhotoTagsViewWidget({super.key, required this.photo});
 
   @override
   _PhotoTagsViewWidgetState createState() => _PhotoTagsViewWidgetState();

@@ -8,10 +8,10 @@ class CommentWidget extends StatefulWidget {
   final Function(String) onCommentSaved;
 
   const CommentWidget({
-    Key? key,
+    super.key,
     required this.initialComment,
     required this.onCommentSaved,
-  }) : super(key: key);
+  });
 
   @override
   _CommentWidgetState createState() => _CommentWidgetState();

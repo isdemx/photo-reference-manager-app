@@ -235,7 +235,7 @@ class TagsHelpers {
   }
 
   static void showEditTagDialog(BuildContext context, Tag tag) {
-    final TextEditingController _controller =
+    final TextEditingController controller =
         TextEditingController(text: tag.name);
 
     showDialog(
@@ -244,13 +244,13 @@ class TagsHelpers {
         return AlertDialog(
           title: const Text('Edit tag'),
           content: TextField(
-            controller: _controller,
+            controller: controller,
             decoration: const InputDecoration(hintText: 'Tag name'),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                final String tagName = _controller.text.trim();
+                final String tagName = controller.text.trim();
                 if (tagName.isNotEmpty) {
                   final updatedTag = Tag(
                     id: tag.id,

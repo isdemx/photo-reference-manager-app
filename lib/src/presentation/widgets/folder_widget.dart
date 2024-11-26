@@ -11,7 +11,7 @@ import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 class FolderWidget extends StatelessWidget {
   final Folder folder;
 
-  const FolderWidget({Key? key, required this.folder}) : super(key: key);
+  const FolderWidget({super.key, required this.folder});
 
   @override
   Widget build(BuildContext context) {

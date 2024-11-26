@@ -11,7 +11,7 @@ Future<void> exportDatabase(BuildContext context) async {
     context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     },
   );
   try {

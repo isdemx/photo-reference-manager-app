@@ -35,9 +35,9 @@ class FoldersHelpers {
   }
 
   static void showEditFolderDialog(BuildContext context, Folder folder) {
-    final TextEditingController _controller =
+    final TextEditingController controller =
         TextEditingController(text: folder.name);
-    bool _isPrivate = folder.isPrivate ??
+    bool isPrivate = folder.isPrivate ??
         false; // Инициализация на основе текущего значения isPrivate
 
     showDialog(
@@ -51,16 +51,16 @@ class FoldersHelpers {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
-                    controller: _controller,
+                    controller: controller,
                     decoration: const InputDecoration(hintText: 'Folder Name'),
                   ),
                   const SizedBox(height: 16.0),
                   CheckboxListTile(
                     title: const Text('Is Private (3 taps on logo to show'),
-                    value: _isPrivate,
+                    value: isPrivate,
                     onChanged: (bool? value) {
                       setState(() {
-                        _isPrivate = value ?? false;
+                        isPrivate = value ?? false;
                       });
                     },
                   ),
@@ -78,12 +78,12 @@ class FoldersHelpers {
                 ),
                 TextButton(
                   onPressed: () {
-                    final String newName = _controller.text.trim();
+                    final String newName = controller.text.trim();
                     if (newName.isNotEmpty) {
                       // Обновляем имя папки и флаг приватности
                       final updatedFolder = folder.copyWith(
                         name: newName,
-                        isPrivate: _isPrivate,
+                        isPrivate: isPrivate,
                       );
                       context
                           .read<FolderBloc>()

@@ -15,10 +15,10 @@ class PhotoViewerScreen extends StatefulWidget {
   final int initialIndex;
 
   const PhotoViewerScreen({
-    Key? key,
+    super.key,
     required this.photos,
     required this.initialIndex,
-  }) : super(key: key);
+  });
 
   @override
   _PhotoViewerScreenState createState() => _PhotoViewerScreenState();
@@ -357,7 +357,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     _shareSelectedPhotos();
                   },
                   deletePhoto: () => _deleteImageWithConfirmation(context),
-                  onAddToFolder: () => null,
+                  onAddToFolder: () {},
                   onCancel: () {
                     _clearSelection();
                   },

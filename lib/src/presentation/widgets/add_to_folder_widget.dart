@@ -10,10 +10,10 @@ class AddToFolderWidget extends StatelessWidget {
       onFolderAdded; // Коллбек для обновления родительского стейта
 
   const AddToFolderWidget({
-    Key? key,
+    super.key,
     required this.photos, // Передаем массив фотографий
     required this.onFolderAdded, // Коллбек
-  }) : super(key: key);
+  });
 
   Future<void> _showFoldersModal(BuildContext context) async {
     var res = await FoldersHelpers.showAddToFolderDialog(context, photos);

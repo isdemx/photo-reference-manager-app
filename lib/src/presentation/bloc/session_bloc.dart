@@ -7,7 +7,7 @@ part 'session_event.dart';
 part 'session_state.dart';
 
 class SessionBloc extends Bloc<SessionEvent, SessionState> {
-  SessionBloc() : super(SessionState(showPrivate: false)) {
+  SessionBloc() : super(const SessionState(showPrivate: false)) {
     on<ToggleShowPrivateEvent>((event, emit) {
       emit(state.copyWith(showPrivate: !state.showPrivate));
     });

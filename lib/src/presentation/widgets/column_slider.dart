@@ -6,11 +6,11 @@ class ColumnSlider extends StatelessWidget {
   final int initialCount;
 
   const ColumnSlider({
-    Key? key,
+    super.key,
     required this.columnCount,
     required this.onChanged,
     required this.initialCount,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

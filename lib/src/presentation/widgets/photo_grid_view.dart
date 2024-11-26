@@ -19,18 +19,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class PhotoGridView extends StatefulWidget {
   final List<Photo> photos;
-  final List<Tag> tags; // Добавлено
+  final List<Tag> tags;
   final Widget? actionFromParent;
   final String title;
   final bool? showShareBtn;
+  final bool showFilter;
 
   const PhotoGridView({
     super.key,
     required this.photos,
-    required this.tags, // Инициализируем
+    required this.tags,
     this.actionFromParent,
     required this.title,
     this.showShareBtn,
+    this.showFilter = true,
   });
 
   @override
@@ -217,15 +219,18 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   Widget build(BuildContext context) {
     final filterState = context.watch<FilterBloc>().state;
 
-    final List<Photo> photosFiltered = _filterPhotos(
-      photos: widget.photos,
-      tags: widget.tags,
-      filterState: filterState,
-    );
+    // Применяем фильтрацию только если showFilter = true
+    final List<Photo> photosFiltered = widget.showFilter
+        ? _filterPhotos(
+            photos: widget.photos,
+            tags: widget.tags,
+            filterState: filterState,
+          )
+        : widget.photos;
 
-    String titleText = 'Images (${photosFiltered.length})';
+    String titleText = '${widget.title} (${photosFiltered.length})'; // Используем переданный заголовок
 
-    bool hasActiveFilters = filterState.filters.isNotEmpty;
+    bool hasActiveFilters = filterState.filters.isNotEmpty && widget.showFilter;
 
     return Stack(
       children: [
@@ -242,7 +247,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                       child: Text(
                         titleText,
                         style: TextStyle(
-                          color: hasActiveFilters ? Colors.yellow : Colors.white,
+                          color: hasActiveFilters ? Colors.yellow : Colors.white, // Подсветка заголовка
                         ),
                       ),
                     ),
@@ -262,18 +267,19 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                             ? 'Switch to Grid View'
                             : 'Switch to Masonry View',
                       ),
-                      IconButton(
-                        icon: Icon(Icons.filter_list,
-                            color: hasActiveFilters
-                                ? Colors.yellow
-                                : Colors.white),
-                        onPressed: () {
-                          setState(() {
-                            _showFilterPanel = !_showFilterPanel;
-                          });
-                        },
-                        tooltip: 'Filters',
-                      ),
+                      if (widget.showFilter) // Проверяем, нужно ли показывать фильтр
+                        IconButton(
+                          icon: Icon(Icons.filter_list,
+                              color: hasActiveFilters
+                                  ? Colors.yellow
+                                  : Colors.white),
+                          onPressed: () {
+                            setState(() {
+                              _showFilterPanel = !_showFilterPanel;
+                            });
+                          },
+                          tooltip: 'Filters',
+                        ),
                       if (widget.showShareBtn == true)
                         IconButton(
                           icon: const Icon(Icons.share),
@@ -390,13 +396,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
               ),
             ),
           ),
-        // Добавляем панель фильтров внизу
-        // Добавляем панель фильтров внизу
-        if (_showFilterPanel)
+        if (_showFilterPanel && widget.showFilter) // Проверяем, нужно ли показывать панель фильтров
           Align(
             alignment: Alignment.topCenter,
             child: Container(
-              constraints: const BoxConstraints(maxHeight: 300),
+              constraints: const BoxConstraints(
+                maxHeight: 300,
+              ),
               margin: const EdgeInsets.only(
                   top: kToolbarHeight + 40), // Отступ от AppBar
               width: double.infinity, // Занять 100% ширины

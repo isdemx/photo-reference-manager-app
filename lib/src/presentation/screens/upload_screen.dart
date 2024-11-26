@@ -13,7 +13,7 @@ import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({Key? key}) : super(key: key);
+  const UploadScreen({super.key});
 
   @override
   _UploadScreenState createState() => _UploadScreenState();
