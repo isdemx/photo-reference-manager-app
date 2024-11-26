@@ -13,6 +13,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/user_settings.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
@@ -143,6 +144,9 @@ class PhotographersReferenceApp extends StatelessWidget {
           ),
           BlocProvider<SessionBloc>(
             create: (context) => SessionBloc(),
+          ),
+          BlocProvider<FilterBloc>(
+            create: (context) => FilterBloc(),
           ),
         ],
         child: MaterialApp(

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
 
@@ -24,72 +25,74 @@ class _FolderScreenState extends State<FolderScreen> {
       child: Scaffold(
         body: BlocBuilder<PhotoBloc, PhotoState>(
           builder: (context, photoState) {
-            if (photoState is PhotoLoading) {
-              return const Center(child: CircularProgressIndicator());
-            } else if (photoState is PhotoLoaded) {
-              final List<Photo> photos = photoState.photos
-                  .where((photo) => photo.folderIds.contains(widget.folder.id))
-                  .toList();
+            return BlocBuilder<TagBloc, TagState>(
+              builder: (context, tagState) {
+                if (photoState is PhotoLoading || tagState is TagLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (photoState is PhotoLoaded && tagState is TagLoaded) {
+                  final List<Photo> photos = photoState.photos
+                      .where((photo) => photo.folderIds.contains(widget.folder.id))
+                      .toList();
 
-              if (photos.isEmpty) {
-                return Scaffold(
-                  appBar: AppBar(
-                    title: Text(widget.folder.name),
-                  ),
-                  body: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 14.0), // Горизонтальный паддинг
-                          child: const Text(
-                            'No images in this folder. You can upload new images or select from the "All Images" section.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 12
-                            )
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        Row(
+                  if (photos.isEmpty) {
+                    return Scaffold(
+                      appBar: AppBar(
+                        title: Text(widget.folder.name),
+                      ),
+                      body: Center(
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/upload');
-                              },
-                              child: const Text('Upload'),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 14.0), // Горизонтальный паддинг
+                              child: Text(
+                                'No images in this folder. You can upload new images or select from the "All Images" section.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(fontSize: 12),
+                              ),
                             ),
-                            const SizedBox(width: 20), // Отступ между кнопками
-                            ElevatedButton(
-                              onPressed: () {
-                                Navigator.pushNamed(context, '/all_photos');
-                              },
-                              child: const Text('All Images'),
+                            const SizedBox(height: 20),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, '/upload');
+                                  },
+                                  child: const Text('Upload'),
+                                ),
+                                const SizedBox(width: 20), // Отступ между кнопками
+                                ElevatedButton(
+                                  onPressed: () {
+                                    Navigator.pushNamed(context, '/all_photos');
+                                  },
+                                  child: const Text('All Images'),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              }
+                      ),
+                    );
+                  }
 
-              return PhotoGridView(
-                title: '${widget.folder.name} (${photos.length})',
-                showShareBtn: true,
-                photos: photos,
-                actionFromParent: IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () {
-                    FoldersHelpers.showEditFolderDialog(context, widget.folder);
-                  },
-                ),
-              );
-            } else {
-              return const Center(child: Text('Failed to load images.'));
-            }
+                  return PhotoGridView(
+                    tags: tagState.tags, // Передаём список тегов
+                    title: '${widget.folder.name} (${photos.length})',
+                    showShareBtn: true,
+                    photos: photos,
+                    actionFromParent: IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () {
+                        FoldersHelpers.showEditFolderDialog(context, widget.folder);
+                      },
+                    ),
+                  );
+                } else {
+                  return const Center(child: Text('Failed to load images.'));
+                }
+              },
+            );
           },
         ),
       ),

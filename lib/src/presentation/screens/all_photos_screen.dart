@@ -48,36 +48,39 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
               print('photosFiltered len ${photosFiltered.length}');
 
               return Scaffold(
-                  body: PhotoGridView(
-                title: 'All images (${photosFiltered.length})',
-                photos: photosFiltered,
-                actionFromParent: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _filterNotRef = !_filterNotRef;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6.0, vertical: 3.0),
-                    decoration: BoxDecoration(
-                      color: _filterNotRef
-                          ? Colors.blueAccent
-                          : Colors.transparent,
-                      border: Border.all(color: Colors.blueAccent),
-                      borderRadius: BorderRadius.circular(20.0),
-                    ),
-                    child: Text(
-                      'Ref Only',
-                      style: TextStyle(
-                        fontSize: 12.0,
-                        color: _filterNotRef ? Colors.white : Colors.blueAccent,
-                        fontWeight: FontWeight.bold,
+                body: PhotoGridView(
+                  title: 'All images (${photosFiltered.length})',
+                  photos: photosFiltered,
+                  tags: tags, // Передаём список тегов
+                  actionFromParent: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _filterNotRef = !_filterNotRef;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6.0, vertical: 3.0),
+                      decoration: BoxDecoration(
+                        color: _filterNotRef
+                            ? Colors.blueAccent
+                            : Colors.transparent,
+                        border: Border.all(color: Colors.blueAccent),
+                        borderRadius: BorderRadius.circular(20.0),
+                      ),
+                      child: Text(
+                        'Ref Only',
+                        style: TextStyle(
+                          fontSize: 12.0,
+                          color:
+                              _filterNotRef ? Colors.white : Colors.blueAccent,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ));
+              );
             } else {
               return const Center(child: Text('Failed to load images.'));
             }
