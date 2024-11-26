@@ -228,7 +228,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           )
         : widget.photos;
 
-    String titleText = '${widget.title} (${photosFiltered.length})'; // Используем переданный заголовок
+    // Debugging: print the number of filtered photos
+    print('Filtered photos count !!: ${photosFiltered.length}');
+
+    // Используем отфильтрованный список для подсчета количества фотографий
+    String titleText = '${widget.title} (${photosFiltered.length})'; 
+
+    print('titleText !!: ${titleText}');
 
     bool hasActiveFilters = filterState.filters.isNotEmpty && widget.showFilter;
 

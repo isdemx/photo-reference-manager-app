@@ -49,7 +49,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
 
               return Scaffold(
                 body: PhotoGridView(
-                  title: 'Images (${photosFiltered.length})',
+                  title: 'Images',
                   photos: photosFiltered,
                   tags: tags, // Передаём список тегов
                   actionFromParent: GestureDetector(

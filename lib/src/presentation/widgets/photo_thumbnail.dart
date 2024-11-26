@@ -14,12 +14,12 @@ class PhotoThumbnail extends StatefulWidget {
   final bool isPinterestLayout;
 
   const PhotoThumbnail({
-    Key? key,
+    super.key,
     required this.photo,
     required this.onPhotoTap,
     required this.onLongPress,
     required this.isPinterestLayout,
-  }) : super(key: key);
+  });
 
   @override
   _PhotoThumbnailState createState() => _PhotoThumbnailState();
