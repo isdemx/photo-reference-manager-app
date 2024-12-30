@@ -188,7 +188,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     if (!isInitScrolling) {
       // Только если не в процессе инициализации
       final double screenWidth = MediaQuery.of(context).size.width;
-      const double itemWidth = 30.0; // Ширина миниатюры
+      const double itemWidth = 20.0; // Ширина миниатюры
       final double scrollOffset = _thumbnailScrollController.offset;
       final double centerPosition =
           (scrollOffset + screenWidth / 2) - (screenWidth / 2);
@@ -298,7 +298,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 bottom: 120,
                 left: 0,
                 right: 0,
-                height: 50,
+                height: 40,
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (ScrollNotification scrollInfo) {
                     if (scrollInfo is ScrollUpdateNotification) {
@@ -327,8 +327,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         onTap: () =>
                             _onThumbnailTap(index - 1), // Меняем фото при клике
                         child: Container(
-                          width: 30,
-                          height: 50,
+                          width: 20,
                           margin: const EdgeInsets.symmetric(horizontal: 0.0),
                           child: Image.file(
                             File(fullPath),

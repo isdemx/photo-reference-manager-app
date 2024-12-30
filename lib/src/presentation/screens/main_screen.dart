@@ -63,12 +63,14 @@ class _MainScreenState extends State<MainScreen> {
                                   ? 'Private mode enabled'
                                   : 'Private mode disabled',
                               style: const TextStyle(
-                                  color: Color.fromARGB(255, 190, 190, 190)), // Белый цвет текста
+                                  color: Color.fromARGB(
+                                      255, 190, 190, 190)), // Белый цвет текста
                               textAlign:
                                   TextAlign.center, // Центрирование текста
                             ),
                             duration: const Duration(seconds: 1),
-                            backgroundColor: const Color.fromARGB(255, 47, 47, 47), // Фиолетовый фон
+                            backgroundColor: const Color.fromARGB(
+                                255, 47, 47, 47), // Фиолетовый фон
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
                               borderRadius:
@@ -76,7 +78,6 @@ class _MainScreenState extends State<MainScreen> {
                             ),
                             elevation:
                                 10, // Добавим тень для эффекта всплывания
-                            
                           ),
                         );
                       }
@@ -142,8 +143,14 @@ class _MainScreenState extends State<MainScreen> {
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(
-                  builder: (context) => const UploadScreen(),
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      const UploadScreen(),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                    // Возвращаем child без анимации
+                    return child;
+                  },
                 ),
               );
             },

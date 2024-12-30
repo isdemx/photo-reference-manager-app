@@ -23,14 +23,44 @@ class _UploadScreenState extends State<UploadScreen> {
   final ImagePicker _picker = ImagePicker();
   List<XFile>? _images;
   bool _isUploading = false;
+  bool _isSelecting = false;
   int _uploadedCount = 0;
   bool _stopRequested = false;
 
+  @override
+  void initState() {
+    super.initState();
+    // Вызываем метод _pickImages при старте виджета
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pickImages();
+    });
+  }
+
   void _pickImages() async {
-    final images = await _picker.pickMultiImage();
-    if (images.isNotEmpty) {
+    if (_isSelecting || _isUploading) return; // Блокируем повторный вызов
+
+    setState(() {
+      _isSelecting = true; // Включаем лоадер выбора
+    });
+
+    try {
+      final images = await _picker.pickMultiImage();
+      if (images.isNotEmpty) {
+        setState(() {
+          _images = images;
+          _isSelecting = false; // Выключаем лоадер выбора
+        });
+        // Вызываем загрузку фотографий
+        await _uploadImages();
+      } else {
+        setState(() {
+          _isSelecting = false; // Выключаем лоадер, если ничего не выбрано
+        });
+      }
+    } catch (e) {
+      print('Error picking images: $e');
       setState(() {
-        _images = images;
+        _isSelecting = false; // Выключаем лоадер при ошибке
       });
     }
   }
@@ -41,10 +71,8 @@ class _UploadScreenState extends State<UploadScreen> {
 
     if (tags.containsKey('GPS GPSLatitude') &&
         tags.containsKey('GPS GPSLongitude')) {
-      final latitude =
-          (tags['GPS GPSLatitude']?.values)?.toList();
-      final longitude =
-          (tags['GPS GPSLongitude']?.values)?.toList();
+      final latitude = (tags['GPS GPSLatitude']?.values)?.toList();
+      final longitude = (tags['GPS GPSLongitude']?.values)?.toList();
 
       final latitudeRef = tags['GPS GPSLatitudeRef']?.printable;
       final longitudeRef = tags['GPS GPSLongitudeRef']?.printable;
@@ -79,7 +107,6 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   double _toDouble(dynamic value) {
-
     if (value is Ratio) {
       // Проверка, является ли значение типом Ratio
       return value.numerator /
@@ -95,12 +122,10 @@ class _UploadScreenState extends State<UploadScreen> {
   Future<void> _uploadImages() async {
     if (_images != null && _images!.isNotEmpty) {
       setState(() {
-        _isUploading = true;
+        _isUploading = true; // Включаем лоадер загрузки
         _uploadedCount = 0;
         _stopRequested = false;
       });
-
-      WakelockPlus.enable(); // Включаем Wakelock
 
       final photoRepository =
           RepositoryProvider.of<PhotoRepositoryImpl>(context);
@@ -109,8 +134,7 @@ class _UploadScreenState extends State<UploadScreen> {
         if (_stopRequested) break;
 
         final image = _images![i];
-        final geoLocation =
-            await _getGeoLocation(image.path); // Получаем геолокацию
+        final geoLocation = await _getGeoLocation(image.path);
 
         final photo = Photo(
           id: const Uuid().v4(),
@@ -122,7 +146,7 @@ class _UploadScreenState extends State<UploadScreen> {
           sortOrder: 0,
           fileName: path_package.basename(image.path),
           isStoredInApp: true,
-          geoLocation: geoLocation, // Сохраняем геолокацию, если доступна
+          geoLocation: geoLocation,
         );
 
         try {
@@ -135,32 +159,13 @@ class _UploadScreenState extends State<UploadScreen> {
         }
       }
 
-      WakelockPlus.disable(); // Отключаем Wakelock
-
       setState(() {
-        _isUploading = false;
-        if (_stopRequested) {
-          _images = _images!.sublist(0, _uploadedCount);
-        } else {
-          _images = null;
-        }
+        _isUploading = false; // Выключаем лоадер загрузки
+        _images = null; // Сбрасываем список изображений
+        Navigator.pushNamed(context, '/all_photos');
       });
 
       context.read<PhotoBloc>().add(LoadPhotos());
-
-      if (!_stopRequested) {
-        setState(() {
-          _isUploading = true; // Включаем лоадер для удаления
-        });
-
-        context.read<PhotoBloc>().add(ClearTemporaryFiles());
-
-        setState(() {
-          _isUploading = false;
-        });
-
-        Navigator.pushNamed(context, '/all_photos');
-      }
     }
   }
 
@@ -182,74 +187,71 @@ class _UploadScreenState extends State<UploadScreen> {
       appBar: AppBar(
         title: const Text('Upload Images'),
       ),
-      body: _images == null
-          ? Center(
-              child: ElevatedButton(
-                onPressed: _pickImages,
-                child: const Text('Select Images'),
+      body: Stack(
+        children: [
+          if (!_isSelecting)
+            if (_images == null)
+              Center(
+                child: ElevatedButton(
+                  onPressed: _pickImages,
+                  child: const Text('Select Images'),
+                ),
+              )
+            else
+              Expanded(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(4.0),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 4.0,
+                    crossAxisSpacing: 4.0,
+                  ),
+                  itemCount: _images!.length,
+                  itemBuilder: (context, index) {
+                    final image = _images![index];
+                    return Image.file(
+                      File(image.path),
+                      fit: BoxFit.cover,
+                    );
+                  },
+                ),
               ),
-            )
-          : Stack(
-              children: [
-                Column(
+          if (_isSelecting)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          if (_isUploading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(4.0),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 4,
-                          mainAxisSpacing: 4.0,
-                          crossAxisSpacing: 4.0,
-                        ),
-                        itemCount: _images!.length,
-                        itemBuilder: (context, index) {
-                          final image = _images![index];
-                          return Image.file(
-                            File(image.path),
-                            fit: BoxFit.cover,
-                          );
-                        },
-                      ),
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Uploading $_uploadedCount of ${_images!.length}',
+                      style: const TextStyle(color: Colors.white),
                     ),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 50.0),
-                      child: ElevatedButton(
-                        onPressed: _isUploading ? null : _uploadImages,
-                        child: const Text('Upload'),
-                      ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Keep application opened until it loads.',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: _stopUpload,
+                      child: const Text('Stop'),
                     ),
                   ],
                 ),
-                if (_isUploading)
-                  Container(
-                    color: Colors.black.withOpacity(0.5),
-                    child: Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Uploading $_uploadedCount of ${_images!.length}',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                          const SizedBox(height: 20),
-                          const Text(
-                            'Keep application opened until it loads.',
-                            style: TextStyle(color: Colors.white),
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            onPressed: _stopUpload,
-                            child: const Text('Stop'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-              ],
+              ),
             ),
+        ],
+      ),
     );
   }
 }
