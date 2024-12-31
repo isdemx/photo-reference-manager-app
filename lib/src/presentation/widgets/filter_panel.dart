@@ -39,8 +39,8 @@ class FilterPanel extends StatelessWidget {
                             boxShadow: [
                               BoxShadow(
                                 color: _getBorderColor(tagFilterState),
-                                spreadRadius: 1.0,
-                                blurRadius: 2.0,
+                                spreadRadius: 2.0,
+                                blurRadius: 0.0,
                               ),
                             ],
                             border: Border.all(
@@ -53,7 +53,7 @@ class FilterPanel extends StatelessWidget {
                             tag.name,
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 12.0,
+                              fontSize: 14.0,
                               fontWeight: FontWeight.bold,
                             ),
                           ),

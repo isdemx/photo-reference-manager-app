@@ -32,7 +32,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   bool _selectPhotoMode = false;
   bool isInitScrolling =
       true; // Флаг для отключения обновления главной картинки
-
+  final double _miniatureWidth = 20.0;
+  
   final List<Photo> _selectedPhotos = [];
 
   @override
@@ -55,7 +56,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   Future<void> _scrollThumbnailsToCenter(int index) async {
     final double screenWidth = MediaQuery.of(context).size.width;
-    const double itemWidth = 30.0; // Ширина одной миниатюры
+    double itemWidth = _miniatureWidth;
 
     // Рассчитываем отступ, чтобы текущая миниатюра оказалась в центре
     final double offset =
@@ -81,9 +82,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     super.dispose();
   }
 
-  void _enableSelectPhotoMode() {
+  void _enableSelectPhotoMode(bool enable) {
     setState(() {
-      _selectPhotoMode = true;
+      _selectPhotoMode = enable;
       // Добавляем текущую фотографию сразу при включении режима выбора
       _toggleSelection(widget.photos[_currentIndex]);
     });
@@ -125,6 +126,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         // Используем addPostFrameCallback, чтобы дождаться полной отрисовки виджетов
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (_thumbnailScrollController.hasClients) {
+            print('_currentIndex $_currentIndex');
             _scrollThumbnailsToCenter(_currentIndex);
           }
         });
@@ -188,7 +190,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     if (!isInitScrolling) {
       // Только если не в процессе инициализации
       final double screenWidth = MediaQuery.of(context).size.width;
-      const double itemWidth = 20.0; // Ширина миниатюры
+      double itemWidth = _miniatureWidth;
       final double scrollOffset = _thumbnailScrollController.offset;
       final double centerPosition =
           (scrollOffset + screenWidth / 2) - (screenWidth / 2);
@@ -258,7 +260,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           : null,
       body: GestureDetector(
         onTap: _toggleActions,
-        onLongPress: () => {vibrate(), _enableSelectPhotoMode()},
+        onLongPress: () => {vibrate(), _enableSelectPhotoMode(!_selectPhotoMode)},
         child: Stack(
           children: [
             Column(
@@ -327,7 +329,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         onTap: () =>
                             _onThumbnailTap(index - 1), // Меняем фото при клике
                         child: Container(
-                          width: 20,
+                          width: _miniatureWidth,
                           margin: const EdgeInsets.symmetric(horizontal: 0.0),
                           child: Image.file(
                             File(fullPath),
@@ -351,7 +353,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   photos: photos,
                   isSelectionMode:
                       _selectedPhotos.isNotEmpty || _selectPhotoMode,
-                  enableSelectPhotoMode: _enableSelectPhotoMode,
+                  enableSelectPhotoMode: () => _enableSelectPhotoMode(!_selectPhotoMode),
                   onShare: () {
                     _shareSelectedPhotos();
                   },

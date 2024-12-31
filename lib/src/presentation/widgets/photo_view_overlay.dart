@@ -17,12 +17,12 @@ class _PhotoViewerOverlayState extends State<PhotoViewerOverlay> {
   Widget build(BuildContext context) {
     return GestureDetector(
       onVerticalDragUpdate: (details) {
-        setState(() {
-          _offsetY += details.delta.dy; // Двигаем виджет вверх/вниз
-        });
+        // setState(() {
+        //   _offsetY += details.delta.dy; // Двигаем виджет вверх/вниз
+        // });
       },
       onVerticalDragEnd: (details) {
-        if (_offsetY.abs() > 50) {
+        if (_offsetY.abs() > 120) {
           // Запускаем анимацию уменьшения прозрачности
           setState(() {
             _opacity = 0.0;
