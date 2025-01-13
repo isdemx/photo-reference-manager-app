@@ -33,7 +33,8 @@ class CategoryWidget extends StatelessWidget {
             },
             child: Text(category.name),
           ),
-          initiallyExpanded: category.collapsed != true, // Если collapsed != true, категория раскрыта
+          initiallyExpanded: category.collapsed !=
+              true, // Если collapsed != true, категория раскрыта
           onExpansionChanged: (isExpanded) {
             // Отправляем событие обновления категории при изменении состояния (сворачивание/разворачивание)
             final updatedCategory = category.copyWith(collapsed: !isExpanded);
@@ -54,27 +55,46 @@ class CategoryWidget extends StatelessWidget {
                   // Фильтрация папок в зависимости от состояния showPrivate
                   final folders = folderState.folders.where((folder) {
                     return folder.categoryId == category.id &&
-                        (showPrivate || (folder.isPrivate == null || folder.isPrivate == false));
+                        (showPrivate ||
+                            (folder.isPrivate == null ||
+                                folder.isPrivate == false));
                   }).toList();
 
-                  if (folders.isEmpty) {
-                    return const Padding(
-                      padding: EdgeInsets.all(8.0),
-                      child: Text('No folders in this category.'),
-                    );
-                  }
+                  // Добавляем ячейку с кнопкой после последней папки
+                  final folderCount = folders.length + 1;
+                  final shouldAddPlaceholder = folders.length % 2 != 0;
 
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: folders.length,
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    itemCount: folderCount,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       childAspectRatio: 1,
                     ),
                     itemBuilder: (context, index) {
-                      final folder = folders[index];
-                      return FolderWidget(folder: folder);
+                      if (index < folders.length) {
+                        // Отображаем существующую папку
+                        final folder = folders[index];
+                        return FolderWidget(folder: folder);
+                      } else if (shouldAddPlaceholder) {
+                        // Последняя ячейка — кнопка с лаконичным "+"
+                        return Center(
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.add,
+                              size: 32.0, // Увеличиваем размер иконки
+                            ),
+                            onPressed: () {
+                              CategoriesHelpers.showAddFolderDialog(
+                                  context, category);
+                            },
+                          ),
+                        );
+                      } else {
+                        return const SizedBox.shrink();
+                      }
                     },
                   );
                 } else {

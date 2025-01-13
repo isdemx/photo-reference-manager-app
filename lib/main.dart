@@ -44,6 +44,11 @@ void main() async {
   final tagRepository = TagRepositoryImpl(tagBox);
   await tagRepository.initializeDefaultTags();
 
+  // Init General category
+  final categoryBox = await Hive.openBox<Category>('categories');
+  final categoryRepository = CategoryRepositoryImpl(categoryBox);
+  await categoryRepository.initializeDefaultCategory();
+
   runApp(MyApp());
 }
 

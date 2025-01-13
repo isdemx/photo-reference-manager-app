@@ -198,7 +198,7 @@ class _UploadScreenState extends State<UploadScreen> {
                 ),
               )
             else
-              Expanded(
+              Positioned.fill(
                 child: GridView.builder(
                   padding: const EdgeInsets.all(4.0),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(

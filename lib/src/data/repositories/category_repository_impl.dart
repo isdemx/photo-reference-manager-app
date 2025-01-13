@@ -3,6 +3,7 @@
 import 'package:hive/hive.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/repositories/category_repository.dart';
+import 'package:uuid/uuid.dart';
 
 class CategoryRepositoryImpl implements CategoryRepository {
   final Box<Category> categoryBox;
@@ -37,6 +38,25 @@ class CategoryRepositoryImpl implements CategoryRepository {
     } catch (e) {
       print('Error saving category: $e');
       rethrow;
+    }
+  }
+
+  Future<void> initializeDefaultCategory() async {
+    // Проверяем, есть ли хотя бы одна категория
+    if (categoryBox.isEmpty) {
+      // Если категорий нет, создаём дефолтную категорию
+      final defaultCategory = Category(
+        id: const Uuid().v4(), // Уникальный идентификатор
+        name: "General",
+        sortOrder: 0,
+        isPrivate: false, // Делаем категорию публичной по умолчанию
+        collapsed: false, // Категория не свернута
+        folderIds: [], // Пустой список папок
+      );
+      await addCategory(defaultCategory);
+      print('Default category "General" has been added to the database.');
+    } else {
+      print('Categories already exist, no default category added.');
     }
   }
 }

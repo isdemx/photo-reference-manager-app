@@ -1,11 +1,10 @@
-// lib/src/presentation/screens/main_screen.dart
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/categories_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
@@ -35,8 +34,7 @@ class _MainScreenState extends State<MainScreen> {
 
               return Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment:
-                    CrossAxisAlignment.end, // Центрируем по нижнему краю
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   GestureDetector(
                     onTap: () {
@@ -63,21 +61,16 @@ class _MainScreenState extends State<MainScreen> {
                                   ? 'Private mode enabled'
                                   : 'Private mode disabled',
                               style: const TextStyle(
-                                  color: Color.fromARGB(
-                                      255, 190, 190, 190)), // Белый цвет текста
-                              textAlign:
-                                  TextAlign.center, // Центрирование текста
+                                  color: Color.fromARGB(255, 190, 190, 190)),
+                              textAlign: TextAlign.center,
                             ),
                             duration: const Duration(seconds: 1),
-                            backgroundColor: const Color.fromARGB(
-                                255, 47, 47, 47), // Фиолетовый фон
+                            backgroundColor: const Color.fromARGB(255, 47, 47, 47),
                             behavior: SnackBarBehavior.floating,
                             shape: RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.circular(10), // Скругленные углы
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            elevation:
-                                10, // Добавим тень для эффекта всплывания
+                            elevation: 10,
                           ),
                         );
                       }
@@ -86,21 +79,19 @@ class _MainScreenState extends State<MainScreen> {
                       builder: (context, sessionState) {
                         final bool showPrivate = sessionState.showPrivate;
                         return Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 2, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
                           decoration: BoxDecoration(
                             border: Border.all(
                               color: showPrivate
                                   ? const Color.fromARGB(255, 82, 82, 82)
                                   : Colors.transparent,
-                              width: 1.0, // Толщина рамки
+                              width: 1.0,
                             ),
-                            borderRadius: BorderRadius.circular(
-                                8.0), // Скругленные углы для рамки
+                            borderRadius: BorderRadius.circular(8.0),
                           ),
                           child: Image.asset(
-                            'assets/refma-logo.png', // Ваш логотип
-                            height: 30, // Уменьшенный размер логотипа
+                            'assets/refma-logo.png',
+                            height: 30,
                           ),
                         );
                       },
@@ -124,7 +115,7 @@ class _MainScreenState extends State<MainScreen> {
               );
             } else {
               return Image.asset(
-                'assets/refma-logo.png', // Логотип при загрузке версии
+                'assets/refma-logo.png',
                 height: 40,
               );
             }
@@ -134,7 +125,6 @@ class _MainScreenState extends State<MainScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              // Open add category dialog
               CategoriesHelpers.showAddCategoryDialog(context);
             },
           ),
@@ -148,7 +138,6 @@ class _MainScreenState extends State<MainScreen> {
                       const UploadScreen(),
                   transitionsBuilder:
                       (context, animation, secondaryAnimation, child) {
-                    // Возвращаем child без анимации
                     return child;
                   },
                 ),
@@ -172,47 +161,58 @@ class _MainScreenState extends State<MainScreen> {
       ),
       body: BlocBuilder<CategoryBloc, CategoryState>(
         builder: (context, categoryState) {
-          if (categoryState is CategoryLoading) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (categoryState is CategoryLoaded) {
-            var categories = categoryState.categories;
+          return BlocBuilder<PhotoBloc, PhotoState>(
+            builder: (context, photoState) {
+              if (categoryState is CategoryLoading ||
+                  photoState is PhotoLoading) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (categories.isEmpty) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'Welcome to Refma!\n\nTo get started, upload your first image using the "Upload" button below. You can also create categories and folders to organize your images efficiently.\n\nUse the "+" button in the app bar to create new category, and within each category, you can add folders to manage your collection.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 16.0),
-                      ),
-                      const SizedBox(
-                          height: 20), // Отступ между текстом и кнопкой
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/upload');
-                        },
-                        child: const Text('Upload'),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }
+              if (categoryState is CategoryLoaded &&
+                  photoState is PhotoLoaded) {
+                final categories = categoryState.categories;
+                final photos = photoState.photos;
 
-            return ListView.builder(
-              itemCount: categories.length,
-              itemBuilder: (context, index) {
-                final category = categories[index];
-                return CategoryWidget(category: category);
-              },
-            );
-          } else {
-            return const Center(child: Text('No categories available.'));
-          }
+                if ((categories.isEmpty ||
+                        (categories.length == 1 &&
+                            categories.first.name == "General")) &&
+                    photos.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'Welcome to Refma!\n\nTo get started, upload your first image using the "Upload" button below. You can also create categories and folders to organize your images efficiently.\n\nUse the "+" button in the app bar to create new category, and within each category, you can add folders to manage your collection.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 16.0),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton(
+                            onPressed: () {
+                              Navigator.pushNamed(context, '/upload');
+                            },
+                            child: const Text('Upload'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    return CategoryWidget(category: category);
+                  },
+                );
+              }
+
+              return const Center(child: Text('Failed to load content.'));
+            },
+          );
         },
       ),
     );

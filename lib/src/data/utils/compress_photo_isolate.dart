@@ -3,7 +3,10 @@ import 'dart:io';
 
 import 'package:photographers_reference_app/src/data/utils/photo_compession.dart';
 
-void compressPhotoIsolate(String filePath) {
+void compressPhotoIsolate(Map<String, dynamic> args) {
+  final filePath = args['filePath'] as String;
+  final compressSizeKb = args['compressSizeKb'] as int;
+
   final file = File(filePath);
-  PhotoCompressor.compressPhotoSync(file, maxFileSize: 200 * 1024);
+  PhotoCompressor.compressPhotoSync(file, maxFileSize: compressSizeKb * 1024);
 }

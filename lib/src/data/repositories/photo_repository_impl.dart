@@ -35,7 +35,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
   }
 
   @override
-  Future<void> addPhoto(Photo photo) async {
+  Future<void> addPhoto(Photo photo, {int compressSizeKb = 300}) async {
     try {
       if (photo.isStoredInApp) {
         final fileName = path_package.basename(photo.path);
@@ -45,8 +45,16 @@ class PhotoRepositoryImpl implements PhotoRepository {
         // Копируем файл из исходного пути в директорию приложения
         File newFile = await File(photo.path).copy(newFilePath);
 
-        // Сжимаем файл до 200 КБ в изоляте
-        await compute(compressPhotoIsolate, newFile.path);
+        if (compressSizeKb != 0) {
+          final fileSizeKb = newFile.lengthSync() ~/ 1024;
+          if (fileSizeKb > compressSizeKb) {
+            // Сжимаем файл до compressSizeKb КБ в изоляте
+            await compute(
+              compressPhotoIsolate,
+              {'filePath': newFile.path, 'compressSizeKb': compressSizeKb},
+            );
+          }
+        }
 
         // Обновляем имя файла
         photo.fileName = path_package.basename(newFile.path);

@@ -33,7 +33,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   bool isInitScrolling =
       true; // Флаг для отключения обновления главной картинки
   final double _miniatureWidth = 20.0;
-  
+
   final List<Photo> _selectedPhotos = [];
 
   @override
@@ -173,6 +173,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   void _scrollToThumbnail(int index) {
+    //  _scrollThumbnailsToCenter(index);
     // final double screenWidth = MediaQuery.of(context).size.width;
     // final double itemWidth = 50.0; // Ширина миниатюры
     // final double offset =
@@ -200,6 +201,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           .clamp(0, widget.photos.length - 1);
 
       if (_currentIndex != index) {
+        vibrate(4);
         _pageController.jumpToPage(index);
         setState(() {
           _currentIndex = index;
@@ -213,6 +215,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final photos = widget.photos;
     final currentPhoto = photos[_currentIndex];
     final isSelected = _selectedPhotos.contains(currentPhoto);
+    bool notScroll = false;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -260,7 +263,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           : null,
       body: GestureDetector(
         onTap: _toggleActions,
-        onLongPress: () => {vibrate(), _enableSelectPhotoMode(!_selectPhotoMode)},
+        onLongPress: () =>
+            {vibrate(), _enableSelectPhotoMode(!_selectPhotoMode)},
         child: Stack(
           children: [
             Column(
@@ -274,7 +278,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       setState(() {
                         _currentIndex = index;
                       });
-                      _scrollToThumbnail(index);
+                      if (!notScroll) {
+                        _scrollThumbnailsToCenter(index);
+                      }
                     },
                     itemBuilder: (context, index) {
                       final photo = photos[index];
@@ -304,6 +310,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 child: NotificationListener<ScrollNotification>(
                   onNotification: (ScrollNotification scrollInfo) {
                     if (scrollInfo is ScrollUpdateNotification) {
+                      setState(() {
+                        notScroll = true;
+                      });
                       _onThumbnailScroll(); // Отслеживаем прокрутку и обновляем большую фотографию
                     }
                     return false;
@@ -353,7 +362,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   photos: photos,
                   isSelectionMode:
                       _selectedPhotos.isNotEmpty || _selectPhotoMode,
-                  enableSelectPhotoMode: () => _enableSelectPhotoMode(!_selectPhotoMode),
+                  enableSelectPhotoMode: () =>
+                      _enableSelectPhotoMode(!_selectPhotoMode),
                   onShare: () {
                     _shareSelectedPhotos();
                   },
