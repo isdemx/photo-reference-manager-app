@@ -208,7 +208,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           .clamp(0, widget.photos.length - 1);
 
       if (_currentIndex != index) {
-        vibrate(4);
+        vibrate(3);
         _pageController.jumpToPage(index);
         setState(() {
           _currentIndex = index;
