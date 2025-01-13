@@ -35,6 +35,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   final double _miniatureWidth = 20.0;
 
   final List<Photo> _selectedPhotos = [];
+  bool _isFlipped = false; // Флаг для переворота фото
 
   @override
   void initState() {
@@ -51,6 +52,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           isInitScrolling = false;
         });
       });
+    });
+  }
+
+  void _flipPhoto() {
+    setState(() {
+      _isFlipped = !_isFlipped;
     });
   }
 
@@ -258,6 +265,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       ),
                     ),
                   ),
+                IconButton(
+                  icon: const Icon(Icons.flip),
+                  onPressed: _flipPhoto, // Переворот фото
+                ),
               ],
             )
           : null,
@@ -277,6 +288,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     onPageChanged: (index) {
                       setState(() {
                         _currentIndex = index;
+                        _isFlipped =
+                            false; // Сбрасываем переворот при смене фотографии
                       });
                       if (!notScroll) {
                         _scrollThumbnailsToCenter(index);
@@ -286,14 +299,21 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       final photo = photos[index];
                       final fullPath =
                           PhotoPathHelper().getFullPath(photo.fileName);
-                      return PhotoView(
-                        imageProvider: FileImage(File(fullPath)),
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(Icons.broken_image,
-                                size: 50, color: Colors.red),
-                          );
-                        },
+                      return Transform(
+                        alignment: Alignment.center,
+                        transform: _isFlipped
+                            ? Matrix4.rotationY(
+                                3.14159) // Переворот по горизонтали
+                            : Matrix4.identity(),
+                        child: PhotoView(
+                          imageProvider: FileImage(File(fullPath)),
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(Icons.broken_image,
+                                  size: 50, color: Colors.red),
+                            );
+                          },
+                        ),
                       );
                     },
                   ),
