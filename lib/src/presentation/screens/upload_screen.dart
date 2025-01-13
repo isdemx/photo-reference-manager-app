@@ -162,7 +162,7 @@ class _UploadScreenState extends State<UploadScreen> {
       setState(() {
         _isUploading = false; // Выключаем лоадер загрузки
         _images = null; // Сбрасываем список изображений
-        Navigator.pushNamed(context, '/all_photos');
+        Navigator.pushReplacementNamed(context, '/all_photos');
       });
 
       context.read<PhotoBloc>().add(LoadPhotos());
