@@ -18,7 +18,7 @@
 		</data>
 		<key>Assets.car</key>
 		<data>
-		bXVM+ca2Zzz4DUBFENd+Cf9EyeI=
+		7Qj5AdvbQg2uxrvzaZLvhXwNDhY=
 		</data>
 		<key>Base.lproj/LaunchScreen.storyboardc/01J-lp-oVM-view-Ze5-6b-2t3.nib</key>
 		<data>
@@ -46,7 +46,7 @@
 		</data>
 		<key>Frameworks/App.framework/App</key>
 		<data>
-		3quoEMIXzNU0UyoA5h5X/3ZSWZM=
+		23WPr9ZepYvT6KRhEUf21mCajY0=
 		</data>
 		<key>Frameworks/App.framework/Info.plist</key>
 		<data>
@@ -54,7 +54,7 @@
 		</data>
 		<key>Frameworks/App.framework/_CodeSignature/CodeResources</key>
 		<data>
-		5AQ0Mq82THO0DMdxndZubfMtBkk=
+		xEY3qsgE3qqNN/mRh7s7ofd/kKc=
 		</data>
 		<key>Frameworks/App.framework/flutter_assets/AssetManifest.bin</key>
 		<data>
@@ -70,7 +70,7 @@
 		</data>
 		<key>Frameworks/App.framework/flutter_assets/NOTICES.Z</key>
 		<data>
-		XqXarePUfoDlM3VDcQNmUrBhZCs=
+		aTH4F1EFKGtOeHu+XoOF2m3Nhxs=
 		</data>
 		<key>Frameworks/App.framework/flutter_assets/assets/refma-logo.png</key>
 		<data>
@@ -86,7 +86,7 @@
 		</data>
 		<key>Frameworks/App.framework/flutter_assets/kernel_blob.bin</key>
 		<data>
-		lc6XIgD6UCbRmS6CkGHvRGdSnfo=
+		vHkhRFx6NLl/0CCc9EMw+BloBBg=
 		</data>
 		<key>Frameworks/App.framework/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf</key>
 		<data>
@@ -110,7 +110,7 @@
 		</data>
 		<key>Frameworks/DKImagePickerController.framework/DKImagePickerController</key>
 		<data>
-		kceE4RkcftY4I/Bln8ToqzqiubU=
+		ftmKVR19EbhNxLnHO/5K/Wrlxm0=
 		</data>
 		<key>Frameworks/DKImagePickerController.framework/DKImagePickerController.bundle/Assets.car</key>
 		<data>
@@ -314,7 +314,7 @@
 		</data>
 		<key>Frameworks/DKPhotoGallery.framework/DKPhotoGallery</key>
 		<data>
-		/Vvl08Vr/32Vk3OrzAUUZUxGTCA=
+		rgE39zM+OMzvJXY0eOuAZWjZJ4Q=
 		</data>
 		<key>Frameworks/DKPhotoGallery.framework/DKPhotoGallery.bundle/Assets.car</key>
 		<data>
@@ -365,7 +365,7 @@
 		</data>
 		<key>Frameworks/Flutter.framework/Flutter</key>
 		<data>
-		aMGX9GAao2bnTdfkHfb2osyA93s=
+		76qdFWfh4rcg1cxK6z69zwRP1TA=
 		</data>
 		<key>Frameworks/Flutter.framework/Headers/Flutter.h</key>
 		<data>
@@ -457,7 +457,7 @@
 		</data>
 		<key>Frameworks/SDWebImage.framework/SDWebImage</key>
 		<data>
-		u2eW62z3NLVgN5D44mNMgohtZ+o=
+		oOD/JU6owZi6EA2u9KCQTi+SZjA=
 		</data>
 		<key>Frameworks/SDWebImage.framework/SDWebImage.bundle/Info.plist</key>
 		<data>
@@ -477,7 +477,7 @@
 		</data>
 		<key>Frameworks/SwiftyGif.framework/SwiftyGif</key>
 		<data>
-		1tNrfbhCXsN1aVLcktxt2fqRqXM=
+		EkI9kraTUL0yOSWg5R/qvYZyY68=
 		</data>
 		<key>Frameworks/SwiftyGif.framework/SwiftyGif.bundle/Info.plist</key>
 		<data>
@@ -501,7 +501,7 @@
 		</data>
 		<key>Frameworks/device_info_plus.framework/device_info_plus</key>
 		<data>
-		B5Eau7B4zwi32mA2qm83l7FKfzc=
+		RKRFbjWbCXjE5o1OiuyfvasgzeA=
 		</data>
 		<key>Frameworks/device_info_plus.framework/device_info_plus_privacy.bundle/Info.plist</key>
 		<data>
@@ -511,17 +511,41 @@
 		<data>
 		/LX0ZlwxwIAIhjZaDB8EiH5KpXA=
 		</data>
+		<key>Frameworks/ffmpegkit.framework/Info.plist</key>
+		<data>
+		G6XxTVf5Bm0UtPr4f9dSOlgKQuQ=
+		</data>
+		<key>Frameworks/ffmpegkit.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/ffmpegkit.framework/SOURCE</key>
+		<data>
+		/YEugIDmcAMyyN/n2VjsDQaNkew=
+		</data>
+		<key>Frameworks/ffmpegkit.framework/_CodeSignature/CodeResources</key>
+		<data>
+		ECeZT8sJdxI3gWSsvfm/7pIrKhI=
+		</data>
+		<key>Frameworks/ffmpegkit.framework/ffmpegkit</key>
+		<data>
+		U2VM1COYVK9NO6T96vwrq5tOUGs=
+		</data>
+		<key>Frameworks/ffmpegkit.framework/strip-frameworks.sh</key>
+		<data>
+		+MG0vr81f9BYFi8t9r2Wy0CFRAQ=
+		</data>
 		<key>Frameworks/file_picker.framework/Info.plist</key>
 		<data>
-		RRPCHFU9WScK2TA1wsk9pjsQduQ=
+		CJG/LP70W7Xfg5s0+qeFHpqOPiY=
 		</data>
 		<key>Frameworks/file_picker.framework/_CodeSignature/CodeResources</key>
 		<data>
-		LW3z0FUArZd+gRP1teWOLEUMIIM=
+		23u4t145uArAceoToutWB1cliIo=
 		</data>
 		<key>Frameworks/file_picker.framework/file_picker</key>
 		<data>
-		IkYbjDsCzceCxyVk+zQ9ufHe/XM=
+		fxZsVJYxfRIiokRiIeFXxdNnlAc=
 		</data>
 		<key>Frameworks/file_picker.framework/file_picker_ios_privacy.bundle/Info.plist</key>
 		<data>
@@ -533,15 +557,15 @@
 		</data>
 		<key>Frameworks/flutter_native_splash.framework/Info.plist</key>
 		<data>
-		bBXTwFvLEZh9SmD/cfL/KoocYPI=
+		RK/U8ao1zY4YbyJSupCyc4D1YOQ=
 		</data>
 		<key>Frameworks/flutter_native_splash.framework/_CodeSignature/CodeResources</key>
 		<data>
-		zeCQ2pN+6dgpmK6pxeOs9GgV32Y=
+		v7c5F14CJnXzmIdQvbO/qipINm0=
 		</data>
 		<key>Frameworks/flutter_native_splash.framework/flutter_native_splash</key>
 		<data>
-		mszUaOSIHODnecitH1R5O9kT+tM=
+		qpt35BdZdCYzldTwBUikOHwfWmk=
 		</data>
 		<key>Frameworks/flutter_native_splash.framework/flutter_native_splash_privacy.bundle/Info.plist</key>
 		<data>
@@ -553,15 +577,15 @@
 		</data>
 		<key>Frameworks/geolocator_apple.framework/Info.plist</key>
 		<data>
-		n0+uzR1VVg1jtHXgVXFamFxY530=
+		fkKecElcOMfoP56XWq/E8nCVsVQ=
 		</data>
 		<key>Frameworks/geolocator_apple.framework/_CodeSignature/CodeResources</key>
 		<data>
-		tefZwycI4mwgwnfbe05nKFZ14ls=
+		3B/07ITZXjNPTdvlCF65MTWOiqA=
 		</data>
 		<key>Frameworks/geolocator_apple.framework/geolocator_apple</key>
 		<data>
-		286bLq452V6SFRjUaudGQRO5Y/E=
+		viUMWmr8TYUdyyvQXu8Ia/DFafQ=
 		</data>
 		<key>Frameworks/geolocator_apple.framework/geolocator_apple_privacy.bundle/Info.plist</key>
 		<data>
@@ -581,7 +605,7 @@
 		</data>
 		<key>Frameworks/get_thumbnail_video.framework/get_thumbnail_video</key>
 		<data>
-		pkUq3knheCN/EhFeua3NPtvNg0s=
+		0BtV43ZIiPPPQosCtotRSrdiebY=
 		</data>
 		<key>Frameworks/image_picker_ios.framework/Info.plist</key>
 		<data>
@@ -593,7 +617,7 @@
 		</data>
 		<key>Frameworks/image_picker_ios.framework/image_picker_ios</key>
 		<data>
-		EAxtjBYdTHZxwMaSN/EBlwQ28K4=
+		fnt0NUvRXcetvlctIqPfxCFD23k=
 		</data>
 		<key>Frameworks/image_picker_ios.framework/image_picker_ios_privacy.bundle/Info.plist</key>
 		<data>
@@ -602,6 +626,134 @@
 		<key>Frameworks/image_picker_ios.framework/image_picker_ios_privacy.bundle/PrivacyInfo.xcprivacy</key>
 		<data>
 		/LX0ZlwxwIAIhjZaDB8EiH5KpXA=
+		</data>
+		<key>Frameworks/libavcodec.framework/Info.plist</key>
+		<data>
+		r+LesW73zBEC7II8eTeHIreV4AM=
+		</data>
+		<key>Frameworks/libavcodec.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libavcodec.framework/LICENSE.LIBVIDSTAB</key>
+		<data>
+		g08jHguMpWAufDv/EJiPZLM/BF8=
+		</data>
+		<key>Frameworks/libavcodec.framework/LICENSE.X264</key>
+		<data>
+		36wZmnU5pARAcJiiVBuUgiefaQ0=
+		</data>
+		<key>Frameworks/libavcodec.framework/LICENSE.X265</key>
+		<data>
+		/RzF6W5HYjyAGXqXn19Zn5rbWzw=
+		</data>
+		<key>Frameworks/libavcodec.framework/LICENSE.XVIDCORE</key>
+		<data>
+		BSN0ILNRu1tvTfyzpM4gwaElhOo=
+		</data>
+		<key>Frameworks/libavcodec.framework/_CodeSignature/CodeResources</key>
+		<data>
+		dczpFzFe6XVeJin5hXqZyqh6a8g=
+		</data>
+		<key>Frameworks/libavcodec.framework/libavcodec</key>
+		<data>
+		pJoAq1QpzNO3yzhgpH0V5cF5Nec=
+		</data>
+		<key>Frameworks/libavdevice.framework/Info.plist</key>
+		<data>
+		oONTBshZat2KKNVtg7NNAWeJVic=
+		</data>
+		<key>Frameworks/libavdevice.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libavdevice.framework/_CodeSignature/CodeResources</key>
+		<data>
+		BPWkVZGo86mi85FI0cs/E2L/DQU=
+		</data>
+		<key>Frameworks/libavdevice.framework/libavdevice</key>
+		<data>
+		d2ESp6PBp0oWfwXJCgxD1yGNKzk=
+		</data>
+		<key>Frameworks/libavfilter.framework/Info.plist</key>
+		<data>
+		PB4CiI/qhbLW25vLWJy7XIfxxZc=
+		</data>
+		<key>Frameworks/libavfilter.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libavfilter.framework/_CodeSignature/CodeResources</key>
+		<data>
+		9r43CFmsE/AaEWNxEoBKooaAQ1Q=
+		</data>
+		<key>Frameworks/libavfilter.framework/libavfilter</key>
+		<data>
+		VUdN/H66XTpw4+2GcKCPqH9EQxM=
+		</data>
+		<key>Frameworks/libavformat.framework/Info.plist</key>
+		<data>
+		CLBSqWyo4wPZMZSJI9HU304+SgM=
+		</data>
+		<key>Frameworks/libavformat.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libavformat.framework/_CodeSignature/CodeResources</key>
+		<data>
+		BZZA0dF0LevQFxRiV2BAF5fyeiU=
+		</data>
+		<key>Frameworks/libavformat.framework/libavformat</key>
+		<data>
+		Fgp7JcHWu3PYA82A9rerVfU3Vb8=
+		</data>
+		<key>Frameworks/libavutil.framework/Info.plist</key>
+		<data>
+		l+29N0jwpIZdhSaC5udXxzNdyjs=
+		</data>
+		<key>Frameworks/libavutil.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libavutil.framework/_CodeSignature/CodeResources</key>
+		<data>
+		ig3dyu1x8ETsq1sPW10KVBODfo4=
+		</data>
+		<key>Frameworks/libavutil.framework/libavutil</key>
+		<data>
+		Chus+v76rh97Kwr3ikoL8E3MsiE=
+		</data>
+		<key>Frameworks/libswresample.framework/Info.plist</key>
+		<data>
+		6fc4Ni992JvJZ33xLyKdF0s/eIM=
+		</data>
+		<key>Frameworks/libswresample.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libswresample.framework/_CodeSignature/CodeResources</key>
+		<data>
+		rHfdQQrSTd357+vpjZZi7igR9gs=
+		</data>
+		<key>Frameworks/libswresample.framework/libswresample</key>
+		<data>
+		i0mwyDp/vmC4HyQcLakl7tTqX3s=
+		</data>
+		<key>Frameworks/libswscale.framework/Info.plist</key>
+		<data>
+		aYmVA9aaXtahj0rPbXOXlNvT3T4=
+		</data>
+		<key>Frameworks/libswscale.framework/LICENSE</key>
+		<data>
+		hiS82uVbru8AzRHV38+mD2hxCgI=
+		</data>
+		<key>Frameworks/libswscale.framework/_CodeSignature/CodeResources</key>
+		<data>
+		YAWhRIloSo00OpOj0z70+O7E5jU=
+		</data>
+		<key>Frameworks/libswscale.framework/libswscale</key>
+		<data>
+		5WKwJjbQCQubk8+R+LxapgNciXU=
 		</data>
 		<key>Frameworks/libwebp.framework/Info.plist</key>
 		<data>
@@ -613,7 +765,7 @@
 		</data>
 		<key>Frameworks/libwebp.framework/libwebp</key>
 		<data>
-		FqYU2RiDBoRmSm9rM8BvV27vjmc=
+		SgbwNQ4hZRgUdVzSvs0E5j5QSUg=
 		</data>
 		<key>Frameworks/package_info_plus.framework/Info.plist</key>
 		<data>
@@ -625,7 +777,7 @@
 		</data>
 		<key>Frameworks/package_info_plus.framework/package_info_plus</key>
 		<data>
-		+v2wBitF5om3E8YUV5MtcfYOdH8=
+		UKU0XYxw4vnpQCEXIEYBkeLE0Xo=
 		</data>
 		<key>Frameworks/package_info_plus.framework/package_info_plus_privacy.bundle/Info.plist</key>
 		<data>
@@ -645,7 +797,7 @@
 		</data>
 		<key>Frameworks/path_provider_foundation.framework/path_provider_foundation</key>
 		<data>
-		3wrEwpsTjHNyWhwFUl6lHDkR1C8=
+		lNMv9GAZf2djhwQzsHtJ7o5T0MU=
 		</data>
 		<key>Frameworks/path_provider_foundation.framework/path_provider_foundation_privacy.bundle/Info.plist</key>
 		<data>
@@ -657,15 +809,15 @@
 		</data>
 		<key>Frameworks/photo_manager.framework/Info.plist</key>
 		<data>
-		v4/Bm8c0ZDdcrs6t5UkbFA4c/Fg=
+		23f5yuLDap+Pz/utSz75OPm7pUk=
 		</data>
 		<key>Frameworks/photo_manager.framework/_CodeSignature/CodeResources</key>
 		<data>
-		3VNK2Gko4waptxThgFm0YNH3b6k=
+		LAUF7I9AnIKsNhWVdoINQ+yoxw0=
 		</data>
 		<key>Frameworks/photo_manager.framework/photo_manager</key>
 		<data>
-		laVVKGYl8YCqlZEbyArXzSRZLXU=
+		8ijCeQGpvc838S/ZLLEdizQSOaA=
 		</data>
 		<key>Frameworks/photo_manager.framework/photo_manager_privacy.bundle/Info.plist</key>
 		<data>
@@ -685,7 +837,7 @@
 		</data>
 		<key>Frameworks/share_plus.framework/share_plus</key>
 		<data>
-		dI1Sh14W58WvV4UkbHTHcPJy8Zo=
+		FUAkrioInnVQVjcSpwdSrATuf4k=
 		</data>
 		<key>Frameworks/share_plus.framework/share_plus_privacy.bundle/Info.plist</key>
 		<data>
@@ -705,7 +857,7 @@
 		</data>
 		<key>Frameworks/shared_preferences_foundation.framework/shared_preferences_foundation</key>
 		<data>
-		ZSoYY0s1IXPKeLiHVNEqYJ1jNCE=
+		OldAQpCQAcZwJxSJNuQbcKKsh+g=
 		</data>
 		<key>Frameworks/shared_preferences_foundation.framework/shared_preferences_foundation_privacy.bundle/Info.plist</key>
 		<data>
@@ -717,15 +869,15 @@
 		</data>
 		<key>Frameworks/vibration.framework/Info.plist</key>
 		<data>
-		GU/rLWf717RJGnafZ/lghNf+Vl0=
+		+/wlT42XC+F3gkPWqW1k/3vk+tc=
 		</data>
 		<key>Frameworks/vibration.framework/_CodeSignature/CodeResources</key>
 		<data>
-		ZDQZli2Se2IAfXJrh26ymNklhUY=
+		Y7ImXgXZIfP9V2Sd1KTAWASqI6w=
 		</data>
 		<key>Frameworks/vibration.framework/vibration</key>
 		<data>
-		0xXXG+2bWdydMrsmXjPzwBMu4EQ=
+		0y+bAve6f6i9xGpEP3r7UPYGx2Q=
 		</data>
 		<key>Frameworks/video_player_avfoundation.framework/Info.plist</key>
 		<data>
@@ -737,7 +889,7 @@
 		</data>
 		<key>Frameworks/video_player_avfoundation.framework/video_player_avfoundation</key>
 		<data>
-		QCO840+8Ud8X6EfpE2yYP2nb1Js=
+		k+IHMEd/SCVnYNq+FqiXJAHT0/I=
 		</data>
 		<key>Frameworks/video_player_avfoundation.framework/video_player_avfoundation_privacy.bundle/Info.plist</key>
 		<data>
@@ -749,11 +901,11 @@
 		</data>
 		<key>Frameworks/wakelock_plus.framework/Info.plist</key>
 		<data>
-		s+IwDEvwg093GifKkK0zNikHHH8=
+		rJUt36c/lhVej/iTicoDYFgtbIM=
 		</data>
 		<key>Frameworks/wakelock_plus.framework/_CodeSignature/CodeResources</key>
 		<data>
-		+6fedB2eUqGbyaymhNiEbsFozGQ=
+		BpCH8YlnQNXuntnlOtRy2nG4psw=
 		</data>
 		<key>Frameworks/wakelock_plus.framework/thermal.bundle/Info.plist</key>
 		<data>
@@ -765,11 +917,11 @@
 		</data>
 		<key>Frameworks/wakelock_plus.framework/wakelock_plus</key>
 		<data>
-		m2XKxpovHh2EVhOhi6GaEzX2elI=
+		7q1EpcQpaj+gIfVprXlZA+Rcqtk=
 		</data>
 		<key>Info.plist</key>
 		<data>
-		3UjY31eyJzjPjequ6pC8pcxpXho=
+		xjhcb49RIV/u3JoxJVSPkbywbTA=
 		</data>
 		<key>PkgInfo</key>
 		<data>
@@ -815,7 +967,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			7ZCbKmsy/Qd5P4ywsd8D7QxO3zPAlqSB9nVi9W8Z1As=
+			iuEOnICpHXeC/S11r7OTnHCHPzpQz6ZN8B2C0GNcnX0=
 			</data>
 		</dict>
 		<key>Base.lproj/LaunchScreen.storyboardc/01J-lp-oVM-view-Ze5-6b-2t3.nib</key>
@@ -864,7 +1016,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			BdPP8o++kLVC7LAwGVJaJbrzpKYQ/jIe18PcWeRDcfw=
+			qNVGfHQNbbc87W+Lc9cI5g1mqdlyo8Ri+6e+llCOJqQ=
 			</data>
 		</dict>
 		<key>Frameworks/App.framework/Info.plist</key>
@@ -878,7 +1030,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			2UydTLB/RzqJbPI41vToUIGn5vOvR1dNQRPG9R91DfE=
+			4ebPCvdtRx16SwjEd0O6GOR8BeffI8ES9vOQMRQHjd0=
 			</data>
 		</dict>
 		<key>Frameworks/App.framework/flutter_assets/AssetManifest.bin</key>
@@ -906,7 +1058,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			laU36JHIIA+LaMvhBx5x6xpgKSdjyHuthLTzJyoaN4k=
+			92+/R8LFkRhhkXoFLwanmkjG+p0ySH2JVSpgpVa0F2k=
 			</data>
 		</dict>
 		<key>Frameworks/App.framework/flutter_assets/assets/refma-logo.png</key>
@@ -934,7 +1086,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			v/vCO/i3VgFwumO8CzcjzHhmYlBHVtjC83Nm3frUPnU=
+			kP6TYjm0dfFx8fQlCmVckPU0I9G4+YP68asXrsNRThs=
 			</data>
 		</dict>
 		<key>Frameworks/App.framework/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf</key>
@@ -976,7 +1128,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			E6am9z4Ff1mnBjQ6+a5lD2ygUPZKri08fFU85YrFrCs=
+			aSam2yjfQBw7gnE/3rWVVFvu9nxdBQJDW2y1sxnG/d0=
 			</data>
 		</dict>
 		<key>Frameworks/DKImagePickerController.framework/DKImagePickerController.bundle/Assets.car</key>
@@ -1198,7 +1350,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			aacOgvYF9ukW5+9AHv7oZIIpSjB5k95/nHozI71P1so=
+			k1u0EHfW6lFK2/InwlxKiLYh5mYHh5/5yagz737u4eo=
 			</data>
 		</dict>
 		<key>Frameworks/DKPhotoGallery.framework/DKPhotoGallery.bundle/Assets.car</key>
@@ -1267,7 +1419,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			IA6pqVhWdvyDtsuEhKl0dh0Kw0o7gzRQTHPQyjtppuA=
+			mNNLznBv772bf3S8XtK/xGS71/Z/1bvLJDPIIREhJ6o=
 			</data>
 		</dict>
 		<key>Frameworks/Flutter.framework/Headers/Flutter.h</key>
@@ -1428,7 +1580,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			68hFhUD5YalJH1L2E8y5MJdAhEnJK96d4JRxuGri8c4=
+			UqcZ3YF4dgx1ULNvqBFeRm8Iacj7pkz9d82MeEuE13o=
 			</data>
 		</dict>
 		<key>Frameworks/SDWebImage.framework/SDWebImage.bundle/Info.plist</key>
@@ -1463,7 +1615,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			HHlNvRd5zQ7gtIO38KMMEdKXM6B1HkahfPYuT0MS+a4=
+			8IgxhK1vTi7D9liTyrhSS4R+Ne5j/Qb4OsA3ZXmFmoA=
 			</data>
 		</dict>
 		<key>Frameworks/SwiftyGif.framework/SwiftyGif.bundle/Info.plist</key>
@@ -1505,7 +1657,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			0RMjG3lQZSd7XpXAMXZ4y7KlVEYc7wF56QgUjtGN3dk=
+			1vNSJhKncRtIRGeE8BLQhtf30T3/VcjmjC0kwHxqXJo=
 			</data>
 		</dict>
 		<key>Frameworks/device_info_plus.framework/device_info_plus_privacy.bundle/Info.plist</key>
@@ -1522,25 +1674,67 @@
 			bS2g2NkwIn1CjB2TY7CtbjoS4sm2jFzilxWKdBL8jDE=
 			</data>
 		</dict>
+		<key>Frameworks/ffmpegkit.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			PQ5nbgIdDf6GQBPKuWE4EgOFoM4Ni4t3TM4i50N/8Ho=
+			</data>
+		</dict>
+		<key>Frameworks/ffmpegkit.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/ffmpegkit.framework/SOURCE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			q/gubsBi5RpLWQxdfa0VkH+WxIFY9GzZmywo5/75VBs=
+			</data>
+		</dict>
+		<key>Frameworks/ffmpegkit.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			OUYkzIXYSjD3cd5O3dZaC5mT0A6OO6BkOuFtjxZWbG8=
+			</data>
+		</dict>
+		<key>Frameworks/ffmpegkit.framework/ffmpegkit</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			FtDSfX/TfwpAKqxXUmjAom90x1kjKwt+SIo+wy6yOK4=
+			</data>
+		</dict>
+		<key>Frameworks/ffmpegkit.framework/strip-frameworks.sh</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			EFBdsgIKkcB/ZW5AgcnnL3/o0Bpiv6XiPi3sPZMaPdg=
+			</data>
+		</dict>
 		<key>Frameworks/file_picker.framework/Info.plist</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			M26qq2u4KD7yap+Zlz8A+of8ppIoPgGrZap2OgNWczM=
+			sycyqHhGIlwiMA5R+GC9KqZcDR4VezKYMFFPxORkdEw=
 			</data>
 		</dict>
 		<key>Frameworks/file_picker.framework/_CodeSignature/CodeResources</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			thoTVuz99vniZhx9UhElfOaH6pDIyQZXHoy3lDtTmdQ=
+			7S1k/e8MjKjlJ20XzYUDQO15KenvJomMKaxf8We0mKg=
 			</data>
 		</dict>
 		<key>Frameworks/file_picker.framework/file_picker</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			lWDti4DgHdHcb7C9lzIXXhrEjWOprvO1/KzRlVYPsRY=
+			SwvdMbFuaKV0V2itnK3p547sdKeQXMZLtbNafw2pNxI=
 			</data>
 		</dict>
 		<key>Frameworks/file_picker.framework/file_picker_ios_privacy.bundle/Info.plist</key>
@@ -1561,21 +1755,21 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			ZGHNcIvBtRV72SmZrjXYvkqNslwb59af/6q67uawrwM=
+			fQceTgO/55yFvdBOXHTX80HFoz5MyRqIGGg2ylFRmPQ=
 			</data>
 		</dict>
 		<key>Frameworks/flutter_native_splash.framework/_CodeSignature/CodeResources</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			QJ4Vp+we46MmjmgeW9+egrxfxVCqKp0kiUogzSGSdQo=
+			FtXQESnHGrru6mJSD6QWgfMtSvJwpa7nemso25RMIZc=
 			</data>
 		</dict>
 		<key>Frameworks/flutter_native_splash.framework/flutter_native_splash</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			QIh25D+a/qa/sK0SYbgWGuf8EhQqr9MFKm+13UWh1Sk=
+			KG4iV6gtafSuGDS6vUWxrySjesI5Vvq+dKyGI41hpzg=
 			</data>
 		</dict>
 		<key>Frameworks/flutter_native_splash.framework/flutter_native_splash_privacy.bundle/Info.plist</key>
@@ -1596,21 +1790,21 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			WBwt0D2nlAQNL3Juymq3Q3eb5PFc+Eh885FKKslpfZk=
+			wY2qS+JD6hsK9knAATi4COC662GNYHEwnOWgD+F0YUY=
 			</data>
 		</dict>
 		<key>Frameworks/geolocator_apple.framework/_CodeSignature/CodeResources</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			6z96wtIwwrkQzRQ2I93kl2yXlBCl9Ktapy6uWKAde8g=
+			5/v9Ap9NOsQAv5ruw1q2XVXPw0J7vKtt85N5jtrJpBw=
 			</data>
 		</dict>
 		<key>Frameworks/geolocator_apple.framework/geolocator_apple</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			OGONCwM6v0TJeMjP/IStyD54GqAQynsSNTLtixUicBU=
+			UcLrihBWpzqQf+Kbw73rM9UsxhTNsFeQHPra9pOyukI=
 			</data>
 		</dict>
 		<key>Frameworks/geolocator_apple.framework/geolocator_apple_privacy.bundle/Info.plist</key>
@@ -1645,7 +1839,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			+914U4QfnRjwiWekYDA9aw7doi7kDyFj+nWEfTgw4V4=
+			2758GlnOy3/g3TSjmFmXW0hPw3/qkQ8ZfdGZI2v7/cE=
 			</data>
 		</dict>
 		<key>Frameworks/image_picker_ios.framework/Info.plist</key>
@@ -1666,7 +1860,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			EliFfwzS3olyRgAdM9kBvIVAl6pr03WribM09xccIy8=
+			aMWC4pEIbtzB1+FG5KfWuZSO87Ik78Ze7sDwPNFRPGQ=
 			</data>
 		</dict>
 		<key>Frameworks/image_picker_ios.framework/image_picker_ios_privacy.bundle/Info.plist</key>
@@ -1681,6 +1875,230 @@
 			<key>hash2</key>
 			<data>
 			bS2g2NkwIn1CjB2TY7CtbjoS4sm2jFzilxWKdBL8jDE=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			dpCs7HUh1AjwYLI7etDaoIlqFLPncgKbdKgejDHZBmc=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/LICENSE.LIBVIDSTAB</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			A/CVxccOoY/7K4ndWOTuV+T2E9BGMpk/kMiQ9MwSW5k=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/LICENSE.X264</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			MrEGL32oSWfnAZ0Bq4BZNcqnq3Mhp87Q4w6+deXfFnA=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/LICENSE.X265</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			2K+xvMeiz8YDaDsWjWmH7wpI5Z4No2k79VxdM7Z+K0k=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/LICENSE.XVIDCORE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			KrBtIzX5eB8aSFx4pVfmxhtsJOEYyq1NQhDEZCa7zpU=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			gFHdqmsx0wJdr/NZmK+FJsHxAovUdMxh9UB5aqOykgo=
+			</data>
+		</dict>
+		<key>Frameworks/libavcodec.framework/libavcodec</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			zVZ6fBbuc8YkckmpGEXJdWGECu9aaB1dOMhfDvxSIno=
+			</data>
+		</dict>
+		<key>Frameworks/libavdevice.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			vi7T78ZD0kpz9MRg/qdX/a5wH8npqvavOR/taZzhIXk=
+			</data>
+		</dict>
+		<key>Frameworks/libavdevice.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libavdevice.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			m2ei9PPLs5Q0Wo40kLtnHCnQ4ZZyH+JUKAIT6o7zDZA=
+			</data>
+		</dict>
+		<key>Frameworks/libavdevice.framework/libavdevice</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			izLa0j3jM6WuaVaGalQhlAbKVRntyKX8kqkLKBVOuHA=
+			</data>
+		</dict>
+		<key>Frameworks/libavfilter.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			x44MX2kryCLGNVt/jKPuJHU0/RDeafvbIQnV6TRszgE=
+			</data>
+		</dict>
+		<key>Frameworks/libavfilter.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libavfilter.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Y4ncucinx0edEemsqJWVAn2zZlKNRyqLFs8C4TBwx8s=
+			</data>
+		</dict>
+		<key>Frameworks/libavfilter.framework/libavfilter</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jezHcXYI8bBLcXM2AUQZpVGnYcAGVVgE9C9MGYu13Dk=
+			</data>
+		</dict>
+		<key>Frameworks/libavformat.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			75nucq0EYzo71OVuRrSo3NX+NsKJFOvPHN/w6w1yG+M=
+			</data>
+		</dict>
+		<key>Frameworks/libavformat.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libavformat.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			MrJmBzRvfnInOaeGOahRf+TZVq4bKGLA1jx3BwyPNKQ=
+			</data>
+		</dict>
+		<key>Frameworks/libavformat.framework/libavformat</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			GM/c3ohC76dszpG0TKfPgDCb02srLSSyynG78o8HVuA=
+			</data>
+		</dict>
+		<key>Frameworks/libavutil.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			geoABdAX5fJ22iGiVQvA20HvBHbMyiVeoUbqHyWFoXk=
+			</data>
+		</dict>
+		<key>Frameworks/libavutil.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libavutil.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			qqApCZEv+qxc2T+QVdxWmgxMRTdS0POJPAaK1rkEUM4=
+			</data>
+		</dict>
+		<key>Frameworks/libavutil.framework/libavutil</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			a2xVwibEpF4udwe+o5UjhGmfWo10RMkBOvdXtBr+hFU=
+			</data>
+		</dict>
+		<key>Frameworks/libswresample.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			5qHGP0ZYPu6gpVPQsChqsQqbRcDWDwVeQzX0/nOzG5o=
+			</data>
+		</dict>
+		<key>Frameworks/libswresample.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libswresample.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Nwv19LNbPucbCsaycD2jolFo1BUlhmXe405jKxWU4RA=
+			</data>
+		</dict>
+		<key>Frameworks/libswresample.framework/libswresample</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			Dh5iRswAVROIFomgsddy7RkqKjfL8wjTxbcPIlV9KEU=
+			</data>
+		</dict>
+		<key>Frameworks/libswscale.framework/Info.plist</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			/+ubOfv1ohJU48tVYeRP4/4Apq4yOisfSHeqNRpijn0=
+			</data>
+		</dict>
+		<key>Frameworks/libswscale.framework/LICENSE</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jOtLnuWt7d5Hsx6XXB2QxzrSe2sWWh3NgMfFRetluQM=
+			</data>
+		</dict>
+		<key>Frameworks/libswscale.framework/_CodeSignature/CodeResources</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			h9xS5AknoRTSgtnXnAcbTK9kSyZOMWqztp3jqocOiz4=
+			</data>
+		</dict>
+		<key>Frameworks/libswscale.framework/libswscale</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			jBpNZwVMxdQL1jEHFW42Cwwy0QjpVC8EmpyirCBg/wE=
 			</data>
 		</dict>
 		<key>Frameworks/libwebp.framework/Info.plist</key>
@@ -1701,7 +2119,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			6Beaw7h7DVKm91+YfRJZ4IuiEK7IX/ADnj+tKk0g3tE=
+			/n/TLtXqKe/jFza71mYB5KWuZGOUc909fgAjhcf9Is0=
 			</data>
 		</dict>
 		<key>Frameworks/package_info_plus.framework/Info.plist</key>
@@ -1722,7 +2140,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			X/gcppUIpZtf0p4i9+Cnz6oJ1fOkLlgOCxFdDCA+XKI=
+			oHQPwvRXagyMwraCXyw7jg0Bugkyk49Q4lGBgcb4mfg=
 			</data>
 		</dict>
 		<key>Frameworks/package_info_plus.framework/package_info_plus_privacy.bundle/Info.plist</key>
@@ -1757,7 +2175,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			i1GPQYZ/KtIs4CA+aYVOxnKB0PgZMofnod7mlxKQHiQ=
+			9IGYFYBjO1BqptbsoKebSoMvMtMRmc4XKG/Lm+nSKXQ=
 			</data>
 		</dict>
 		<key>Frameworks/path_provider_foundation.framework/path_provider_foundation_privacy.bundle/Info.plist</key>
@@ -1778,21 +2196,21 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			9Ei79c9ESE8yee2AXIhRyNqAN9DLNiy4vAmVvKANpQU=
+			emPdxxgUX9Q6ALk5XWMtSTcl1W66eRO4ptfpbUmk0HU=
 			</data>
 		</dict>
 		<key>Frameworks/photo_manager.framework/_CodeSignature/CodeResources</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			JIriUwOB86Fci9ALn+9EUxSCz/bs+GZdTGlmIqXf3uo=
+			e0tiV8wgTZ+vwaAMKkfZW04DtJeyXfzv7E/ahvohFzk=
 			</data>
 		</dict>
 		<key>Frameworks/photo_manager.framework/photo_manager</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			4OMWwO4psRiDGPjg0a9NPAcfhg3piZXqXAgT0x/21bc=
+			zNnOPTEiLllDjSRjnq5LITUCnUreHZvyd5dClO6nndE=
 			</data>
 		</dict>
 		<key>Frameworks/photo_manager.framework/photo_manager_privacy.bundle/Info.plist</key>
@@ -1827,7 +2245,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			9ArXkZiziBLNXTvZrVJeOLuIOHef54E0vtnxQeHR0B0=
+			Q/KDgyoLI+Wa+w5afo0wCaNaL8mxEmHm3IE+qRlvgCs=
 			</data>
 		</dict>
 		<key>Frameworks/share_plus.framework/share_plus_privacy.bundle/Info.plist</key>
@@ -1862,7 +2280,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			4VlcukhX6c1qhdyLRlKSMdY1oLJbCvHXaWEgi0I5Ls8=
+			21FS+SSlUDRiR1hK6b9ztGUq1QxaZ6GfFomIPYhugCE=
 			</data>
 		</dict>
 		<key>Frameworks/shared_preferences_foundation.framework/shared_preferences_foundation_privacy.bundle/Info.plist</key>
@@ -1883,21 +2301,21 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			60AZlWW9NtTxB8CYYLydih99Iu9RO1ODbpbjrFzbxeA=
+			Cp9FOSnoyhGTJzSjhhv3xi3fWtlqsR2xtuA56kzWaNI=
 			</data>
 		</dict>
 		<key>Frameworks/vibration.framework/_CodeSignature/CodeResources</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			ej6jsLFH4FeG9G0FbLaTbRP5zZ2Iv88sbEuOIO9z9Ms=
+			YBh/F0EzmGraIbviGyQDR21Ccrp7noc67fftu8X5SOE=
 			</data>
 		</dict>
 		<key>Frameworks/vibration.framework/vibration</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			nrymcQvcSXXANLavgq3d7BWcVwwrlk2DJBo5oflcz00=
+			4oeHzQV4RPPp+SvL4k4A7DQaDnWhu9nd3VjmNQ6Pm/g=
 			</data>
 		</dict>
 		<key>Frameworks/video_player_avfoundation.framework/Info.plist</key>
@@ -1918,7 +2336,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			WLYLVeO2KIYT55VF7bZIzx98hAvj96c+wwzdR5hklgc=
+			jMT4w7tCGsNJXol1YKC9aROZDvLAsIH6U/ICWhhBkpw=
 			</data>
 		</dict>
 		<key>Frameworks/video_player_avfoundation.framework/video_player_avfoundation_privacy.bundle/Info.plist</key>
@@ -1939,14 +2357,14 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			kddr96b7VtuWaj93WUXLLbGD4QMN2gmH8Gw0G82INwU=
+			rIRH787ejG8IYKpH1Hjkzp+8mA0RQWNH/1FrsYs7JGA=
 			</data>
 		</dict>
 		<key>Frameworks/wakelock_plus.framework/_CodeSignature/CodeResources</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			YqgBHzqx4xppZdQfo7qFIYF135LHuAyIaXyleZoVsyA=
+			Mw5DbVhvUKAzufsBJOTvk+FyHb38FNJwV8UU8krJwK0=
 			</data>
 		</dict>
 		<key>Frameworks/wakelock_plus.framework/thermal.bundle/Info.plist</key>
@@ -1967,7 +2385,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			7Lp9PiviIBpZQHThN8Skn1/b88N0RB/uwTyo354gXNc=
+			KFQHUa/DROPHExrkQkOYCRjk+Zg5U/im9U5M5pYTHdc=
 			</data>
 		</dict>
 		<key>embedded.mobileprovision</key>

@@ -9,6 +9,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.da
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/presentation/screens/video_generator.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/filter_panel.dart';
@@ -161,6 +162,14 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     );
   }
 
+  // Новый метод _onVideoGeneratorPressed
+void _onVideoGeneratorPressed(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
+  );
+}
+
   Future<void> _onSelectedSharePressed(BuildContext context) async {
     bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
     if (res) {
@@ -232,7 +241,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     print('Filtered photos count !!: ${photosFiltered.length}');
 
     // Используем отфильтрованный список для подсчета количества фотографий
-    String titleText = '${widget.title} (${photosFiltered.length})'; 
+    String titleText = '${widget.title} (${photosFiltered.length})';
 
     print('titleText !!: ${titleText}');
 
@@ -253,7 +262,9 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                       child: Text(
                         titleText,
                         style: TextStyle(
-                          color: hasActiveFilters ? Colors.yellow : Colors.white, // Подсветка заголовка
+                          color: hasActiveFilters
+                              ? Colors.yellow
+                              : Colors.white, // Подсветка заголовка
                         ),
                       ),
                     ),
@@ -273,7 +284,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                             ? 'Switch to Grid View'
                             : 'Switch to Masonry View',
                       ),
-                      if (widget.showFilter) // Проверяем, нужно ли показывать фильтр
+                      if (widget
+                          .showFilter) // Проверяем, нужно ли показывать фильтр
                         IconButton(
                           icon: Icon(Icons.filter_list,
                               color: hasActiveFilters
@@ -394,6 +406,12 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     onPressed: () => _onSelectedSharePressed(context),
                   ),
                   IconButton(
+                    icon:
+                        const Icon(Icons.video_collection, color: Colors.white),
+                    onPressed: () =>
+                        _onVideoGeneratorPressed(context), // Генерация видео
+                  ),
+                  IconButton(
                     icon: const Icon(Icons.delete,
                         color: Color.fromARGB(255, 120, 13, 13)),
                     onPressed: () => _onDeletePressed(context, _selectedPhotos),
@@ -402,7 +420,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
               ),
             ),
           ),
-        if (_showFilterPanel && widget.showFilter) // Проверяем, нужно ли показывать панель фильтров
+        if (_showFilterPanel &&
+            widget.showFilter) // Проверяем, нужно ли показывать панель фильтров
           Align(
             alignment: Alignment.topCenter,
             child: Container(

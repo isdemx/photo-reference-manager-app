@@ -37,13 +37,17 @@ class PhotoRepositoryImpl implements PhotoRepository {
   @override
   Future<void> addPhoto(Photo photo, {int compressSizeKb = 300}) async {
     try {
+      print('Add Pjoto, ${photo.fileName}');
       if (photo.isStoredInApp) {
         final fileName = path_package.basename(photo.path);
         final photosDir = await _getAppPhotosDirectory();
         final newFilePath = path_package.join(photosDir.path, fileName);
 
+        print('newFilePatho, $newFilePath');
+
         // Копируем файл из исходного пути в директорию приложения
         File newFile = await File(photo.path).copy(newFilePath);
+        print('newFile, $newFile');
 
         if (photo.mediaType == 'image') {
           // Обрабатываем только изображения
@@ -64,6 +68,8 @@ class PhotoRepositoryImpl implements PhotoRepository {
 
         // Обновляем имя файла
         photo.fileName = path_package.basename(newFile.path);
+
+        print('fileName, ${photo.fileName}');
       }
 
       await photoBox.put(photo.id, photo);

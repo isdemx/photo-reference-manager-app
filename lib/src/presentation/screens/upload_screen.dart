@@ -45,6 +45,7 @@ class _UploadScreenState extends State<UploadScreen> {
     });
 
     try {
+      WakelockPlus.enable();
       final images = await _picker.pickMultipleMedia();
       if (images.isNotEmpty) {
         setState(() {
@@ -54,6 +55,7 @@ class _UploadScreenState extends State<UploadScreen> {
         // Вызываем загрузку фотографий
         await _uploadImages();
       } else {
+        WakelockPlus.disable();
         setState(() {
           _isSelecting = false; // Выключаем лоадер, если ничего не выбрано
         });
