@@ -1,5 +1,3 @@
-// lib/main.dart
-
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -39,37 +37,49 @@ void main() async {
   Hive.registerAdapter(TagAdapter());
   Hive.registerAdapter(UserSettingsAdapter());
 
-  // Init Not Ref tag
+  // Инициализация баз данных
   final tagBox = await Hive.openBox<Tag>('tags');
   final tagRepository = TagRepositoryImpl(tagBox);
   await tagRepository.initializeDefaultTags();
 
-  // Init General category
   final categoryBox = await Hive.openBox<Category>('categories');
   final categoryRepository = CategoryRepositoryImpl(categoryBox);
   await categoryRepository.initializeDefaultCategory();
 
+  // Миграция для обновления старых данных
+  await migratePhotoBox();
+
   runApp(MyApp());
+}
+
+Future<void> migratePhotoBox() async {
+  final box = await Hive.openBox<Photo>('photos');
+  for (var key in box.keys) {
+    final photo = box.get(key);
+    if (photo != null && photo.mediaType == null) {
+      photo.mediaType = 'image'; // Устанавливаем значение по умолчанию
+      await box.put(key, photo); // Сохраняем обновления
+    }
+  }
 }
 
 class MyApp extends StatelessWidget {
   final Future<void> _initHive = _initializeHive();
 
   static Future<void> openHiveBoxes() async {
-    print('open box');
+    print('Opening Hive boxes...');
     await Hive.openBox<Category>('categories');
     await Hive.openBox<Folder>('folders');
     await Hive.openBox<Photo>('photos');
     await Hive.openBox<Tag>('tags');
-    print('opened box');
+    print('Hive boxes opened successfully.');
   }
 
   static Future<void> _initializeHive() async {
-    print('init');
-    // Открываем боксы
+    print('Initializing Hive...');
     await openHiveBoxes();
-
     await PhotoPathHelper().initialize();
+    print('Hive initialization complete.');
   }
 
   @override
@@ -88,7 +98,6 @@ class MyApp extends StatelessWidget {
             ),
           );
         } else {
-          // Показываем индикатор загрузки пока Hive инициализируется
           return const MaterialApp(
             home: Scaffold(
               body: Center(

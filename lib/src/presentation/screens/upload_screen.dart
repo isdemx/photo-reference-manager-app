@@ -8,6 +8,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -44,7 +45,7 @@ class _UploadScreenState extends State<UploadScreen> {
     });
 
     try {
-      final images = await _picker.pickMultiImage();
+      final images = await _picker.pickMultipleMedia();
       if (images.isNotEmpty) {
         setState(() {
           _images = images;
@@ -134,6 +135,9 @@ class _UploadScreenState extends State<UploadScreen> {
         if (_stopRequested) break;
 
         final image = _images![i];
+
+        final mediaType = determineMediaType(image.path);
+        // print('IMAGE!!!!!!!!! ${image.}');
         final geoLocation = await _getGeoLocation(image.path);
 
         final photo = Photo(
@@ -147,6 +151,7 @@ class _UploadScreenState extends State<UploadScreen> {
           fileName: path_package.basename(image.path),
           isStoredInApp: true,
           geoLocation: geoLocation,
+          mediaType: mediaType
         );
 
         try {

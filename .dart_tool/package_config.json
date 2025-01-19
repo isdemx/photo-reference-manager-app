@@ -380,6 +380,12 @@
       "languageVersion": "2.15"
     },
     {
+      "name": "get_thumbnail_video",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/get_thumbnail_video-0.7.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "glob",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/glob-2.1.2",
       "packageUri": "lib/",
@@ -968,6 +974,36 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "video_player",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player-2.9.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "video_player_android",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_android-2.7.16",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "video_player_avfoundation",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_avfoundation-2.6.7",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "video_player_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_platform_interface-6.2.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "video_player_web",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_web-2.3.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "vm_service",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/vm_service-14.2.5",
       "packageUri": "lib/",
@@ -1046,7 +1082,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2024-12-30T18:10:11.804587Z",
+  "generated": "2025-01-19T12:10:38.834572Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

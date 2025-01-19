@@ -36,6 +36,9 @@ class Photo extends HiveObject {
   @HiveField(9)
   final Map<String, double>? geoLocation; // Новое поле для геолокации
 
+  @HiveField(10)
+  String mediaType; // Убрано final
+
   Photo({
     required this.id,
     required this.path,
@@ -45,6 +48,7 @@ class Photo extends HiveObject {
     required this.comment,
     required this.dateAdded,
     required this.sortOrder,
+    required this.mediaType,
     this.isStoredInApp = false,
     this.geoLocation,
   });
@@ -53,4 +57,7 @@ class Photo extends HiveObject {
   String toString() {
     return 'Photo{id: $id, fileName: "$fileName", geoLocation: $geoLocation, isStoredInApp: $isStoredInApp, tagIds: $tagIds, folderIds: $folderIds}';
   }
+
+  bool get isImage => mediaType == 'image';
+  bool get isVideo => mediaType == 'video';
 }

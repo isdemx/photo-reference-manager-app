@@ -45,15 +45,21 @@ class PhotoRepositoryImpl implements PhotoRepository {
         // Копируем файл из исходного пути в директорию приложения
         File newFile = await File(photo.path).copy(newFilePath);
 
-        if (compressSizeKb != 0) {
-          final fileSizeKb = newFile.lengthSync() ~/ 1024;
-          if (fileSizeKb > compressSizeKb) {
-            // Сжимаем файл до compressSizeKb КБ в изоляте
-            await compute(
-              compressPhotoIsolate,
-              {'filePath': newFile.path, 'compressSizeKb': compressSizeKb},
-            );
+        if (photo.mediaType == 'image') {
+          // Обрабатываем только изображения
+          if (compressSizeKb != 0) {
+            final fileSizeKb = newFile.lengthSync() ~/ 1024;
+            if (fileSizeKb > compressSizeKb) {
+              // Сжимаем файл до compressSizeKb КБ в изоляте
+              await compute(
+                compressPhotoIsolate,
+                {'filePath': newFile.path, 'compressSizeKb': compressSizeKb},
+              );
+            }
           }
+        } else {
+          // Если это видео, просто логируем
+          print('Video file copied without compression: ${newFile.path}');
         }
 
         // Обновляем имя файла
@@ -61,7 +67,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
       }
 
       await photoBox.put(photo.id, photo);
-      print('Photo saved with id: ${photo.id}');
+      print('Photo saved with id: ${photo.id}, type: ${photo.mediaType}');
     } catch (e) {
       print('Error adding photo: $e');
       rethrow;
