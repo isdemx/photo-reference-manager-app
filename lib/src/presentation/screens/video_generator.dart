@@ -6,13 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
-import 'package:photographers_reference_app/src/utils/photo_share_helper.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
 class VideoGeneratorWidget extends StatefulWidget {
   final List<Photo> photos;
@@ -25,17 +24,14 @@ class VideoGeneratorWidget extends StatefulWidget {
 }
 
 class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
-  /// Слайдер от 1 до 10 (числа целые).
-  /// После преобразования получаем время кадра [1/60 .. 1.0].
-  int sliderValue = 2; // по умолчанию = 1 => 1/60 s
-  bool isShuffle = false; // для чекбокса "Make Shuffle"
+  int sliderValue = 2; 
+  bool isShuffle = false;
   bool isGenerating = false;
   String? generatedVideoPath;
 
   @override
   Widget build(BuildContext context) {
-    print(
-        'build => isGenerating=$isGenerating, generatedVideoPath=$generatedVideoPath');
+    print('build => isGenerating=$isGenerating, generatedVideoPath=$generatedVideoPath');
     return Stack(
       children: [
         Column(
@@ -44,19 +40,15 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
             Card(
               margin: const EdgeInsets.all(16),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
-                    const Text(
-                      'Select duration per photo:',
-                      style: TextStyle(fontSize: 16),
-                    ),
+                    const Text('Select duration per photo:', style: TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
                     Slider(
                       min: 2,
                       max: 10,
-                      divisions: 9,
+                      divisions: 8,
                       label: '$sliderValue',
                       value: sliderValue.toDouble(),
                       onChanged: (double val) {
@@ -69,7 +61,7 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Slider: $sliderValue => ${_mapSliderToDuration().toStringAsFixed(3)} sec/photo',
+                          'Slider: $sliderValue => ${_mapSliderToDuration().toStringAsFixed(3)} s/photo',
                           style: TextStyle(color: Colors.grey[700]),
                         ),
                         Row(
@@ -112,12 +104,10 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
     );
   }
 
-  /// Преобразуем значение слайдера (1..10) в диапазон (1/60 .. 1.0).
   double _mapSliderToDuration() {
-    // fraction = [0..1]
     final fraction = (sliderValue - 1) / 9.0;
-    final minDur = 1.0 / 60.0; // ~0.0167
-    final maxDur = 1.0; // 1 second
+    final minDur = 1.0 / 60.0;
+    final maxDur = 1.0;
     return minDur + fraction * (maxDur - minDur);
   }
 
@@ -128,11 +118,11 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
     });
 
     try {
-      final double durationPerPhoto = _mapSliderToDuration();
-      print(
-          '=== generateVideo START => each photo duration=$durationPerPhoto seconds ===');
+      final durationPerPhoto = _mapSliderToDuration();
+      final frameRate = 1.0 / durationPerPhoto;
+      print('=== generateVideo START => each photo=$durationPerPhoto s => fr=$frameRate ===');
 
-      // 1) Готовим выходной путь
+      // Папка для итогового файла
       final appDir = await getApplicationDocumentsDirectory();
       final photosDir = Directory(p.join(appDir.path, 'photos'));
       if (!photosDir.existsSync()) {
@@ -142,7 +132,7 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
       final outputName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final finalOutputPath = p.join(photosDir.path, outputName);
 
-      // 2) Временная папка
+      // Временная папка
       final tempDir = await getTemporaryDirectory();
       final videoDir = Directory(p.join(tempDir.path, 'video_images'));
       if (videoDir.existsSync()) {
@@ -153,61 +143,50 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
         videoDir.createSync(recursive: true);
       }
 
-      // 3) Список команд (с shuffle, если включён)
+      // Копируем фото
+      final photos = [...widget.photos];
       if (isShuffle) {
-        widget.photos.shuffle();
+        photos.shuffle();
       }
 
-      final List<String> inputSegments = [];
-      for (int i = 0; i < widget.photos.length; i++) {
-        final photo = widget.photos[i];
-        final originalPath = PhotoPathHelper().getFullPath(photo.fileName);
+      for (int i = 0; i < photos.length; i++) {
+        final originalPath = PhotoPathHelper().getFullPath(photos[i].fileName);
         final originalFile = File(originalPath);
-
         if (!originalFile.existsSync()) {
           throw Exception('File not found: $originalPath');
         }
 
-        final ext = p.extension(originalPath);
-        final copiedName = 'img_$i$ext';
-        final copiedPath = p.join(videoDir.path, copiedName);
+        // Переименовываем всё в .jpg, начиная с 1
+        final newName = 'img_${i+1}.jpg';
+        final copiedPath = p.join(videoDir.path, newName);
 
+        // Просто копируем, несмотря на реальный формат
+        // (FFmpeg обычно умеет распознавать PNG/JPEG и т.д. по сигнатуре.)
         await originalFile.copy(copiedPath);
-
-        inputSegments.add('-loop 1 -t $durationPerPhoto -i "$copiedPath"');
       }
 
-      // 4) Формируем filter_complex
-      final scaleBlocks = List.generate(widget.photos.length, (i) {
-        return '[${i}:v]'
-            'scale=800:800:force_original_aspect_ratio=decrease,'
-            'pad=800:800:(ow-iw)/2:(oh-ih)/2,'
-            'setsar=1[v$i];';
-      }).join('');
+      // Команда ffmpeg с pattern_type
+      final command = [
+        '-framerate $frameRate',
+        '-pattern_type sequence',
+        '-start_number 1',
+        '-i "${videoDir.path}/img_%d.jpg"',
+        '-vf "scale=800:800:force_original_aspect_ratio=decrease,'
+            'pad=800:800:(ow-iw)/2:(oh-ih)/2,setsar=1"',
+        '-pix_fmt yuv420p',
+        '-c:v libx264',
+        '-y "$finalOutputPath"',
+      ].join(' ');
 
-      final concatInputs =
-          List.generate(widget.photos.length, (i) => '[v$i]').join('');
-      final filterComplex = '$scaleBlocks'
-          '$concatInputs'
-          'concat=n=${widget.photos.length}:v=1:a=0';
+      print('FFmpeg command => $command');
 
-      // 5) Составляем FFmpeg команду
-      final command = '${inputSegments.join(' ')} '
-          '-filter_complex "$filterComplex" '
-          '-c:v libx264 '
-          '-f mp4 '
-          '-y "$finalOutputPath"';
-
-      print('FFmpeg command:\n$command');
-
-      // 6) Запускаем
       await FFmpegKit.execute(command).then((session) async {
         final returnCode = await session.getReturnCode();
 
         if (ReturnCode.isSuccess(returnCode)) {
           print('FFmpeg SUCCESS => $finalOutputPath');
 
-          // Добавляем в БД
+          // Сохраняем в БД
           final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
           final newVideo = Photo(
             id: const Uuid().v4(),
@@ -224,20 +203,19 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
           );
           await repo.addPhoto(newVideo);
 
-          // Обновляем список в UI через Bloc (опционально)
+          // Обновляем Bloc
           context.read<PhotoBloc>().add(LoadPhotos());
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-                content: Text('Video generated & saved successfully!')),
+            const SnackBar(content: Text('Video generated & saved successfully!')),
           );
 
           setState(() {
             generatedVideoPath = finalOutputPath;
           });
           Navigator.pop(context);
+
         } else {
-          // Выводим логи ffmpeg
           final logs = await session.getLogs();
           for (var line in logs) {
             print('FFmpeg Log => ${line.getMessage()}');

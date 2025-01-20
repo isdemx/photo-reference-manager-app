@@ -11,6 +11,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/images_help
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/video_generator.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/filter_panel.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
@@ -147,6 +148,11 @@ class _PhotoGridViewState extends State<PhotoGridView> {
       } else {
         _selectedPhotos.add(photo);
       }
+
+      // Если список пуст, выключаем режим мультиселекта
+      if (_selectedPhotos.isEmpty) {
+        _isMultiSelect = false;
+      }
     });
   }
 
@@ -163,12 +169,29 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   // Новый метод _onVideoGeneratorPressed
-void _onVideoGeneratorPressed(BuildContext context) {
-  showModalBottomSheet(
-    context: context,
-    builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
-  );
-}
+  void _onVideoGeneratorPressed(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
+    );
+  }
+
+  void _onCollageGeneratorPressed(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      enableDrag: false, // Запрещает закрытие свайпом вниз
+      isScrollControlled:
+          true, // Позволяет модальному окну растягиваться на весь экран
+      builder: (context) {
+        return Container(
+          width: double.infinity,
+          height: MediaQuery.of(context).size.height, // Полная высота экрана
+          color: Colors.black, // Фон (опционально)
+          child: PhotoCollageWidget(photos: _selectedPhotos),
+        );
+      },
+    );
+  }
 
   Future<void> _onSelectedSharePressed(BuildContext context) async {
     bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
@@ -260,11 +283,16 @@ void _onVideoGeneratorPressed(BuildContext context) {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8.0),
                       child: Text(
-                        titleText,
+                        _isMultiSelect
+                            ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
+                            : '${widget.title} (${photosFiltered.length})',
                         style: TextStyle(
-                          color: hasActiveFilters
+                          color: _isMultiSelect
                               ? Colors.yellow
-                              : Colors.white, // Подсветка заголовка
+                              : (filterState.filters.isNotEmpty &&
+                                      widget.showFilter
+                                  ? Colors.yellow
+                                  : Colors.white), // Подсветка заголовка
                         ),
                       ),
                     ),
@@ -284,11 +312,10 @@ void _onVideoGeneratorPressed(BuildContext context) {
                             ? 'Switch to Grid View'
                             : 'Switch to Masonry View',
                       ),
-                      if (widget
-                          .showFilter) // Проверяем, нужно ли показывать фильтр
+                      if (widget.showFilter)
                         IconButton(
                           icon: Icon(Icons.filter_list,
-                              color: hasActiveFilters
+                              color: filterState.filters.isNotEmpty
                                   ? Colors.yellow
                                   : Colors.white),
                           onPressed: () {
@@ -324,22 +351,46 @@ void _onVideoGeneratorPressed(BuildContext context) {
                       childCount: photosFiltered.length,
                       itemBuilder: (context, index) {
                         final photo = photosFiltered[index];
-                        return Container(
-                          decoration: BoxDecoration(
-                            border: _isMultiSelect &&
-                                    _selectedPhotos.contains(photo)
-                                ? Border.all(color: Colors.white, width: 3.0)
-                                : null,
-                          ),
-                          child: PhotoThumbnail(
-                            photo: photo,
-                            onPhotoTap: () => _onPhotoTap(context, index),
-                            isPinterestLayout: true,
-                            onLongPress: () => {
-                              vibrate(),
-                              _onThumbnailLongPress(context, photo),
-                            },
-                          ),
+                        return Stack(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                border: _isMultiSelect &&
+                                        _selectedPhotos.contains(photo)
+                                    ? Border.all(
+                                        color: Colors.white, width: 3.0)
+                                    : null,
+                              ),
+                              child: PhotoThumbnail(
+                                photo: photo,
+                                onPhotoTap: () => _onPhotoTap(context, index),
+                                isPinterestLayout: true,
+                                onLongPress: () => {
+                                  vibrate(),
+                                  _onThumbnailLongPress(context, photo),
+                                },
+                              ),
+                            ),
+                            if (_isMultiSelect &&
+                                _selectedPhotos.contains(photo))
+                              Positioned(
+                                bottom: 8,
+                                right: 8,
+                                child: Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue, // Синий фон
+                                    shape: BoxShape.circle, // Круглая форма
+                                  ),
+                                  child: const Icon(
+                                    Icons.check, // Иконка галочки
+                                    color: Colors.white, // Белый цвет иконки
+                                    size: 16, // Размер иконки
+                                  ),
+                                ),
+                              ),
+                          ],
                         );
                       },
                     )
@@ -352,22 +403,46 @@ void _onVideoGeneratorPressed(BuildContext context) {
                       delegate: SliverChildBuilderDelegate(
                         (context, index) {
                           final photo = photosFiltered[index];
-                          return Container(
-                            decoration: BoxDecoration(
-                              border: _isMultiSelect &&
-                                      _selectedPhotos.contains(photo)
-                                  ? Border.all(color: Colors.white, width: 3.0)
-                                  : null,
-                            ),
-                            child: PhotoThumbnail(
-                              photo: photo,
-                              onPhotoTap: () => _onPhotoTap(context, index),
-                              isPinterestLayout: false,
-                              onLongPress: () => {
-                                vibrate(),
-                                _onThumbnailLongPress(context, photo),
-                              },
-                            ),
+                          return Stack(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  border: _isMultiSelect &&
+                                          _selectedPhotos.contains(photo)
+                                      ? Border.all(
+                                          color: Colors.white, width: 3.0)
+                                      : null,
+                                ),
+                                child: PhotoThumbnail(
+                                  photo: photo,
+                                  onPhotoTap: () => _onPhotoTap(context, index),
+                                  isPinterestLayout: false,
+                                  onLongPress: () => {
+                                    vibrate(),
+                                    _onThumbnailLongPress(context, photo),
+                                  },
+                                ),
+                              ),
+                              if (_isMultiSelect &&
+                                  _selectedPhotos.contains(photo))
+                                Positioned(
+                                  bottom: 8,
+                                  right: 8,
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue, // Синий фон
+                                      shape: BoxShape.circle, // Круглая форма
+                                    ),
+                                    child: const Icon(
+                                      Icons.check, // Иконка галочки
+                                      color: Colors.white, // Белый цвет иконки
+                                      size: 16, // Размер иконки
+                                    ),
+                                  ),
+                                ),
+                            ],
                           );
                         },
                         childCount: photosFiltered.length,
@@ -410,6 +485,11 @@ void _onVideoGeneratorPressed(BuildContext context) {
                         const Icon(Icons.video_collection, color: Colors.white),
                     onPressed: () =>
                         _onVideoGeneratorPressed(context), // Генерация видео
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.grid_on,
+                        color: Colors.white), // Пример иконки коллажа
+                    onPressed: () => _onCollageGeneratorPressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete,
