@@ -43,7 +43,8 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
-                    const Text('Select duration per photo:', style: TextStyle(fontSize: 16)),
+                    const Text('This feature will create a slide show video', style: TextStyle(fontSize: 20)),
+                    const Text('Select slide show speed:', style: TextStyle(fontSize: 16)), 
                     const SizedBox(height: 8),
                     Slider(
                       min: 2,
@@ -61,7 +62,7 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Slider: $sliderValue => ${_mapSliderToDuration().toStringAsFixed(3)} s/photo',
+                          'Slider: $sliderValue => ${_mapSliderToDuration().toStringAsFixed(3)} frames per photo',
                           style: TextStyle(color: Colors.grey[700]),
                         ),
                         Row(

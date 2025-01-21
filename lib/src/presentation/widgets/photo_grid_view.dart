@@ -11,6 +11,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/images_help
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/video_generator.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_grid_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/filter_panel.dart';
@@ -188,6 +189,23 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           height: MediaQuery.of(context).size.height, // Полная высота экрана
           color: Colors.black, // Фон (опционально)
           child: PhotoCollageWidget(photos: _selectedPhotos),
+        );
+      },
+    );
+  }
+
+  void _onCollageGridGeneratorPressed(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      enableDrag: false, // Запрещает закрытие свайпом вниз
+      isScrollControlled:
+          true, // Позволяет модальному окну растягиваться на весь экран
+      builder: (context) {
+        return Container(
+          width: double.infinity,
+          height: MediaQuery.of(context).size.height, // Полная высота экрана
+          color: Colors.black, // Фон (опционально)
+          child: GridCollageWidget(photos: _selectedPhotos),
         );
       },
     );
@@ -490,6 +508,11 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     icon: const Icon(Icons.grid_on,
                         color: Colors.white), // Пример иконки коллажа
                     onPressed: () => _onCollageGeneratorPressed(context),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.grid_on,
+                        color: Colors.yellow), // Пример иконки коллажа
+                    onPressed: () => _onCollageGridGeneratorPressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Icons.delete,
