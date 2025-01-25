@@ -10,6 +10,7 @@ import 'package:uuid/uuid.dart';
 class CategoriesHelpers {
   static void showAddCategoryDialog(BuildContext context) {
     final TextEditingController controller = TextEditingController();
+    final FocusNode focusNode = FocusNode(); // Добавляем FocusNode
 
     showDialog(
       context: context,
@@ -18,6 +19,7 @@ class CategoriesHelpers {
           title: const Text('Add Category'),
           content: TextField(
             controller: controller,
+            focusNode: focusNode, // Устанавливаем FocusNode
             decoration: const InputDecoration(hintText: 'Category Name'),
           ),
           actions: [
@@ -41,10 +43,16 @@ class CategoriesHelpers {
         );
       },
     );
+
+    // Устанавливаем фокус после открытия диалога
+    Future.delayed(Duration.zero, () {
+      focusNode.requestFocus();
+    });
   }
 
   static void showEditCategoryDialog(BuildContext context, Category category) {
     final TextEditingController controller = TextEditingController();
+    final FocusNode focusNode = FocusNode(); // Добавляем FocusNode
     controller.text = category.name;
     bool isPrivate = category.isPrivate ?? false;
 
@@ -60,6 +68,7 @@ class CategoriesHelpers {
                 children: [
                   TextField(
                     controller: controller,
+                    focusNode: focusNode, // Устанавливаем FocusNode
                     decoration:
                         const InputDecoration(hintText: 'Category Name'),
                   ),
@@ -79,7 +88,6 @@ class CategoriesHelpers {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Кнопка для перемещения категории вверх
                     IconButton(
                       icon: const Icon(Icons.arrow_upward),
                       onPressed: () {
@@ -90,7 +98,6 @@ class CategoriesHelpers {
                             categoryId: category.id,
                             move: 'up',
                           );
-                          // Обновляем все категории с новыми сортировками
                           for (var updatedCategory in sortedCategories) {
                             context
                                 .read<CategoryBloc>()
@@ -100,7 +107,6 @@ class CategoriesHelpers {
                         Navigator.of(context).pop();
                       },
                     ),
-                    // Кнопка для перемещения категории вниз
                     IconButton(
                       icon: const Icon(Icons.arrow_downward),
                       onPressed: () {
@@ -111,7 +117,6 @@ class CategoriesHelpers {
                             categoryId: category.id,
                             move: 'down',
                           );
-                          // Обновляем все категории с новыми сортировками
                           for (var updatedCategory in sortedCategories) {
                             context
                                 .read<CategoryBloc>()
@@ -121,21 +126,17 @@ class CategoriesHelpers {
                         Navigator.of(context).pop();
                       },
                     ),
-                    // Кнопка для удаления категории
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
                       onPressed: () {
-                        Navigator.of(context)
-                            .pop(); // Закрываем диалог редактирования
-                        confirmDeleteCategory(context,
-                            category); // Показываем диалог подтверждения
+                        Navigator.of(context).pop();
+                        confirmDeleteCategory(context, category);
                       },
                     ),
                     TextButton(
                       onPressed: () {
                         final String newName = controller.text.trim();
                         if (newName.isNotEmpty) {
-                          // Обновляем имя категории и isPrivate
                           final updatedCategory = category.copyWith(
                             name: newName,
                             isPrivate: isPrivate,
@@ -143,7 +144,7 @@ class CategoriesHelpers {
                           context
                               .read<CategoryBloc>()
                               .add(UpdateCategory(updatedCategory));
-                          Navigator.of(context).pop(); // Закрываем диалог
+                          Navigator.of(context).pop();
                         }
                       },
                       child: const Text('OK'),
@@ -156,51 +157,17 @@ class CategoriesHelpers {
         );
       },
     );
-  }
 
-  static void confirmDeleteCategory(BuildContext context, Category category) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Delete Category"),
-          content: const Text(
-              "Are you sure you want to delete this category? All folders inside will be deleted as well!"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(), // Отмена
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () {
-                // Получаем все папки в категории
-                final folderState = context.read<FolderBloc>().state;
-                if (folderState is FolderLoaded) {
-                  final foldersInCategory = folderState.folders
-                      .where((folder) => folder.categoryId == category.id)
-                      .toList();
-
-                  // Удаляем каждую папку
-                  for (var folder in foldersInCategory) {
-                    context.read<FolderBloc>().add(DeleteFolder(folder.id));
-                  }
-                }
-
-                // Удаляем категорию
-                context.read<CategoryBloc>().add(DeleteCategory(category.id));
-                Navigator.of(context).pop(); // Закрываем диалог подтверждения
-              },
-              child: const Text('Delete', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
+    // Устанавливаем фокус после открытия диалога
+    Future.delayed(Duration.zero, () {
+      focusNode.requestFocus();
+    });
   }
 
   static void showAddFolderDialog(BuildContext context, Category category) {
     final TextEditingController controller = TextEditingController();
-    bool isPrivate = false; // Переменная для отслеживания состояния чекбокса
+    final FocusNode focusNode = FocusNode(); // Добавляем FocusNode
+    bool isPrivate = false;
 
     showDialog(
       context: context,
@@ -214,6 +181,7 @@ class CategoriesHelpers {
                 children: [
                   TextField(
                     controller: controller,
+                    focusNode: focusNode, // Устанавливаем FocusNode
                     decoration: const InputDecoration(hintText: 'Folder Name'),
                   ),
                   const SizedBox(height: 16.0),
@@ -239,7 +207,7 @@ class CategoriesHelpers {
                         categoryId: category.id,
                         photoIds: [],
                         dateCreated: DateTime.now(),
-                        isPrivate: isPrivate, // Используем значение чекбокса
+                        isPrivate: isPrivate,
                         sortOrder: 0,
                       );
                       context.read<FolderBloc>().add(AddFolder(folder));
@@ -251,6 +219,47 @@ class CategoriesHelpers {
               ],
             );
           },
+        );
+      },
+    );
+
+    // Устанавливаем фокус после открытия диалога
+    Future.delayed(Duration.zero, () {
+      focusNode.requestFocus();
+    });
+  }
+
+  static void confirmDeleteCategory(BuildContext context, Category category) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Delete Category"),
+          content: const Text(
+              "Are you sure you want to delete this category? All folders inside will be deleted as well!"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                final folderState = context.read<FolderBloc>().state;
+                if (folderState is FolderLoaded) {
+                  final foldersInCategory = folderState.folders
+                      .where((folder) => folder.categoryId == category.id)
+                      .toList();
+
+                  for (var folder in foldersInCategory) {
+                    context.read<FolderBloc>().add(DeleteFolder(folder.id));
+                  }
+                }
+                context.read<CategoryBloc>().add(DeleteCategory(category.id));
+                Navigator.of(context).pop();
+              },
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
         );
       },
     );

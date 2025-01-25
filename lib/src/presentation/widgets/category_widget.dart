@@ -60,41 +60,45 @@ class CategoryWidget extends StatelessWidget {
                                 folder.isPrivate == false));
                   }).toList();
 
-                  // Добавляем ячейку с кнопкой после последней папки
-                  final folderCount = folders.length + 1;
-                  final shouldAddPlaceholder = folders.length % 2 != 0;
+                  return LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Ширина одной папки (адаптивная, между 200 и 300px)
+                      const double folderWidth = 200.0;
+                      final int crossAxisCount =
+                          (constraints.maxWidth / folderWidth).floor();
 
-                  return GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: folderCount,
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 1,
-                    ),
-                    itemBuilder: (context, index) {
-                      if (index < folders.length) {
-                        // Отображаем существующую папку
-                        final folder = folders[index];
-                        return FolderWidget(folder: folder);
-                      } else if (shouldAddPlaceholder) {
-                        // Последняя ячейка — кнопка с лаконичным "+"
-                        return Center(
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.add,
-                              size: 32.0, // Увеличиваем размер иконки
-                            ),
-                            onPressed: () {
-                              CategoriesHelpers.showAddFolderDialog(
-                                  context, category);
-                            },
-                          ),
-                        );
-                      } else {
-                        return const SizedBox.shrink();
-                      }
+                      return GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: folders.length + 1, // +1 для кнопки "+"
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount, // Динамическое количество колонок
+                          childAspectRatio: 1, // Квадратные ячейки
+                          mainAxisSpacing: 8.0,
+                          crossAxisSpacing: 8.0,
+                        ),
+                        itemBuilder: (context, index) {
+                          if (index < folders.length) {
+                            // Отображаем существующую папку
+                            final folder = folders[index];
+                            return FolderWidget(folder: folder);
+                          } else {
+                            // Последняя ячейка — кнопка "+"
+                            return Center(
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.add,
+                                  size: 32.0,
+                                ),
+                                onPressed: () {
+                                  CategoriesHelpers.showAddFolderDialog(
+                                      context, category);
+                                },
+                              ),
+                            );
+                          }
+                        },
+                      );
                     },
                   );
                 } else {

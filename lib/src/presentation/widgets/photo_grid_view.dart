@@ -178,19 +178,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   void _onCollageGeneratorPressed(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      enableDrag: false, // Запрещает закрытие свайпом вниз
-      isScrollControlled:
-          true, // Позволяет модальному окну растягиваться на весь экран
-      builder: (context) {
-        return Container(
-          width: double.infinity,
-          height: MediaQuery.of(context).size.height, // Полная высота экрана
-          color: Colors.black, // Фон (опционально)
-          child: PhotoCollageWidget(photos: _selectedPhotos),
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          body: PhotoCollageWidget(photos: _selectedPhotos),
+        ),
+      ),
     );
   }
 

@@ -1,10 +1,11 @@
-// lib/src/presentation/screens/upload_screen.dart
-
+import 'dart:io' show Platform;
 import 'package:exif/exif.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
@@ -31,118 +32,90 @@ class _UploadScreenState extends State<UploadScreen> {
   @override
   void initState() {
     super.initState();
-    // Вызываем метод _pickImages при старте виджета
+    // Автоматически вызываем выбор файлов после сборки экрана
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _pickImages();
     });
   }
 
-  void _pickImages() async {
-    if (_isSelecting || _isUploading) return; // Блокируем повторный вызов
+  Future<void> _pickImages() async {
+    if (_isSelecting || _isUploading) return;
 
-    setState(() {
-      _isSelecting = true; // Включаем лоадер выбора
-    });
+    setState(() => _isSelecting = true);
+    WakelockPlus.enable();
+
+    List<XFile> selectedFiles = [];
 
     try {
-      WakelockPlus.enable();
-      final images = await _picker.pickMultipleMedia();
-      if (images.isNotEmpty) {
-        setState(() {
-          _images = images;
-          _isSelecting = false; // Выключаем лоадер выбора
-        });
-        // Вызываем загрузку фотографий
-        await _uploadImages();
+      // Если мы на iOS/Android, используем image_picker
+      if ((Platform.isIOS || Platform.isAndroid) && !kIsWeb) {
+        final media = await _picker.pickMultipleMedia();
+        if (media.isNotEmpty) {
+          selectedFiles = media;
+        }
+      }
+      // Если мы на macOS — используем file_picker
+      else if (Platform.isMacOS) {
+        final result = await FilePicker.platform.pickFiles(
+          allowMultiple: true,
+          // Можно оставить только изображения, либо расширить для видео
+          type: FileType.custom,
+          allowedExtensions: [
+            'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', // фото
+            'mp4', 'mov', 'avi', 'mkv', 'webm' // видео
+          ],
+        );
+        if (result != null && result.files.isNotEmpty) {
+          selectedFiles = result.files
+              .where((f) => f.path != null)
+              .map((f) => XFile(f.path!))
+              .toList();
+        }
       } else {
-        WakelockPlus.disable();
-        setState(() {
-          _isSelecting = false; // Выключаем лоадер, если ничего не выбрано
-        });
+        // На всякий случай fallback
+        final media = await _picker.pickMultipleMedia();
+        if (media.isNotEmpty) {
+          selectedFiles = media;
+        }
       }
     } catch (e) {
-      print('Error picking images: $e');
-      setState(() {
-        _isSelecting = false; // Выключаем лоадер при ошибке
-      });
-    }
-  }
-
-  Future<Map<String, double>?> _getGeoLocation(String imagePath) async {
-    final bytes = await File(imagePath).readAsBytes();
-    final tags = await readExifFromBytes(bytes);
-
-    if (tags.containsKey('GPS GPSLatitude') &&
-        tags.containsKey('GPS GPSLongitude')) {
-      final latitude = (tags['GPS GPSLatitude']?.values)?.toList();
-      final longitude = (tags['GPS GPSLongitude']?.values)?.toList();
-
-      final latitudeRef = tags['GPS GPSLatitudeRef']?.printable;
-      final longitudeRef = tags['GPS GPSLongitudeRef']?.printable;
-
-      if (latitude != null && longitude != null) {
-        final lat = _toDecimalDegrees(latitude, latitudeRef);
-        final lon = _toDecimalDegrees(longitude, longitudeRef);
-        return {'lat': lat, 'lon': lon};
-      }
-    }
-    return null;
-  }
-
-  double _toDecimalDegrees(List values, String? ref) {
-    double degrees = 0.0, minutes = 0.0, seconds = 0.0;
-
-    // Преобразование значения в double для каждого компонента
-    if (values.isNotEmpty) {
-      degrees = _toDouble(values[0]);
-      minutes = _toDouble(values[1]) / 60;
-      seconds = _toDouble(values[2]) / 3600;
+      debugPrint('Error picking images: $e');
+    } finally {
+      WakelockPlus.disable();
+      setState(() => _isSelecting = false);
     }
 
-    double decimal = degrees + minutes + seconds;
-
-    // Инверсия для южной или западной полушарий
-    if (ref == 'S' || ref == 'W') {
-      decimal = -decimal;
+    if (selectedFiles.isNotEmpty) {
+      setState(() => _images = selectedFiles);
+      await _uploadImages();
     }
-
-    return decimal;
-  }
-
-  double _toDouble(dynamic value) {
-    if (value is Ratio) {
-      // Проверка, является ли значение типом Ratio
-      return value.numerator /
-          value.denominator; // Вычисляем значение как дробь
-    } else if (value is int) {
-      return value.toDouble();
-    } else if (value is double) {
-      return value;
-    }
-    return 0.0; // Значение по умолчанию
   }
 
   Future<void> _uploadImages() async {
-    if (_images != null && _images!.isNotEmpty) {
-      setState(() {
-        _isUploading = true; // Включаем лоадер загрузки
-        _uploadedCount = 0;
-        _stopRequested = false;
-      });
+    if (_images == null || _images!.isEmpty) return;
 
-      final photoRepository =
-          RepositoryProvider.of<PhotoRepositoryImpl>(context);
+    setState(() {
+      _isUploading = true;
+      _uploadedCount = 0;
+      _stopRequested = false;
+    });
 
-      for (var i = 0; i < _images!.length; i++) {
-        if (_stopRequested) break;
+    final photoRepository = RepositoryProvider.of<PhotoRepositoryImpl>(context);
 
-        final image = _images![i];
+    for (var i = 0; i < _images!.length; i++) {
+      if (_stopRequested) break;
+      final image = _images![i];
 
-        final mediaType = determineMediaType(image.path);
-        // print('IMAGE!!!!!!!!! ${image.}');
-        final geoLocation = await _getGeoLocation(image.path);
+      // Определяем тип файла: фото или видео
+      final mediaType = determineMediaType(image.path);
 
-        final photo = Photo(
+      // Считываем геолокацию только если это фотография
+      Map<String, double>? geoLocation;
+      if (mediaType == 'image') {
+        geoLocation = await _getGeoLocation(image.path);
+      }
+
+      final photo = Photo(
           id: const Uuid().v4(),
           path: image.path,
           folderIds: [],
@@ -153,38 +126,86 @@ class _UploadScreenState extends State<UploadScreen> {
           fileName: path_package.basename(image.path),
           isStoredInApp: true,
           geoLocation: geoLocation,
-          mediaType: mediaType
-        );
+          mediaType: mediaType);
 
-        try {
-          await photoRepository.addPhoto(photo);
-          setState(() {
-            _uploadedCount++;
-          });
-        } catch (e) {
-          print('Error adding image: $e');
+      try {
+        await photoRepository.addPhoto(photo);
+        setState(() => _uploadedCount++);
+      } catch (e) {
+        debugPrint('Error adding image: $e');
+      }
+    }
+
+    setState(() {
+      _isUploading = false;
+      _images = null;
+      Navigator.pushReplacementNamed(context, '/all_photos');
+    });
+
+    context.read<PhotoBloc>().add(LoadPhotos());
+  }
+
+  /// Попытка достать GPS из EXIF (только если это изображение)
+  Future<Map<String, double>?> _getGeoLocation(String imagePath) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final tags = await readExifFromBytes(bytes);
+
+      if (tags.containsKey('GPS GPSLatitude') &&
+          tags.containsKey('GPS GPSLongitude')) {
+        final latitude = (tags['GPS GPSLatitude']?.values)?.toList();
+        final longitude = (tags['GPS GPSLongitude']?.values)?.toList();
+
+        final latitudeRef = tags['GPS GPSLatitudeRef']?.printable;
+        final longitudeRef = tags['GPS GPSLongitudeRef']?.printable;
+
+        if (latitude != null && longitude != null) {
+          final lat = _toDecimalDegrees(latitude, latitudeRef);
+          final lon = _toDecimalDegrees(longitude, longitudeRef);
+          return {'lat': lat, 'lon': lon};
         }
       }
-
-      setState(() {
-        _isUploading = false; // Выключаем лоадер загрузки
-        _images = null; // Сбрасываем список изображений
-        Navigator.pushReplacementNamed(context, '/all_photos');
-      });
-
-      context.read<PhotoBloc>().add(LoadPhotos());
+    } catch (e) {
+      debugPrint('EXIF parsing error: $e');
     }
+    return null;
+  }
+
+  double _toDecimalDegrees(List values, String? ref) {
+    double degrees = 0.0, minutes = 0.0, seconds = 0.0;
+
+    if (values.isNotEmpty) {
+      degrees = _toDouble(values[0]);
+      minutes = _toDouble(values[1]) / 60;
+      seconds = _toDouble(values[2]) / 3600;
+    }
+    double decimal = degrees + minutes + seconds;
+
+    // Для S/W меняем знак
+    if (ref == 'S' || ref == 'W') {
+      decimal = -decimal;
+    }
+    return decimal;
+  }
+
+  double _toDouble(dynamic value) {
+    if (value is Ratio) {
+      return value.numerator / value.denominator;
+    } else if (value is int) {
+      return value.toDouble();
+    } else if (value is double) {
+      return value;
+    }
+    return 0.0;
   }
 
   void _stopUpload() {
-    setState(() {
-      _stopRequested = true;
-    });
+    setState(() => _stopRequested = true);
   }
 
   @override
   void dispose() {
-    WakelockPlus.disable(); // На случай, если Wakelock остался включенным
+    WakelockPlus.disable();
     super.dispose();
   }
 
@@ -196,15 +217,18 @@ class _UploadScreenState extends State<UploadScreen> {
       ),
       body: Stack(
         children: [
+          // Если не идёт процесс выбора (нет лоадера выбора)
           if (!_isSelecting)
+            // Если ничего не выбрано
             if (_images == null)
               Center(
                 child: ElevatedButton(
                   onPressed: _pickImages,
-                  child: const Text('Select Images'),
+                  child: const Text('Select Images / Videos'),
                 ),
               )
             else
+              // Отображаем сетку выбранных файлов
               Positioned.fill(
                 child: GridView.builder(
                   padding: const EdgeInsets.all(4.0),
@@ -216,13 +240,19 @@ class _UploadScreenState extends State<UploadScreen> {
                   itemCount: _images!.length,
                   itemBuilder: (context, index) {
                     final image = _images![index];
-                    return Image.file(
-                      File(image.path),
-                      fit: BoxFit.cover,
+                    return MouseRegion(
+                      // исправляет возможные проблемы с курсором на macOS
+                      cursor: SystemMouseCursors.basic,
+                      child: Image.file(
+                        File(image.path),
+                        fit: BoxFit.cover,
+                      ),
                     );
                   },
                 ),
               ),
+
+          // Лоадер при выборе
           if (_isSelecting)
             Container(
               color: Colors.black.withOpacity(0.5),
@@ -230,6 +260,8 @@ class _UploadScreenState extends State<UploadScreen> {
                 child: CircularProgressIndicator(),
               ),
             ),
+
+          // Лоадер при загрузке
           if (_isUploading)
             Container(
               color: Colors.black.withOpacity(0.5),
@@ -245,7 +277,7 @@ class _UploadScreenState extends State<UploadScreen> {
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Keep application opened until it loads.',
+                      'Keep application opened until it completes.',
                       style: TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 20),
