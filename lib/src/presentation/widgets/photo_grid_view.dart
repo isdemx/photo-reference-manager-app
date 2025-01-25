@@ -480,6 +480,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.remove_red_eye, color: Colors.white),
+                    tooltip: 'View choosed media in Fullscreen',
                     onPressed: _onSelectedViewPressed,
                   ),
                   AddToFolderWidget(
@@ -490,28 +491,32 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     },
                   ),
                   IconButton(
-                    icon:
-                        const Icon(Iconsax.video_add, color: Colors.white),
+                    icon: const Icon(Iconsax.video_add, color: Colors.white),
+                    tooltip: 'Create video slideshow',
                     onPressed: () =>
                         _onVideoGeneratorPressed(context), // Генерация видео
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.grid_3,
                         color: Colors.white), // Пример иконки коллажа
+                    tooltip: 'Create free collage',
                     onPressed: () => _onCollageGeneratorPressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.grid_2,
                         color: Colors.white), // Пример иконки коллажа
+                    tooltip: 'Create grid collage',
                     onPressed: () => _onCollageGridGeneratorPressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.export, color: Colors.white),
+                    tooltip: 'Share choosed media',
                     onPressed: () => _onSelectedSharePressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.trash,
                         color: Color.fromARGB(255, 255, 0, 0)),
+                        tooltip: 'Delete choosed media',
                     onPressed: () => _onDeletePressed(context, _selectedPhotos),
                   ),
                 ],

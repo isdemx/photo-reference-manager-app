@@ -235,14 +235,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.color_lens, color: Colors.white),
+                  tooltip: 'Change background color',
                   onPressed: _showColorPickerDialog,
                 ),
                 IconButton(
                   icon: const Icon(Icons.done, color: Colors.white),
+                  tooltip: 'Turn collage to image',
                   onPressed: _onGenerateCollage,
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white),
+                  tooltip: 'Cancel collage',
                   onPressed: () => Navigator.pop(context),
                 ),
               ],

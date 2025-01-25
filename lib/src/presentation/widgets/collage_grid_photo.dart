@@ -287,6 +287,7 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
                 Icons.grid_on,
                 color: isGridMode ? Colors.blue : Colors.white,
               ),
+              tooltip: 'Squares grid mode',
               onPressed: () {
                 setState(() {
                   isGridMode = true;
@@ -298,6 +299,7 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
                 Icons.fullscreen,
                 color: !isGridMode ? Colors.blue : Colors.white,
               ),
+              tooltip: 'Fullscreen grid mode',
               onPressed: () {
                 setState(() {
                   isGridMode = false;
@@ -306,10 +308,12 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
             ),
             IconButton(
               icon: const Icon(Icons.check, color: Colors.green),
+              tooltip: 'Turn collage to image',
               onPressed: _onGenerateCollage,
             ),
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
+              tooltip: 'Cancel collage',
               onPressed: () {
                 Navigator.pop(context); // Закрыть виджет
               },
