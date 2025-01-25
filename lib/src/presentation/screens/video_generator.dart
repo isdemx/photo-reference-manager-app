@@ -62,7 +62,7 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'Slider: $sliderValue => ${_mapSliderToDuration().toStringAsFixed(3)} frames per photo',
+                          'Each photo will last ${_mapSliderToDuration().toStringAsFixed(3)} sec',
                           style: TextStyle(color: Colors.grey[700]),
                         ),
                         Row(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
@@ -41,7 +42,8 @@ class CategoryWidget extends StatelessWidget {
             context.read<CategoryBloc>().add(UpdateCategory(updatedCategory));
           },
           trailing: IconButton(
-            icon: const Icon(Icons.add),
+            tooltip: 'Add new folder',
+            icon: const Icon(Iconsax.add),
             onPressed: () {
               CategoriesHelpers.showAddFolderDialog(context, category);
             },
@@ -63,7 +65,7 @@ class CategoryWidget extends StatelessWidget {
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       // Ширина одной папки (адаптивная, между 200 и 300px)
-                      const double folderWidth = 200.0;
+                      final double folderWidth = constraints.maxWidth < 600 ? 130.0 : 200.0;
                       final int crossAxisCount =
                           (constraints.maxWidth / folderWidth).floor();
 
@@ -87,9 +89,10 @@ class CategoryWidget extends StatelessWidget {
                             return Center(
                               child: IconButton(
                                 icon: const Icon(
-                                  Icons.add,
+                                  Iconsax.add,
                                   size: 32.0,
                                 ),
+                                tooltip: 'Add new folder',
                                 onPressed: () {
                                   CategoriesHelpers.showAddFolderDialog(
                                       context, category);

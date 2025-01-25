@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
@@ -30,7 +31,7 @@ class FolderWidget extends StatelessWidget {
         FoldersHelpers.showEditFolderDialog(context, folder);
       },
       child: Container(
-        margin: const EdgeInsets.all(8.0),
+        margin: const EdgeInsets.all(0.0),
         decoration: BoxDecoration(
           color: const Color.fromARGB(255, 0, 0, 0),
           borderRadius: BorderRadius.circular(4.0),
@@ -62,9 +63,8 @@ class FolderWidget extends StatelessWidget {
                   } else {
                     // Нет фотографий в папке, показываем иконку папки
                     return Container(
-                      color: Colors.grey[800],
                       child: const Icon(
-                        Icons.folder,
+                        Iconsax.folder,
                         size: 50,
                         color: Colors.white,
                       ),
@@ -75,9 +75,8 @@ class FolderWidget extends StatelessWidget {
                 } else {
                   // Ошибка загрузки фотографий, показываем иконку папки
                   return Container(
-                    color: Colors.grey[800],
                     child: const Icon(
-                      Icons.folder,
+                      Iconsax.folder,
                       size: 50,
                       color: Colors.white,
                     ),

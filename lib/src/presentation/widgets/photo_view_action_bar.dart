@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
@@ -44,7 +45,7 @@ class ActionBar extends StatelessWidget {
                 children: [
                   ElevatedButton.icon(
                     onPressed: onCancel,
-                    icon: const Icon(Icons.close),
+                    icon: const Icon(Iconsax.close_circle),
                     label: const Text('Cancel'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 172, 46, 37),
@@ -52,7 +53,7 @@ class ActionBar extends StatelessWidget {
                   ),
                   ElevatedButton.icon(
                     onPressed: onShare,
-                    icon: const Icon(Icons.share),
+                    icon: const Icon(Iconsax.export_1),
                     label: const Text('Share'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 35, 107, 166),
@@ -60,7 +61,7 @@ class ActionBar extends StatelessWidget {
                   ),
                   ElevatedButton.icon(
                     onPressed: deletePhoto,
-                    icon: const Icon(Icons.delete),
+                    icon: const Icon(Iconsax.trash),
                     label: const Text('Delete'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 237, 75, 6),
@@ -95,7 +96,7 @@ class ActionBar extends StatelessWidget {
                   Expanded(
                     child: IconButton(
                       icon: Icon(
-                        Icons.location_on,
+                        Iconsax.location,
                         color: photo.geoLocation != null
                             ? Colors.blue
                             : Colors.grey, // серый, если нет геолокации
@@ -125,7 +126,7 @@ class ActionBar extends StatelessWidget {
                   ),
                   Expanded(
                     child: IconButton(
-                      icon: const Icon(Icons.delete,
+                      icon: const Icon(Iconsax.trash,
                           color: Color.fromARGB(255, 120, 13, 13)),
                       onPressed: deletePhoto,
                       tooltip: 'Delete Image',

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
@@ -123,13 +124,15 @@ class _MainScreenState extends State<MainScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Iconsax.add),
+            tooltip: 'Add new category',
             onPressed: () {
               CategoriesHelpers.showAddCategoryDialog(context);
             },
           ),
           IconButton(
-            icon: const Icon(Icons.upload),
+            icon: const Icon(Iconsax.import_1),
+            tooltip: 'Download photos/videos',
             onPressed: () {
               Navigator.push(
                 context,
@@ -145,13 +148,14 @@ class _MainScreenState extends State<MainScreen> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.photo_library),
+            icon: const Icon(Iconsax.gallery),
+            tooltip: 'All photos gallery',
             onPressed: () {
               Navigator.pushNamed(context, '/all_photos');
             },
           ),
           IconButton(
-            icon: const Icon(Icons.label),
+            icon: const Icon(Iconsax.tag_2),
             onPressed: () {
               Navigator.pushNamed(context, '/all_tags');
             },

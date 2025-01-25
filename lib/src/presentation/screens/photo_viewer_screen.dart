@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get_thumbnail_video/index.dart';
 import 'package:get_thumbnail_video/video_thumbnail.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
@@ -319,7 +320,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       ),
                     if (currentPhoto.mediaType == 'image')
                       IconButton(
-                        icon: const Icon(Icons.flip),
+                        icon: const Icon(Iconsax.arrange_circle),
                         onPressed: _flipPhoto,
                       ),
                   ],
@@ -404,8 +405,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                                     IconButton(
                                       icon: Icon(
                                         _videoController!.value.isPlaying
-                                            ? Icons.pause
-                                            : Icons.play_arrow,
+                                            ? Iconsax.pause
+                                            : Iconsax.play,
                                       ),
                                       onPressed: () {
                                         setState(() {

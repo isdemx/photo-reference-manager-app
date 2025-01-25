@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
@@ -68,7 +69,8 @@ class FoldersHelpers {
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: const Icon(Iconsax.trash, color: Colors.red),
+                  tooltip: 'Delete folder (No media will be lost)',
                   onPressed: () {
                     Navigator.of(context)
                         .pop(); // Закрываем диалог редактирования

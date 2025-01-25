@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
@@ -32,7 +33,8 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
         title: const Text('Tags'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.add),
+            tooltip: 'Add new tag',
+            icon: const Icon(Iconsax.add),
             onPressed: () {
               TagsHelpers.showAddTagDialog(context);
             },
@@ -77,7 +79,8 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                 sortedTags.sort((a, b) {
                   final countA = tagPhotoCounts[a.id] ?? 0;
                   final countB = tagPhotoCounts[b.id] ?? 0;
-                  return countB.compareTo(countA); // Сортируем по количеству фото
+                  return countB
+                      .compareTo(countA); // Сортируем по количеству фото
                 });
 
                 return ListView.builder(
@@ -110,16 +113,30 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                         children: [
                           if (tag.name != 'Not Ref')
                             IconButton(
-                              icon: const Icon(Icons.edit, color: Color.fromARGB(255, 216, 216, 216)),
+                              tooltip: 'Edit tag',
+                              icon: const Icon(Iconsax.edit,
+                                  color: Color.fromARGB(255, 216, 216, 216)),
                               onPressed: () {
                                 TagsHelpers.showEditTagDialog(context, tag);
                               },
                             ),
                           if (tag.name != 'Not Ref')
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              tooltip: 'Change color',
+                              icon: const Icon(Iconsax.colors_square,
+                                  color: Colors.amber),
                               onPressed: () {
-                                TagsHelpers.showDeleteConfirmationDialog(context, tag);
+                                TagsHelpers.showColorPickerDialog(context, tag);
+                              },
+                            ),
+                          if (tag.name != 'Not Ref')
+                            IconButton(
+                              tooltip: 'Delete tag',
+                              icon:
+                                  const Icon(Iconsax.trash, color: Colors.red),
+                              onPressed: () {
+                                TagsHelpers.showDeleteConfirmationDialog(
+                                    context, tag);
                               },
                             ),
                         ],

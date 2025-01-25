@@ -254,6 +254,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   void _showColorPickerDialog() {
+    Color oldColor = _backgroundColor;
     Color tempColor = _backgroundColor;
 
     showDialog(
@@ -266,12 +267,18 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               pickerColor: tempColor,
               onColorChanged: (color) {
                 tempColor = color;
+                setState(() {
+                  _backgroundColor = tempColor; // Обновить цвет фона
+                });
               },
             ),
           ),
           actions: [
             TextButton(
               onPressed: () {
+                setState(() {
+                  _backgroundColor = oldColor;
+                });
                 Navigator.of(context).pop(); // Закрыть диалог
               },
               child: const Text('Cancel'),

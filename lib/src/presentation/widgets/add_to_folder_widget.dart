@@ -1,6 +1,7 @@
 // lib/src/presentation/widgets/add_to_folder_widget.dart
 
 import 'package:flutter/material.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 
@@ -25,7 +26,7 @@ class AddToFolderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.folder, color: Colors.white),
+      icon: const Icon(Iconsax.folder_add  , color: Colors.white),
       onPressed: () => _showFoldersModal(context),
       tooltip: 'Add Photos to Folder',
     );

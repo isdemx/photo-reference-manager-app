@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
@@ -31,7 +32,8 @@ class _FolderScreenState extends State<FolderScreen> {
                   return const Center(child: CircularProgressIndicator());
                 } else if (photoState is PhotoLoaded && tagState is TagLoaded) {
                   final List<Photo> photos = photoState.photos
-                      .where((photo) => photo.folderIds.contains(widget.folder.id))
+                      .where(
+                          (photo) => photo.folderIds.contains(widget.folder.id))
                       .toList();
 
                   if (photos.isEmpty) {
@@ -44,7 +46,8 @@ class _FolderScreenState extends State<FolderScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 14.0), // Горизонтальный паддинг
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 14.0), // Горизонтальный паддинг
                               child: Text(
                                 'No images in this folder. You can upload new images or select from the "All Images" section.',
                                 textAlign: TextAlign.center,
@@ -57,11 +60,17 @@ class _FolderScreenState extends State<FolderScreen> {
                               children: [
                                 ElevatedButton(
                                   onPressed: () {
-                                    Navigator.pushNamed(context, '/upload');
+                                    Navigator.pushNamed(
+                                      context,
+                                      '/upload',
+                                      arguments:
+                                          widget.folder, // объект типа Folder
+                                    );
                                   },
                                   child: const Text('Upload'),
                                 ),
-                                const SizedBox(width: 20), // Отступ между кнопками
+                                const SizedBox(
+                                    width: 20), // Отступ между кнопками
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.pushNamed(context, '/all_photos');
@@ -83,9 +92,11 @@ class _FolderScreenState extends State<FolderScreen> {
                     showShareBtn: true,
                     photos: photos,
                     actionFromParent: IconButton(
-                      icon: const Icon(Icons.edit),
+                      icon: const Icon(Iconsax.edit),
+                      tooltip: 'Edit folder properties',
                       onPressed: () {
-                        FoldersHelpers.showEditFolderDialog(context, widget.folder);
+                        FoldersHelpers.showEditFolderDialog(
+                            context, widget.folder);
                       },
                     ),
                   );

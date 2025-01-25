@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
@@ -89,7 +90,8 @@ class CategoriesHelpers {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.arrow_upward),
+                      icon: const Icon(Iconsax.arrow_up_2),
+                      tooltip: 'Move folder up',
                       onPressed: () {
                         final categories = context.read<CategoryBloc>().state;
                         if (categories is CategoryLoaded) {
@@ -108,7 +110,8 @@ class CategoriesHelpers {
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.arrow_downward),
+                      icon: const Icon(Iconsax.arrow_down_1),
+                      tooltip: 'Move folder down',
                       onPressed: () {
                         final categories = context.read<CategoryBloc>().state;
                         if (categories is CategoryLoaded) {
@@ -127,7 +130,8 @@ class CategoriesHelpers {
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
+                      icon: const Icon(Iconsax.trash, color: Colors.red),
+                      tooltip: 'Delete category and pholders inside (No media will be deleted)',
                       onPressed: () {
                         Navigator.of(context).pop();
                         confirmDeleteCategory(context, category);

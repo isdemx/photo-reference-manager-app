@@ -175,7 +175,7 @@ class PhotographersReferenceApp extends StatelessWidget {
           ),
           home: const MainScreen(),
           routes: {
-            '/upload': (context) => const UploadScreen(),
+            // '/upload': (context) => const UploadScreen(),
             '/all_tags': (context) => const AllTagsScreen(),
             '/all_photos': (context) => const AllPhotosScreen(),
           },
@@ -184,6 +184,12 @@ class PhotographersReferenceApp extends StatelessWidget {
               final folder = settings.arguments as Folder;
               return MaterialPageRoute(
                 builder: (context) => FolderScreen(folder: folder),
+              );
+            } else if (settings.name == '/upload') {
+              // Проверяем, есть ли переданный folder
+              final folder = settings.arguments as Folder?;
+              return MaterialPageRoute(
+                builder: (context) => UploadScreen(folder: folder),
               );
             } else if (settings.name == '/photo') {
               final args = settings.arguments as Map<String, dynamic>;

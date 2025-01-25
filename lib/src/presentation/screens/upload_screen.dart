@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
+import 'package:photographers_reference_app/src/domain/entities/folder.dart';  // <--- new import
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
@@ -15,7 +16,10 @@ import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 class UploadScreen extends StatefulWidget {
-  const UploadScreen({super.key});
+  /// Необязательный параметр. Если не null — значит загружаем в конкретную папку.
+  final Folder? folder;
+
+  const UploadScreen({super.key, this.folder});
 
   @override
   _UploadScreenState createState() => _UploadScreenState();
@@ -72,7 +76,7 @@ class _UploadScreenState extends State<UploadScreen> {
               .toList();
         }
       } else {
-        // На всякий случай fallback
+        // На всякий случай fallback (например, web)
         final media = await _picker.pickMultipleMedia();
         if (media.isNotEmpty) {
           selectedFiles = media;
@@ -115,18 +119,25 @@ class _UploadScreenState extends State<UploadScreen> {
         geoLocation = await _getGeoLocation(image.path);
       }
 
+      // Если зашли с экрана конкретной папки, добавляем её ID
+      final folderIds = <String>[];
+      if (widget.folder != null) {
+        folderIds.add(widget.folder!.id);
+      }
+
       final photo = Photo(
-          id: const Uuid().v4(),
-          path: image.path,
-          folderIds: [],
-          tagIds: [],
-          comment: '',
-          dateAdded: DateTime.now(),
-          sortOrder: 0,
-          fileName: path_package.basename(image.path),
-          isStoredInApp: true,
-          geoLocation: geoLocation,
-          mediaType: mediaType);
+        id: const Uuid().v4(),
+        path: image.path,
+        folderIds: folderIds, // <--- Записываем, если есть папка
+        tagIds: [],
+        comment: '',
+        dateAdded: DateTime.now(),
+        sortOrder: 0,
+        fileName: path_package.basename(image.path),
+        isStoredInApp: true,
+        geoLocation: geoLocation,
+        mediaType: mediaType,
+      );
 
       try {
         await photoRepository.addPhoto(photo);
@@ -136,13 +147,23 @@ class _UploadScreenState extends State<UploadScreen> {
       }
     }
 
+    // Когда закончили загрузку
     setState(() {
       _isUploading = false;
       _images = null;
-      Navigator.pushReplacementNamed(context, '/all_photos');
     });
 
+    // Обновляем список фото в Bloc
     context.read<PhotoBloc>().add(LoadPhotos());
+
+    // Если папка не null, возвращаемся в экран папки
+    if (widget.folder != null) {
+      Navigator.pushReplacementNamed(context, '/folder',
+          arguments: widget.folder);
+    } else {
+      // Иначе возвращаемся в All Photos
+      Navigator.pushReplacementNamed(context, '/all_photos');
+    }
   }
 
   /// Попытка достать GPS из EXIF (только если это изображение)
@@ -213,7 +234,11 @@ class _UploadScreenState extends State<UploadScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Upload Images'),
+        title: Text(
+          widget.folder == null
+              ? 'Upload Images and video'
+              : 'Upload to Folder: ${widget.folder!.name}',
+        ),
       ),
       body: Stack(
         children: [
@@ -241,7 +266,6 @@ class _UploadScreenState extends State<UploadScreen> {
                   itemBuilder: (context, index) {
                     final image = _images![index];
                     return MouseRegion(
-                      // исправляет возможные проблемы с курсором на macOS
                       cursor: SystemMouseCursors.basic,
                       child: Image.file(
                         File(image.path),

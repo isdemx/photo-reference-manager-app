@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
@@ -489,28 +490,28 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.share, color: Colors.white),
-                    onPressed: () => _onSelectedSharePressed(context),
-                  ),
-                  IconButton(
                     icon:
-                        const Icon(Icons.video_collection, color: Colors.white),
+                        const Icon(Iconsax.video_add, color: Colors.white),
                     onPressed: () =>
                         _onVideoGeneratorPressed(context), // Генерация видео
                   ),
                   IconButton(
-                    icon: const Icon(Icons.grid_on,
+                    icon: const Icon(Iconsax.grid_3,
                         color: Colors.white), // Пример иконки коллажа
                     onPressed: () => _onCollageGeneratorPressed(context),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.grid_on,
-                        color: Colors.yellow), // Пример иконки коллажа
+                    icon: const Icon(Iconsax.grid_2,
+                        color: Colors.white), // Пример иконки коллажа
                     onPressed: () => _onCollageGridGeneratorPressed(context),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete,
-                        color: Color.fromARGB(255, 120, 13, 13)),
+                    icon: const Icon(Iconsax.export, color: Colors.white),
+                    onPressed: () => _onSelectedSharePressed(context),
+                  ),
+                  IconButton(
+                    icon: const Icon(Iconsax.trash,
+                        color: Color.fromARGB(255, 255, 0, 0)),
                     onPressed: () => _onDeletePressed(context, _selectedPhotos),
                   ),
                 ],

@@ -458,6 +458,12 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "iconsax",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/iconsax-0.0.8",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "image",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image-4.2.0",
       "packageUri": "lib/",
@@ -1094,7 +1100,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2025-01-19T16:30:58.864181Z",
+  "generated": "2025-01-25T17:22:02.705950Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

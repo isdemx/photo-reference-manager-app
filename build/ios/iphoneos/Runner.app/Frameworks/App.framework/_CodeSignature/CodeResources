@@ -10,19 +10,19 @@
 		</data>
 		<key>flutter_assets/AssetManifest.bin</key>
 		<data>
-		XEgWJQuhd6cHnvf8Cd5SA0MLMn8=
+		/Wj2LEVf+E9WqiPGl96oWLz9NwQ=
 		</data>
 		<key>flutter_assets/AssetManifest.json</key>
 		<data>
-		W4oCedwuvK0j+PT1r4BrqgwiURc=
+		TpJG4Hqz357aHHAOC+JdULAyM7c=
 		</data>
 		<key>flutter_assets/FontManifest.json</key>
 		<data>
-		vKJkVIcw+LGHFnKJGwrQwCREv68=
+		2g1aPPcdSS3ET8FZumtWkMLwsEg=
 		</data>
 		<key>flutter_assets/NOTICES.Z</key>
 		<data>
-		aTH4F1EFKGtOeHu+XoOF2m3Nhxs=
+		GSRec8+8RoGMaqSU0zdeQ0QI+NY=
 		</data>
 		<key>flutter_assets/assets/refma-logo.png</key>
 		<data>
@@ -38,7 +38,7 @@
 		</data>
 		<key>flutter_assets/kernel_blob.bin</key>
 		<data>
-		RLuuPoNxbbTayZCpaSSWeuKPl7I=
+		U6v+ywYCHZNkzhMAI3MFRuGrUN0=
 		</data>
 		<key>flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf</key>
 		<data>
@@ -47,6 +47,10 @@
 		<key>flutter_assets/packages/flutter_map/lib/assets/flutter_map_logo.png</key>
 		<data>
 		kUCCgXRmQ7Ql3lxXrdQuoudq1L8=
+		</data>
+		<key>flutter_assets/packages/iconsax/lib/assets/fonts/iconsax.ttf</key>
+		<data>
+		UXc1urONMvYo3WOs8WB0L34AniA=
 		</data>
 		<key>flutter_assets/packages/wakelock_plus/assets/no_sleep.js</key>
 		<data>
@@ -67,28 +71,28 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			VLS/MoPciA1u6wQiB4n1W273zx8wLUmBV4ZYrty2GiE=
+			OdUOSWlFqw6PURBhQGP5DS6D0VsQXM3m9+1w41p7oFM=
 			</data>
 		</dict>
 		<key>flutter_assets/AssetManifest.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			++9ir+JHw04KDNeNPhhN2vWQ6DYH5YovTEdfC8uXN48=
+			i3e6n94RO67r+zQfMi2CQIN3i+OXBMSWIzw4on6+swM=
 			</data>
 		</dict>
 		<key>flutter_assets/FontManifest.json</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			zX4DZFvESy3Ue3y2JvUcTsv1Whl6t3JBYotHrBZfviE=
+			gXYhBDwGOsZzxJbo4iL95j3M96d5eiRkNo8f440sN7g=
 			</data>
 		</dict>
 		<key>flutter_assets/NOTICES.Z</key>
 		<dict>
 			<key>hash2</key>
 			<data>
-			92+/R8LFkRhhkXoFLwanmkjG+p0ySH2JVSpgpVa0F2k=
+			46cms0AL/XXkDreVOf/sTYSMrJNOj2jw2JrBsu4lm8M=
 			</data>
 		</dict>
 		<key>flutter_assets/assets/refma-logo.png</key>
@@ -116,7 +120,7 @@
 		<dict>
 			<key>hash2</key>
 			<data>
-			naTahNOY8vNc/lJNZVrKxEIuqQag3Q5SNVAZpCQe4rw=
+			zdbDCiSl0VjzhXp3gxT9dmzIkZyojNAO+Mo9DccCL3o=
 			</data>
 		</dict>
 		<key>flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf</key>
@@ -131,6 +135,13 @@
 			<key>hash2</key>
 			<data>
 			YFGuQvtQWTGoM+WPkgmp+WZppNDks/BvbYLN4SoOBAE=
+			</data>
+		</dict>
+		<key>flutter_assets/packages/iconsax/lib/assets/fonts/iconsax.ttf</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			ZWunwXfLm0tJBFt3zBlYkm9QWoNxv81t8W5FBtVVS/s=
 			</data>
 		</dict>
 		<key>flutter_assets/packages/wakelock_plus/assets/no_sleep.js</key>
