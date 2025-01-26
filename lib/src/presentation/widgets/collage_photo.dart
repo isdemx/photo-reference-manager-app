@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:image/image.dart' as img;
 import 'package:photographers_reference_app/src/presentation/helpers/collage_save_helper.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
@@ -16,7 +17,7 @@ import 'package:photographers_reference_app/src/data/repositories/photo_reposito
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
-/// Состояние одного фото на канвасе (drag+zoom+zIndex).
+/// Состояние одного фото (drag+zoom+zIndex).
 class CollagePhotoState {
   final Photo photo;
 
@@ -24,13 +25,13 @@ class CollagePhotoState {
   Offset offset;
   double scale;
 
-  // Слои для наложения (чем больше, тем выше)
+  // Слои наложения (чем больше, тем выше)
   int zIndex;
 
-  /// "Базовый" масштаб при onScaleStart — для плавного зума
+  /// Базовый масштаб при onScaleStart — для плавного зума
   double? baseScaleOnGesture;
 
-  /// Сохраняем уже вычисленные размеры (без учёта `scale`)
+  /// "Исходные" размеры (без учёта `scale`)
   double baseWidth;
   double baseHeight;
 
@@ -45,8 +46,17 @@ class CollagePhotoState {
 }
 
 class PhotoCollageWidget extends StatefulWidget {
+  /// Начальный набор фотографий, уже выбранных для коллажа
   final List<Photo> photos;
-  const PhotoCollageWidget({Key? key, required this.photos}) : super(key: key);
+
+  /// Все доступные фотографии, чтобы можно было добавлять новые
+  final List<Photo> allPhotos;
+
+  const PhotoCollageWidget({
+    Key? key,
+    required this.photos,
+    required this.allPhotos,
+  }) : super(key: key);
 
   @override
   State<PhotoCollageWidget> createState() => _PhotoCollageWidgetState();
@@ -54,64 +64,43 @@ class PhotoCollageWidget extends StatefulWidget {
 
 class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   final GlobalKey _collageKey = GlobalKey(); // для RepaintBoundary
+  final GlobalKey _deleteIconKey = GlobalKey(); // для измерения иконки удаления
 
-  late List<CollagePhotoState> _items;
+  late List<CollagePhotoState> _items; // Состояния фото
   int _maxZIndex = 0;
 
-  /// Какое фото тянем (drag)
+  /// Индекс перетаскиваемого фото
   int? _draggingIndex;
 
-  /// Подсветка удаляющей иконки
+  /// Подсветка при наведении на иконку удаления
   bool _deleteHover = false;
 
-  /// Область экрана, где нарисована "иконка удаления"
+  /// Реальный прямоугольник для зоны удаления
   Rect _deleteRect = Rect.zero;
 
-  Color _backgroundColor = Colors.black; // Цвет фона по умолчанию
+  /// Цвет фона по умолчанию
+  Color _backgroundColor = Colors.black;
+
+  /// Флаг для отображения мини-руководства
+  bool _showTutorial = true;
 
   @override
   void initState() {
     super.initState();
     _initCollageItems();
+
+    // После построения виджета вычислим реальные координаты иконки удаления
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateDeleteRect();
+    });
   }
 
-  /// Инициализация расположения фотографий (2..8)
+  /// Инициализация состояния фото для начальных widget.photos
   void _initCollageItems() {
-    final List<CollagePhotoState> tempList = [];
+    _items = widget.photos.map((p) => _createCollagePhotoState(p)).toList();
 
-    for (final photo in widget.photos) {
-      // 1) Считаем базовые размеры
-      double baseW = 150; // для всех
-      double baseH = 150; // по умолчанию 150x150
-
-      // 2) Пытаемся вычислить реальное соотношение
-      final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
-      final file = File(fullPath);
-      if (file.existsSync()) {
-        final decoded = img.decodeImage(file.readAsBytesSync());
-        if (decoded != null) {
-          // ratio = decoded.height / decoded.width
-          // baseH = ratio * baseW
-          baseH = decoded.height * (baseW / decoded.width);
-        }
-      }
-
-      tempList.add(
-        CollagePhotoState(
-          photo: photo,
-          offset: Offset.zero,
-          scale: 1.0,
-          zIndex: 0,
-          baseWidth: baseW,
-          baseHeight: baseH,
-        ),
-      );
-    }
-
-    _items = tempList;
-
+    // Пример простого размещения (псевдо-раскладки для n=2..8)
     final n = _items.length;
-    // Ваши раскладки (2..8)
     switch (n) {
       case 2:
         _items[0].offset = const Offset(30, 30);
@@ -122,70 +111,67 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         _items[1].offset = const Offset(230, 30);
         _items[2].offset = const Offset(130, 200);
         break;
-      case 4:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(230, 30);
-        _items[2].offset = const Offset(30, 230);
-        _items[3].offset = const Offset(230, 230);
-        break;
-      case 5:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(230, 30);
-        _items[2].offset = const Offset(30, 230);
-        _items[3].offset = const Offset(230, 230);
-        _items[4].offset = const Offset(130, 400);
-        break;
-      case 6:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(150, 30);
-        _items[2].offset = const Offset(270, 30);
-        _items[3].offset = const Offset(30, 200);
-        _items[4].offset = const Offset(150, 200);
-        _items[5].offset = const Offset(270, 200);
-        break;
-      case 7:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(150, 30);
-        _items[2].offset = const Offset(270, 30);
-        _items[3].offset = const Offset(30, 200);
-        _items[4].offset = const Offset(230, 200);
-        _items[5].offset = const Offset(80, 370);
-        _items[6].offset = const Offset(280, 370);
-        break;
-      case 8:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(180, 30);
-        _items[2].offset = const Offset(330, 30);
-        _items[3].offset = const Offset(30, 200);
-        _items[4].offset = const Offset(180, 200);
-        _items[5].offset = const Offset(330, 200);
-        _items[6].offset = const Offset(90, 370);
-        _items[7].offset = const Offset(270, 370);
-        break;
+      // Добавьте остальные кейсы при необходимости...
       default:
+        // Не делаем раскладку
         break;
     }
 
-    for (int i = 0; i < n; i++) {
+    // zIndex
+    for (int i = 0; i < _items.length; i++) {
       _items[i].zIndex = i;
     }
-    _maxZIndex = n;
+    _maxZIndex = _items.length;
+  }
+
+  /// Фабрика создания `CollagePhotoState` — вычисляет baseWidth/baseHeight
+  CollagePhotoState _createCollagePhotoState(Photo photo) {
+    const double initialWidth = 150.0;
+    double baseW = initialWidth;
+    double baseH = initialWidth;
+
+    final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
+    final file = File(fullPath);
+    if (file.existsSync()) {
+      final decoded = img.decodeImage(file.readAsBytesSync());
+      if (decoded != null && decoded.width != 0) {
+        baseH = decoded.height * (baseW / decoded.width);
+      }
+    }
+
+    return CollagePhotoState(
+      photo: photo,
+      offset: Offset.zero,
+      scale: 1.0,
+      zIndex: 0,
+      baseWidth: baseW,
+      baseHeight: baseH,
+    );
+  }
+
+  /// Пересчёт позиции и размеров зоны удаления
+  void _updateDeleteRect() {
+    final iconBox =
+        _deleteIconKey.currentContext?.findRenderObject() as RenderBox?;
+    if (iconBox == null) return;
+
+    final position = iconBox.localToGlobal(Offset.zero);
+    _deleteRect = Rect.fromLTWH(
+      position.dx,
+      position.dy,
+      iconBox.size.width,
+      iconBox.size.height,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    // Сортируем _items по zIndex
+    // Сортируем фото по zIndex, чтобы "верхние" рендерились последними
     final sorted = [..._items]..sort((a, b) => a.zIndex.compareTo(b.zIndex));
-
-    final screenSize = MediaQuery.of(context).size;
-    const iconSize = 64.0;
-    final iconLeft = (screenSize.width - iconSize) / 2;
-    final iconTop = screenSize.height - 80 - iconSize - 80;
-    _deleteRect = Rect.fromLTWH(iconLeft, iconTop, iconSize, iconSize);
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Collage (${widget.photos.length} photos)'),
+        title: Text('Free collage (${_items.length} images)'),
       ),
       body: Column(
         children: [
@@ -195,31 +181,73 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               children: [
                 Container(color: _backgroundColor),
 
-                // RepaintBoundary => коллаж
+                // Наш коллаж (RepaintBoundary)
                 RepaintBoundary(
                   key: _collageKey,
-                  child: SizedBox.expand(
-                    child: Stack(
-                      children: [
-                        for (final item in sorted) _buildPhotoItem(item),
-                      ],
-                    ),
+                  child: Stack(
+                    children: [
+                      // Расширяем на весь экран
+                      Positioned.fill(
+                          child: Container(color: _backgroundColor)),
+
+                      for (final item in sorted) _buildPhotoItem(item),
+                    ],
                   ),
                 ),
 
-                // Иконка удаления (если тянем)
+                // Иконка удаления (прикрепляем GlobalKey)
                 if (_draggingIndex != null)
                   Positioned(
-                    left: iconLeft,
-                    top: iconTop,
-                    child: Container(
-                      width: iconSize,
-                      height: iconSize,
-                      decoration: BoxDecoration(
-                        color: _deleteHover ? Colors.red : Colors.white30,
-                        shape: BoxShape.circle,
+                    key: _deleteIconKey,
+                    left: 0,
+                    right: 0,
+                    bottom: 100, // Расположим над нижними кнопками
+                    child: Center(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: _deleteHover ? Colors.red : Colors.white30,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.delete, color: Colors.black),
                       ),
-                      child: const Icon(Icons.delete, color: Colors.black),
+                    ),
+                  ),
+
+                // Туториал
+                if (_showTutorial)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black.withOpacity(0.8),
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.touch_app,
+                                size: 60, color: Colors.white),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'Move with one finger\nZoom with two fingers\nPlace on top with a tap',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton(
+                              onPressed: () {
+                                setState(() {
+                                  _showTutorial = false;
+                                });
+                              },
+                              child: const Text('Got it'),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -234,13 +262,18 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.color_lens, color: Colors.white),
+                  icon: const Icon(Iconsax.add, color: Colors.white),
+                  tooltip: 'Add photo',
+                  onPressed: _showAllPhotosSheet,
+                ),
+                IconButton(
+                  icon: const Icon(Iconsax.colorfilter, color: Colors.white),
                   tooltip: 'Change background color',
                   onPressed: _showColorPickerDialog,
                 ),
                 IconButton(
                   icon: const Icon(Icons.done, color: Colors.white),
-                  tooltip: 'Turn collage to image',
+                  tooltip: 'Save collage as image',
                   onPressed: _onGenerateCollage,
                 ),
                 IconButton(
@@ -256,8 +289,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  /// Диалог выбора цвета
   void _showColorPickerDialog() {
-    Color oldColor = _backgroundColor;
+    final oldColor = _backgroundColor;
     Color tempColor = _backgroundColor;
 
     showDialog(
@@ -270,9 +304,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               pickerColor: tempColor,
               onColorChanged: (color) {
                 tempColor = color;
-                setState(() {
-                  _backgroundColor = tempColor; // Обновить цвет фона
-                });
+                setState(() => _backgroundColor = tempColor);
               },
             ),
           ),
@@ -282,16 +314,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 setState(() {
                   _backgroundColor = oldColor;
                 });
-                Navigator.of(context).pop(); // Закрыть диалог
+                Navigator.of(context).pop();
               },
               child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
-                setState(() {
-                  _backgroundColor = tempColor; // Обновить цвет фона
-                });
-                Navigator.of(context).pop(); // Закрыть диалог
+                setState(() => _backgroundColor = tempColor);
+                Navigator.of(context).pop();
               },
               child: const Text('OK'),
             ),
@@ -301,26 +331,27 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  /// Построение каждого фото
+  /// Построение каждого фото внутри коллажа
   Widget _buildPhotoItem(CollagePhotoState item) {
     final fullPath = PhotoPathHelper().getFullPath(item.photo.fileName);
 
-    // На базе precomputed baseWidth/baseHeight
-    double effectiveWidth = item.baseWidth * item.scale;
-    double effectiveHeight = item.baseHeight * item.scale;
+    // Учитываем "масштабированные" размеры
+    final effectiveWidth = item.baseWidth * item.scale;
+    final effectiveHeight = item.baseHeight * item.scale;
 
     return Positioned(
       left: item.offset.dx,
       top: item.offset.dy,
       child: GestureDetector(
         onTap: () {
+          // Повышаем zIndex, фото становится "выше" других
           setState(() {
-            // Повышаем zIndex
             _maxZIndex++;
             item.zIndex = _maxZIndex;
           });
         },
-        onScaleStart: (details) {
+        onScaleStart: (_) {
+          // Начинаем перетаскивать
           setState(() {
             item.baseScaleOnGesture = item.scale;
             _draggingIndex = _items.indexOf(item);
@@ -328,17 +359,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         },
         onScaleUpdate: (details) {
           setState(() {
-            // Перемещаем
+            // Двигаем по экрану
             item.offset += details.focalPointDelta;
 
-            // Плавный зум
+            // Зум
             if (item.baseScaleOnGesture != null) {
               final newScale = item.baseScaleOnGesture! * details.scale;
               item.scale = newScale.clamp(0.5, 3.0);
             }
 
-            // Проверка зоны удаления
-            final pointer = details.focalPoint;
+            // Проверяем зону удаления
+            final pointer = details.focalPoint; // Глобальные координаты
             final wasHover = _deleteHover;
             _deleteHover = _deleteRect.contains(pointer);
             if (_deleteHover && !wasHover) {
@@ -346,7 +377,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             }
           });
         },
-        onScaleEnd: (details) {
+        onScaleEnd: (_) {
+          // Завершаем перетаскивание
           setState(() {
             if (_deleteHover && _draggingIndex != null) {
               _items.removeAt(_draggingIndex!);
@@ -373,7 +405,61 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  /// Сохранение коллажа в изображение
   Future<void> _onGenerateCollage() async {
     await CollageSaveHelper.saveCollage(_collageKey, context);
+  }
+
+  /// Показать лист всех фотографий -> выбор -> добавить
+  void _showAllPhotosSheet() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        final all = widget.allPhotos;
+        return Container(
+          color: Colors.black,
+          padding: const EdgeInsets.all(8),
+          child: GridView.builder(
+            itemCount: all.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4, // 4 миниатюры в ряду
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemBuilder: (context, index) {
+              final photo = all[index];
+              final path = PhotoPathHelper().getFullPath(photo.fileName);
+
+              return GestureDetector(
+                onTap: () {
+                  Navigator.pop(context); // Закрываем BottomSheet
+                  _addPhotoToCollage(photo);
+                },
+                child: Image.file(
+                  File(path),
+                  fit: BoxFit.cover,
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  /// Добавление нового фото в коллаж
+  void _addPhotoToCollage(Photo photo) {
+    setState(() {
+      final collageState = _createCollagePhotoState(photo);
+      // Ставим фото куда-нибудь (например, слева сверху)
+      collageState.offset = const Offset(50, 50);
+
+      // Увеличиваем zIndex
+      _maxZIndex++;
+      collageState.zIndex = _maxZIndex;
+
+      // Добавляем в список
+      _items.add(collageState);
+    });
   }
 }

@@ -28,7 +28,7 @@ class AddToFolderWidget extends StatelessWidget {
     return IconButton(
       icon: const Icon(Iconsax.folder_add  , color: Colors.white),
       onPressed: () => _showFoldersModal(context),
-      tooltip: 'Add Photos to Folder',
+      tooltip: 'Add media to folder',
     );
   }
 }

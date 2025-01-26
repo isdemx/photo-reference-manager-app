@@ -183,7 +183,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
-          body: PhotoCollageWidget(photos: _selectedPhotos),
+          body: PhotoCollageWidget(photos: _selectedPhotos, allPhotos: widget.photos,),
         ),
       ),
     );
@@ -474,12 +474,12 @@ class _PhotoGridViewState extends State<PhotoGridView> {
             alignment: Alignment.bottomCenter,
             child: Container(
               color: Colors.black54,
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              padding: const EdgeInsets.symmetric(vertical: 20.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.remove_red_eye, color: Colors.white),
+                    icon: const Icon(Iconsax.eye, color: Colors.white),
                     tooltip: 'View choosed media in Fullscreen',
                     onPressed: _onSelectedViewPressed,
                   ),

@@ -388,7 +388,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                                             child: VideoProgressIndicator(
                                               _videoController!,
                                               allowScrubbing: true,
-                                              colors: VideoProgressColors(
+                                              colors: const VideoProgressColors(
                                                 playedColor: Colors.blue,
                                                 bufferedColor: Colors.white54,
                                                 backgroundColor: Colors.black26,
