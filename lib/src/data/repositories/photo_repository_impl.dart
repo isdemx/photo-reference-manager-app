@@ -15,25 +15,6 @@ class PhotoRepositoryImpl implements PhotoRepository {
 
   PhotoRepositoryImpl(this.photoBox);
 
-  Future<String> _copyPhotoToAppDirectory(String originalPhotoPath) async {
-    final photosDir = await _getAppPhotosDirectory();
-
-    final fileName = path_package.basename(originalPhotoPath);
-
-    String newFilePath = path_package.join(photosDir.path, fileName);
-
-    int counter = 1;
-    while (await File(newFilePath).exists()) {
-      newFilePath = path_package.join(photosDir.path, '${counter}_$fileName');
-      counter++;
-    }
-
-    final newFile = await File(originalPhotoPath).copy(newFilePath);
-    print('Photo copied to: ${newFile.path}'); // Логирование
-
-    return newFile.path;
-  }
-
   @override
   Future<void> addPhoto(Photo photo, {int compressSizeKb = 300}) async {
     try {

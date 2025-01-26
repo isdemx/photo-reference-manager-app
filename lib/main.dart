@@ -53,14 +53,17 @@ void main() async {
 }
 
 Future<void> migratePhotoBox() async {
+  print('Starting migration...');
   final box = await Hive.openBox<Photo>('photos');
   for (var key in box.keys) {
     final photo = box.get(key);
     if (photo != null && photo.mediaType == null) {
       photo.mediaType = 'image'; // Устанавливаем значение по умолчанию
       await box.put(key, photo); // Сохраняем обновления
+      print('Migrated photo with key $key');
     }
   }
+  print('Migration complete');
 }
 
 class MyApp extends StatelessWidget {

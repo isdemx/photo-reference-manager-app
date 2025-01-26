@@ -48,7 +48,44 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
     );
   }
 
-  /// Grid Mode - динамическая генерация макетов для 2-8 фотографий
+  /// Grid Mode - стандартная сетка 2xN (вмещаем максимум 8 фото)
+  Widget _buildGridMode() {
+    final List<Photo?> displayPhotos = List.generate(8, (index) {
+      return index < widget.photos.length ? widget.photos[index] : null;
+    });
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double cellWidth =
+            constraints.maxWidth / 2; // 2 колонки
+        final double cellHeight =
+            constraints.maxWidth / 2; // Квадратная ячейка
+
+        return Stack(
+          children: [
+            for (int i = 0; i < 8; i++)
+              if (displayPhotos[i] != null)
+                Positioned(
+                  left: (i % 2) * cellWidth,   // колонка
+                  top: (i ~/ 2) * cellHeight,  // строка
+                  width: cellWidth,
+                  height: cellHeight,
+                  child: Container(
+                    color: Colors.black12,
+                    child: InteractivePhotoItem(
+                      photo: displayPhotos[i]!,
+                      maxWidth: cellWidth,
+                      maxHeight: cellHeight,
+                    ),
+                  ),
+                ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// FullScreen Mode - динамическая генерация макетов для 2-8 фотографий
   Widget _buildFullScreenMode() {
     final List<Photo?> displayPhotos = List.generate(8, (index) {
       return index < widget.photos.length ? widget.photos[index] : null;
@@ -59,9 +96,9 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
         final double fullWidth = constraints.maxWidth;
         final double fullHeight = constraints.maxHeight;
 
+        // Генерируем разные лейауты в зависимости от количества фотографий
         return Stack(
-          children:
-              _generateCollageLayout(displayPhotos, fullWidth, fullHeight),
+          children: _generateCollageLayout(displayPhotos, fullWidth, fullHeight),
         );
       },
     );
@@ -219,7 +256,7 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
     return widgets;
   }
 
-  /// Создание контейнера с фото
+  /// Контейнер для фото (обёрнут в интерактивный виджет)
   Widget _buildPhotoContainer(Photo? photo, double width, double height) {
     return Container(
       color: Colors.black12,
@@ -230,43 +267,6 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
               maxHeight: height,
             )
           : const SizedBox.shrink(),
-    );
-  }
-
-  /// Grid Mode - стандартная сетка 2xN
-  Widget _buildGridMode() {
-    final List<Photo?> displayPhotos = List.generate(8, (index) {
-      return index < widget.photos.length ? widget.photos[index] : null;
-    });
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final double cellWidth =
-            constraints.maxWidth / 2; // Делим экран на 2 колонки
-        final double cellHeight =
-            constraints.maxWidth / 2; // Высота равна ширине ячейки
-
-        return Stack(
-          children: [
-            for (int i = 0; i < 8; i++)
-              if (displayPhotos[i] != null)
-                Positioned(
-                  left: (i % 2) * cellWidth, // Вычисляем позицию по колонке
-                  top: (i ~/ 2) * cellHeight, // Вычисляем позицию по строке
-                  width: cellWidth,
-                  height: cellHeight,
-                  child: Container(
-                    color: Colors.black12, // Фон для пустых ячеек
-                    child: InteractivePhotoItem(
-                      photo: displayPhotos[i]!,
-                      maxWidth: cellWidth,
-                      maxHeight: cellHeight,
-                    ),
-                  ),
-                ),
-          ],
-        );
-      },
     );
   }
 
@@ -282,6 +282,7 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
+            // Переключение в режим Grid
             IconButton(
               icon: Icon(
                 Icons.grid_on,
@@ -294,6 +295,7 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
                 });
               },
             ),
+            // Переключение в Full Screen
             IconButton(
               icon: Icon(
                 Icons.fullscreen,
@@ -306,16 +308,18 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
                 });
               },
             ),
+            // Сохранить полученный коллаж
             IconButton(
               icon: const Icon(Icons.check, color: Colors.green),
               tooltip: 'Turn collage to image',
               onPressed: _onGenerateCollage,
             ),
+            // Закрыть
             IconButton(
               icon: const Icon(Icons.close, color: Colors.red),
               tooltip: 'Cancel collage',
               onPressed: () {
-                Navigator.pop(context); // Закрыть виджет
+                Navigator.pop(context);
               },
             ),
           ],
@@ -325,7 +329,8 @@ class _GridCollageWidgetState extends State<GridCollageWidget> {
   }
 }
 
-class InteractivePhotoItem extends StatefulWidget {
+/// Фото-элемент с возможностью зума и перемещения
+class InteractivePhotoItem extends StatelessWidget {
   final Photo photo;
   final double? maxWidth;
   final double? maxHeight;
@@ -338,66 +343,25 @@ class InteractivePhotoItem extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<InteractivePhotoItem> createState() => _InteractivePhotoItemState();
-}
-
-class _InteractivePhotoItemState extends State<InteractivePhotoItem> {
-  double scale = 1.0;
-  Offset offset = Offset.zero;
-  double baseScale = 1.0;
-  Offset? startFocalPoint;
-
-  @override
   Widget build(BuildContext context) {
-    final fullPath = PhotoPathHelper().getFullPath(widget.photo.fileName);
-
-    final maxWidth = widget.maxWidth ?? double.infinity;
-    final maxHeight = widget.maxHeight ?? double.infinity;
+    final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
 
     return ClipRect(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return GestureDetector(
-            onScaleStart: (details) {
-              startFocalPoint = details.focalPoint;
-              baseScale = scale;
-            },
-            onScaleUpdate: (details) {
-              setState(() {
-                scale = (baseScale * details.scale).clamp(1.0, 3.0);
-                if (startFocalPoint != null) {
-                  final Offset delta = details.focalPoint - startFocalPoint!;
-                  offset += delta;
-                  startFocalPoint = details.focalPoint;
-                }
+      child: InteractiveViewer(
+        // Разрешаем зумить меньше 100% (0.5 = 50%)
+        minScale: 0.5,
+        maxScale: 4.0,
+        // Позволяем «уходить» за границы контейнера
+        boundaryMargin: const EdgeInsets.all(double.infinity),
+        clipBehavior: Clip.none,
 
-                // Ограничиваем перемещение фото в пределах ячейки
-                offset = Offset(
-                  offset.dx.clamp(-maxWidth * (scale - 1), 0),
-                  offset.dy.clamp(-maxHeight * (scale - 1), 0),
-                );
-              });
-            },
-            child: Stack(
-              children: [
-                Positioned(
-                  left: offset.dx,
-                  top: offset.dy,
-                  child: Transform.scale(
-                    scale: scale,
-                    alignment: Alignment.topLeft,
-                    child: Image.file(
-                      File(fullPath),
-                      width: maxWidth,
-                      height: maxHeight,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+        // Само изображение
+        child: Image.file(
+          File(fullPath),
+          width: maxWidth,
+          height: maxHeight,
+          fit: BoxFit.cover,
+        ),
       ),
     );
   }

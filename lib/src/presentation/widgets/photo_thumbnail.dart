@@ -2,13 +2,9 @@ import 'dart:io';
 
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
-import 'package:get_thumbnail_video/index.dart';
-import 'package:get_thumbnail_video/video_thumbnail.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
-import 'package:video_player/video_player.dart';
 
 class PhotoThumbnail extends StatefulWidget {
   final Photo photo;
@@ -30,53 +26,10 @@ class PhotoThumbnail extends StatefulWidget {
 
 class _PhotoThumbnailState extends State<PhotoThumbnail> {
   bool _showDeleteIcon = false;
-  String? _videoThumbnailPath; // Путь к превью
-  String? _videoDuration; // Длительность видео
 
   @override
   void initState() {
     super.initState();
-    _generateVideoThumbnail();
-  }
-
-  Future<void> _generateVideoThumbnail() async {
-    if (widget.photo.mediaType == 'video') {
-      try {
-        final tempDir = await getTemporaryDirectory();
-        final videoPath = PhotoPathHelper().getFullPath(widget.photo.fileName);
-
-        // Генерация превью
-        final thumbnailPath = await VideoThumbnail.thumbnailFile(
-          video: videoPath,
-          thumbnailPath: tempDir.path,
-          imageFormat: ImageFormat.JPEG,
-          maxHeight: 200, // Высота превью (автоширина для сохранения пропорций)
-          quality: 75,
-        );
-
-        if (thumbnailPath != null) {
-          // Получение длительности видео
-          final videoPlayerController = VideoPlayerController.file(File(videoPath));
-          await videoPlayerController.initialize();
-          final duration = videoPlayerController.value.duration;
-          videoPlayerController.dispose();
-
-          setState(() {
-            _videoThumbnailPath = thumbnailPath.path;
-            _videoDuration = _formatDuration(duration);
-          });
-        }
-      } catch (e) {
-        print('Error generating video thumbnail: $e');
-      }
-    }
-  }
-
-  String _formatDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return '$minutes:$seconds';
   }
 
   @override
@@ -87,13 +40,14 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
     Widget mediaWidget;
 
     if (isVideo) {
+      print('widget.photo.videoPreview ${widget.photo.videoPreview}');
       // Если это видео, показываем превью
       mediaWidget = Stack(
         alignment: Alignment.center,
         children: [
-          if (_videoThumbnailPath != null)
+          if (widget.photo.videoPreview != null)
             Image.file(
-              File(_videoThumbnailPath!),
+              File(widget.photo.videoPreview!),
               fit: BoxFit.cover,
               width: double.infinity,
               height: double.infinity,
@@ -102,7 +56,7 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
             Container(
               color: Colors.black,
             ),
-          if (_videoDuration != null)
+          if (widget.photo.videoDuration != null)
             Positioned(
               bottom: 8,
               right: 8,
@@ -110,7 +64,7 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
                 padding: const EdgeInsets.all(0),
                 color: Colors.black.withOpacity(0.5),
                 child: Text(
-                  _videoDuration!,
+                  widget.photo.videoDuration!,
                   style: const TextStyle(color: Colors.white, fontSize: 12),
                 ),
               ),

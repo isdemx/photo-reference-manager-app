@@ -94,6 +94,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Rect _deleteRect = Rect.zero;
 
   Color _backgroundColor = Colors.black;
+  bool _isFullscreen = false;
 
   /// Туториал
   bool _showTutorial = false; // Проверим SharedPreferences
@@ -104,7 +105,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   @override
   void initState() {
     super.initState();
-    _initCollageItems();
+    // _initCollageItems();
     _checkTutorial(); // Проверяем, нужно ли показывать подсказку
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateDeleteRect());
   }
@@ -124,28 +125,38 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     await prefs.setBool('collage_tutor_passed', true);
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initCollageItems(); // Теперь метод будет вызван после полной инициализации context
+  }
+
   void _initCollageItems() {
     _items = widget.photos.map(_createCollagePhotoState).toList();
 
-    // Пример раскладки для 2..3 фото
+    final canvasWidth = MediaQuery.of(context).size.width;
+    final canvasHeight = MediaQuery.of(context).size.height;
+
+    // Распределяем фото
     final n = _items.length;
-    switch (n) {
-      case 2:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(30, 300);
-        break;
-      case 3:
-        _items[0].offset = const Offset(30, 30);
-        _items[1].offset = const Offset(230, 30);
-        _items[2].offset = const Offset(130, 200);
-        break;
-      default:
-        break;
+
+    // Если больше 6 фото, размещаем каскадом
+    const cascadeOffset = 50.0;
+    for (int i = 0; i < n; i++) {
+      final item = _items[i];
+      item.offset = Offset(
+        (i * cascadeOffset) % (canvasWidth - item.baseWidth),
+        (i * cascadeOffset) % (canvasHeight - item.baseHeight),
+      );
     }
+
+    // Устанавливаем zIndex
     for (int i = 0; i < _items.length; i++) {
       _items[i].zIndex = i;
     }
     _maxZIndex = _items.length;
+
+    setState(() {}); // Обновляем состояние
   }
 
   CollagePhotoState _createCollagePhotoState(Photo photo) {
@@ -212,116 +223,144 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final isSomePhotoInEditMode = sorted.any((it) => it.isEditing);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Free collage (${_items.length} images)'),
-        actions: [
-          IconButton(
-            tooltip: 'Help / Info',
-            icon: const Icon(Icons.info_outline),
-            onPressed: _showHelp,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // === Основной Canvas ===
-          Expanded(
-            child: Stack(
-              children: [
-                Container(color: _backgroundColor),
-
-                // RepaintBoundary для сохранения
-                RepaintBoundary(
-                  key: _collageKey,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Container(color: _backgroundColor),
-                      ),
-                      for (final item in sorted) _buildPhotoItem(item),
-                    ],
-                  ),
+      appBar: !_isFullscreen
+          ? AppBar(
+              title: Text('Free collage (${_items.length} images)'),
+              actions: [
+                IconButton(
+                  tooltip: 'Help / Info',
+                  icon: const Icon(Icons.info_outline),
+                  onPressed: _showHelp,
                 ),
+                IconButton(
+                  tooltip: 'Help / Info',
+                  icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                  onPressed: _toggleFullscreen,
+                ),
+              ],
+            )
+          : null,
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              Expanded(
+                child: Stack(
+                  children: [
+                    Container(color: _backgroundColor),
 
-                // Иконка удаления
-                if (!isSomePhotoInEditMode &&
-                    (showForInit || _draggingIndex != null))
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 50,
-                    child: Center(
-                      child: Container(
-                        key: _deleteIconKey,
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          color: _deleteHover ? Colors.red : Colors.white30,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.delete, color: Colors.black),
+                    // RepaintBoundary для сохранения
+                    RepaintBoundary(
+                      key: _collageKey,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: Container(color: _backgroundColor),
+                          ),
+                          for (final item in sorted) _buildPhotoItem(item),
+                        ],
                       ),
                     ),
-                  ),
 
-                // Туториал поверх всего
-                if (_showTutorial)
-                  Positioned.fill(
-                    child: Container(
-                      color: Colors.black.withOpacity(0.8),
-                      child: Center(
-                        child: SingleChildScrollView(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.touch_app,
-                                  size: 60, color: Colors.white),
-                              const SizedBox(height: 20),
-                              const Text(
-                                'Move with one finger\n'
-                                'Zoom with two fingers\n'
-                                'Long Press to toggle Edit Mode\n'
-                                'Rotate in bottom panel\n'
-                                'Brightness & Saturation in bottom panel\n'
-                                'Crop corners when in Edit Mode\n'
-                                'Place on top with a tap\n'
-                                'Press check to save image',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 20),
-                              ElevatedButton(
-                                onPressed: () {
-                                  setState(() => _showTutorial = false);
-                                  _markTutorialPassed(); // Запомнить в prefs
-                                },
-                                child: const Text('Got it'),
-                              ),
-                            ],
+                    // Иконка удаления
+                    if (!isSomePhotoInEditMode &&
+                        (showForInit || _draggingIndex != null))
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 50,
+                        child: Center(
+                          child: Container(
+                            key: _deleteIconKey,
+                            width: 64,
+                            height: 64,
+                            decoration: BoxDecoration(
+                              color: _deleteHover ? Colors.red : Colors.white30,
+                              shape: BoxShape.circle,
+                            ),
+                            child:
+                                const Icon(Icons.delete, color: Colors.black),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
 
-          // === Панель снизу ===
-          Container(
-            height: isSomePhotoInEditMode ? 160 : 80,
-            color: Colors.black54,
-            child: isSomePhotoInEditMode
-                ? _buildEditPanel(editingPhoto)
-                : _buildDefaultPanel(),
+                    // Туториал поверх всего
+                    if (_showTutorial)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withOpacity(0.8),
+                          child: Center(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.touch_app,
+                                      size: 60, color: Colors.white),
+                                  const SizedBox(height: 20),
+                                  const Text(
+                                    'Move with one finger\n'
+                                    'Zoom with two fingers\n'
+                                    'Long Press to toggle Edit Mode\n'
+                                    'Rotate in bottom panel\n'
+                                    'Brightness & Saturation in bottom panel\n'
+                                    'Crop corners when in Edit Mode\n'
+                                    'Place on top with a tap\n'
+                                    'Press check to save image',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      setState(() => _showTutorial = false);
+                                      _markTutorialPassed(); // Запомнить в prefs
+                                    },
+                                    child: const Text('Got it'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // === Панель снизу ===
+              Container(
+                height: isSomePhotoInEditMode ? 160 : 80,
+                color: Colors.black54,
+                child: isSomePhotoInEditMode
+                    ? _buildEditPanel(editingPhoto)
+                    : _isFullscreen
+                        ? null
+                        : _buildDefaultPanel(),
+              ),
+            ],
           ),
+          if (_isFullscreen)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: IconButton(
+                icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
+                onPressed: _toggleFullscreen,
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  void _toggleFullscreen() {
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+    });
   }
 
   /// Панель, если никто не в edit mode
@@ -340,12 +379,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           onPressed: _showColorPickerDialog,
         ),
         IconButton(
-          icon: const Icon(Icons.check, color: Colors.white),
+          icon: const Icon(Icons.check, color: Colors.green),
           tooltip: 'Save collage as image',
           onPressed: _onGenerateCollage,
         ),
         IconButton(
-          icon: const Icon(Icons.close, color: Colors.white),
+          icon: const Icon(Icons.close, color: Colors.red),
           tooltip: 'Cancel collage',
           onPressed: () => Navigator.pop(context),
         ),

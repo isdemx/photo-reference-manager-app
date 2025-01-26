@@ -123,8 +123,8 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                           if (tag.name != 'Not Ref')
                             IconButton(
                               tooltip: 'Change color',
-                              icon: const Icon(Iconsax.colors_square,
-                                  color: Colors.amber),
+                              icon: Icon(Iconsax.colors_square,
+                                  color: Color(tag.colorValue)),
                               onPressed: () {
                                 TagsHelpers.showColorPickerDialog(context, tag);
                               },

@@ -51,6 +51,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
 
   bool _showFilterPanel = false; // Для отображения панели фильтров
 
+  bool _isSharing = false;
+
   @override
   void initState() {
     super.initState();
@@ -183,33 +185,43 @@ class _PhotoGridViewState extends State<PhotoGridView> {
       context,
       MaterialPageRoute(
         builder: (context) => Scaffold(
-          body: PhotoCollageWidget(photos: _selectedPhotos, allPhotos: widget.photos,),
+          body: PhotoCollageWidget(
+            photos: _selectedPhotos,
+            allPhotos: widget.photos,
+          ),
         ),
       ),
     );
   }
 
   void _onCollageGridGeneratorPressed(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      enableDrag: false, // Запрещает закрытие свайпом вниз
-      isScrollControlled:
-          true, // Позволяет модальному окну растягиваться на весь экран
-      builder: (context) {
-        return Container(
-          width: double.infinity,
-          height: MediaQuery.of(context).size.height, // Полная высота экрана
-          color: Colors.black, // Фон (опционально)
-          child: GridCollageWidget(photos: _selectedPhotos),
-        );
-      },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          body: GridCollageWidget(photos: _selectedPhotos),
+        ),
+      ),
     );
   }
 
   Future<void> _onSelectedSharePressed(BuildContext context) async {
-    bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
-    if (res) {
-      _turnMultiSelectModeOff();
+    setState(() {
+      _isSharing = true; // Включаем лоадер
+    });
+
+    try {
+      bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
+      if (res) {
+        _turnMultiSelectModeOff();
+      }
+    } catch (e) {
+      print('Error while sharing: $e');
+      // Здесь можно показать сообщение об ошибке, если нужно
+    } finally {
+      setState(() {
+        _isSharing = false; // Выключаем лоадер
+      });
     }
   }
 
@@ -464,6 +476,13 @@ class _PhotoGridViewState extends State<PhotoGridView> {
             ),
           ],
         ),
+        if (_isSharing)
+        Container(
+          color: Colors.black.withOpacity(0.5), // Полупрозрачный фон
+          child: const Center(
+            child: CircularProgressIndicator(), // Индикатор загрузки
+          ),
+        ),
         ColumnSlider(
           initialCount: _columnCount,
           columnCount: _columnCount,
@@ -502,12 +521,12 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     tooltip: 'Create free collage',
                     onPressed: () => _onCollageGeneratorPressed(context),
                   ),
-                  IconButton(
-                    icon: const Icon(Iconsax.grid_2,
-                        color: Colors.white), // Пример иконки коллажа
-                    tooltip: 'Create grid collage',
-                    onPressed: () => _onCollageGridGeneratorPressed(context),
-                  ),
+                  // IconButton(
+                  //   icon: const Icon(Iconsax.grid_2,
+                  //       color: Colors.white), // Пример иконки коллажа
+                  //   tooltip: 'Create grid collage',
+                  //   onPressed: () => _onCollageGridGeneratorPressed(context),
+                  // ),
                   IconButton(
                     icon: const Icon(Iconsax.export, color: Colors.white),
                     tooltip: 'Share choosed media',
@@ -516,7 +535,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                   IconButton(
                     icon: const Icon(Iconsax.trash,
                         color: Color.fromARGB(255, 255, 0, 0)),
-                        tooltip: 'Delete choosed media',
+                    tooltip: 'Delete choosed media',
                     onPressed: () => _onDeletePressed(context, _selectedPhotos),
                   ),
                 ],

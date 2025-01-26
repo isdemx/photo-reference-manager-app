@@ -7,10 +7,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
-import 'package:photographers_reference_app/src/domain/entities/folder.dart';  // <--- new import
+import 'package:photographers_reference_app/src/domain/entities/folder.dart'; // <--- new import
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
+import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -141,6 +142,17 @@ class _UploadScreenState extends State<UploadScreen> {
 
       try {
         await photoRepository.addPhoto(photo);
+
+        if (mediaType == 'video') {
+          final videoResult =
+              await generateVideoThumbnail(photo);
+          if (videoResult != null) {
+            photo.videoPreview = videoResult['videoPreview'].path;
+            photo.videoDuration = videoResult['videoDuration'];
+            await photoRepository.updatePhoto(photo);
+          }
+        }
+
         setState(() => _uploadedCount++);
       } catch (e) {
         debugPrint('Error adding image: $e');

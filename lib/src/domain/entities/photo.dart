@@ -39,6 +39,12 @@ class Photo extends HiveObject {
   @HiveField(10)
   String mediaType; // Убрано final
 
+  @HiveField(11)
+  String? videoPreview;
+
+  @HiveField(12)
+  String? videoDuration;
+
   Photo({
     required this.id,
     required this.path,
@@ -49,6 +55,8 @@ class Photo extends HiveObject {
     required this.dateAdded,
     required this.sortOrder,
     required this.mediaType,
+    this.videoPreview,
+    this.videoDuration,
     this.isStoredInApp = false,
     this.geoLocation,
   });
@@ -60,4 +68,37 @@ class Photo extends HiveObject {
 
   bool get isImage => mediaType == 'image';
   bool get isVideo => mediaType == 'video';
+
+  /// Метод copyWith для создания нового объекта с изменёнными полями
+  Photo copyWith({
+    String? id,
+    String? path,
+    String? fileName,
+    List<String>? folderIds,
+    List<String>? tagIds,
+    String? comment,
+    DateTime? dateAdded,
+    int? sortOrder,
+    String? mediaType,
+    String? videoPreview,
+    String? videoDuration,
+    bool? isStoredInApp,
+    Map<String, double>? geoLocation,
+  }) {
+    return Photo(
+      id: id ?? this.id,
+      path: path ?? this.path,
+      fileName: fileName ?? this.fileName,
+      folderIds: folderIds ?? this.folderIds,
+      tagIds: tagIds ?? this.tagIds,
+      comment: comment ?? this.comment,
+      dateAdded: dateAdded ?? this.dateAdded,
+      sortOrder: sortOrder ?? this.sortOrder,
+      mediaType: mediaType ?? this.mediaType,
+      videoPreview: videoPreview ?? this.videoPreview,
+      videoDuration: videoDuration ?? this.videoDuration,
+      isStoredInApp: isStoredInApp ?? this.isStoredInApp,
+      geoLocation: geoLocation ?? this.geoLocation,
+    );
+  }
 }
