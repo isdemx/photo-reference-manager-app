@@ -168,6 +168,8 @@ class _UploadScreenState extends State<UploadScreen> {
     // Обновляем список фото в Bloc
     context.read<PhotoBloc>().add(LoadPhotos());
 
+    context.read<PhotoBloc>().add(ClearTemporaryFiles());
+
     // Если папка не null, возвращаемся в экран папки
     if (widget.folder != null) {
       Navigator.pushReplacementNamed(context, '/folder',

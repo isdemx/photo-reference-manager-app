@@ -26,6 +26,7 @@ import 'package:photographers_reference_app/src/presentation/screens/upload_scre
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
 void main() async {
+  print('START MAIN');
   WidgetsFlutterBinding.ensureInitialized();
 
   await Hive.initFlutter();
@@ -55,11 +56,26 @@ void main() async {
 Future<void> migratePhotoBox() async {
   print('Starting migration...');
   final box = await Hive.openBox<Photo>('photos');
+
   for (var key in box.keys) {
     final photo = box.get(key);
-    if (photo != null && photo.mediaType == null) {
-      photo.mediaType = 'image'; // Устанавливаем значение по умолчанию
-      await box.put(key, photo); // Сохраняем обновления
+
+    if (photo != null) {
+      // Убедитесь, что каждое новое поле имеет значение
+      if (photo.mediaType == null) {
+        photo.mediaType = 'image'; // Установите значение по умолчанию
+      }
+
+      if (photo.videoPreview == null) {
+        photo.videoPreview = ''; // Пустая строка вместо null
+      }
+
+      if (photo.videoDuration == null) {
+        photo.videoDuration = ''; // Пустая строка вместо null
+      }
+
+      // Сохраните обновлённый объект
+      await box.put(key, photo);
       print('Migrated photo with key $key');
     }
   }
@@ -87,6 +103,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('STARTTT!!!!');
     return FutureBuilder(
       future: _initHive,
       builder: (context, snapshot) {
