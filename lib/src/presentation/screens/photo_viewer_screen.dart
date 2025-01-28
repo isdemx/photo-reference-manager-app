@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:get_thumbnail_video/index.dart';
-import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';

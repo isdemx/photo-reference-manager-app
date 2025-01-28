@@ -11,10 +11,11 @@ import 'package:photographers_reference_app/src/domain/entities/folder.dart'; //
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
-import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
+import 'package:photographers_reference_app/src/utils/handle_video_upload.dart'; // <-- generateVideoThumbnail() здесь
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:path_provider/path_provider.dart'; // Для постоянного пути
 
 class UploadScreen extends StatefulWidget {
   /// Необязательный параметр. Если не null — значит загружаем в конкретную папку.
@@ -109,15 +110,15 @@ class _UploadScreenState extends State<UploadScreen> {
 
     for (var i = 0; i < _images!.length; i++) {
       if (_stopRequested) break;
-      final image = _images![i];
+      final xfile = _images![i];
 
       // Определяем тип файла: фото или видео
-      final mediaType = determineMediaType(image.path);
+      final mediaType = determineMediaType(xfile.path);
 
       // Считываем геолокацию только если это фотография
       Map<String, double>? geoLocation;
       if (mediaType == 'image') {
-        geoLocation = await _getGeoLocation(image.path);
+        geoLocation = await _getGeoLocation(xfile.path);
       }
 
       // Если зашли с экрана конкретной папки, добавляем её ID
@@ -126,15 +127,19 @@ class _UploadScreenState extends State<UploadScreen> {
         folderIds.add(widget.folder!.id);
       }
 
+      /// 1. Сохраняем оригинальный файл (фото или видео) в постоянную директорию "photos/"
+      final savedPath = await _saveFileToPhotosDir(xfile);
+
+      /// 2. Создаём объект Photo и записываем в Hive
       final photo = Photo(
         id: const Uuid().v4(),
-        path: image.path,
-        folderIds: folderIds, // <--- Записываем, если есть папка
+        path: savedPath,                // Уже в постоянной директории
+        folderIds: folderIds,
         tagIds: [],
         comment: '',
         dateAdded: DateTime.now(),
         sortOrder: 0,
-        fileName: path_package.basename(image.path),
+        fileName: path_package.basename(savedPath),
         isStoredInApp: true,
         geoLocation: geoLocation,
         mediaType: mediaType,
@@ -143,12 +148,15 @@ class _UploadScreenState extends State<UploadScreen> {
       try {
         await photoRepository.addPhoto(photo);
 
+        /// 3. Если это видео — генерируем превью (первый кадр)
         if (mediaType == 'video') {
-          final videoResult =
-              await generateVideoThumbnail(photo);
+          final videoResult = await generateVideoThumbnail(photo);
           if (videoResult != null) {
-            photo.videoPreview = videoResult['videoPreview'].path;
+            // videoResult['videoPreview'] — строка пути
+            photo.videoPreview = videoResult['videoPreview'];
             photo.videoDuration = videoResult['videoDuration'];
+
+            /// 4. Обновляем в Hive
             await photoRepository.updatePhoto(photo);
           }
         }
@@ -168,7 +176,7 @@ class _UploadScreenState extends State<UploadScreen> {
     // Обновляем список фото в Bloc
     context.read<PhotoBloc>().add(LoadPhotos());
 
-    context.read<PhotoBloc>().add(ClearTemporaryFiles());
+    // context.read<PhotoBloc>().add(ClearTemporaryFiles());
 
     // Если папка не null, возвращаемся в экран папки
     if (widget.folder != null) {
@@ -178,6 +186,26 @@ class _UploadScreenState extends State<UploadScreen> {
       // Иначе возвращаемся в All Photos
       Navigator.pushReplacementNamed(context, '/all_photos');
     }
+  }
+
+  /// Сохраняем файл (фото или видео) в постоянную директорию "photos"
+  Future<String> _saveFileToPhotosDir(XFile xfile) async {
+    final appDocDir = await getApplicationDocumentsDirectory();
+    final photosDir = Directory(path_package.join(appDocDir.path, 'photos'));
+
+    if (!photosDir.existsSync()) {
+      photosDir.createSync(recursive: true);
+    }
+
+    // Формируем конечный путь
+    final newPath = path_package.join(
+      photosDir.path,
+      path_package.basename(xfile.path),
+    );
+
+    // Копируем файл
+    final savedFile = await File(xfile.path).copy(newPath);
+    return savedFile.path;
   }
 
   /// Попытка достать GPS из EXIF (только если это изображение)

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+
+// Импортируем все нужные сущности, адаптеры и репозитории
 import 'package:photographers_reference_app/src/data/repositories/category_repository_impl.dart';
 import 'package:photographers_reference_app/src/data/repositories/folder_repository_impl.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
@@ -10,12 +12,14 @@ import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/user_settings.dart';
+
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
+
 import 'package:photographers_reference_app/src/presentation/screens/all_photos_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/all_tags_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/folder_screen.dart';
@@ -23,59 +27,65 @@ import 'package:photographers_reference_app/src/presentation/screens/main_screen
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
+/// Точка входа
 void main() async {
-  print('START MAIN');
   WidgetsFlutterBinding.ensureInitialized();
 
+  // 1. Инициализация Hive
   await Hive.initFlutter();
 
-  // Регистрируем адаптеры
+  // 2. Регистрация всех адаптеров
   Hive.registerAdapter(CategoryAdapter());
   Hive.registerAdapter(FolderAdapter());
   Hive.registerAdapter(PhotoAdapter());
   Hive.registerAdapter(TagAdapter());
   Hive.registerAdapter(UserSettingsAdapter());
 
-  // Инициализация баз данных
+  // 3. Открытие всех боксов (по одному разу).
   final tagBox = await Hive.openBox<Tag>('tags');
+  final categoryBox = await Hive.openBox<Category>('categories');
+  final folderBox = await Hive.openBox<Folder>('folders');
+  final photoBox = await Hive.openBox<Photo>('photos');
+
+  // 4. Запуск миграции (если нужно)
+  await migratePhotoBox(photoBox);
+
+  // Инициализация дефолтных данных (например, начальные теги/категории)
   final tagRepository = TagRepositoryImpl(tagBox);
   await tagRepository.initializeDefaultTags();
 
-  final categoryBox = await Hive.openBox<Category>('categories');
   final categoryRepository = CategoryRepositoryImpl(categoryBox);
   await categoryRepository.initializeDefaultCategory();
 
-  // Миграция для обновления старых данных
-  await migratePhotoBox();
+  // (Опционально) Инициализируем пути для фото
+  await PhotoPathHelper().initialize();
 
-  runApp(MyApp());
+  // 5. Запуск приложения. Передаём открытые боксы в MyApp, чтобы дальше не открывать их повторно.
+  runApp(MyApp(
+    tagBox: tagBox,
+    categoryBox: categoryBox,
+    folderBox: folderBox,
+    photoBox: photoBox,
+  ));
 }
 
-Future<void> migratePhotoBox() async {
+/// Пример миграции, если надо заполнить новые поля
+Future<void> migratePhotoBox(Box<Photo> photoBox) async {
   print('Starting migration...');
-  final box = await Hive.openBox<Photo>('photos');
-
-  for (var key in box.keys) {
-    final photo = box.get(key);
+  for (var key in photoBox.keys) {
+    final photo = photoBox.get(key);
 
     if (photo != null) {
       // Убедитесь, что каждое новое поле имеет значение
-      if (photo.mediaType == null) {
-        photo.mediaType = 'image'; // Установите значение по умолчанию
-      }
-
-      if (photo.videoPreview == null) {
-        photo.videoPreview = ''; // Пустая строка вместо null
-      }
-
-      if (photo.videoDuration == null) {
-        photo.videoDuration = ''; // Пустая строка вместо null
-      }
+      photo.mediaType ??= 'image';
+      photo.videoPreview ??= '';
+      photo.videoDuration ??= '';
 
       // Сохраните обновлённый объект
-      await box.put(key, photo);
+      await photoBox.put(key, photo);
       print('Migrated photo with key $key');
     }
   }
@@ -83,72 +93,34 @@ Future<void> migratePhotoBox() async {
 }
 
 class MyApp extends StatelessWidget {
-  final Future<void> _initHive = _initializeHive();
+  final Box<Tag> tagBox;
+  final Box<Category> categoryBox;
+  final Box<Folder> folderBox;
+  final Box<Photo> photoBox;
 
-  static Future<void> openHiveBoxes() async {
-    print('Opening Hive boxes...');
-    await Hive.openBox<Category>('categories');
-    await Hive.openBox<Folder>('folders');
-    await Hive.openBox<Photo>('photos');
-    await Hive.openBox<Tag>('tags');
-    print('Hive boxes opened successfully.');
-  }
-
-  static Future<void> _initializeHive() async {
-    print('Initializing Hive...');
-    await openHiveBoxes();
-    await PhotoPathHelper().initialize();
-    print('Hive initialization complete.');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    print('STARTTT!!!!');
-    return FutureBuilder(
-      future: _initHive,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.done) {
-          return const PhotographersReferenceApp();
-        } else if (snapshot.hasError) {
-          return MaterialApp(
-            home: Scaffold(
-              body: Center(
-                child: Text('Error initializing Hive: ${snapshot.error}'),
-              ),
-            ),
-          );
-        } else {
-          return const MaterialApp(
-            home: Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            ),
-          );
-        }
-      },
-    );
-  }
-}
-
-class PhotographersReferenceApp extends StatelessWidget {
-  const PhotographersReferenceApp({Key? key}) : super(key: key);
+  const MyApp({
+    Key? key,
+    required this.tagBox,
+    required this.categoryBox,
+    required this.folderBox,
+    required this.photoBox,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<CategoryRepositoryImpl>(
-          create: (context) => CategoryRepositoryImpl(Hive.box('categories')),
+          create: (_) => CategoryRepositoryImpl(categoryBox),
         ),
         RepositoryProvider<FolderRepositoryImpl>(
-          create: (context) => FolderRepositoryImpl(Hive.box('folders')),
+          create: (_) => FolderRepositoryImpl(folderBox),
         ),
         RepositoryProvider<PhotoRepositoryImpl>(
-          create: (context) => PhotoRepositoryImpl(Hive.box('photos')),
+          create: (_) => PhotoRepositoryImpl(photoBox),
         ),
         RepositoryProvider<TagRepositoryImpl>(
-          create: (context) => TagRepositoryImpl(Hive.box('tags')),
+          create: (_) => TagRepositoryImpl(tagBox),
         ),
       ],
       child: MultiBlocProvider(
@@ -177,10 +149,10 @@ class PhotographersReferenceApp extends StatelessWidget {
             )..add(LoadTags()),
           ),
           BlocProvider<SessionBloc>(
-            create: (context) => SessionBloc(),
+            create: (_) => SessionBloc(),
           ),
           BlocProvider<FilterBloc>(
-            create: (context) => FilterBloc(),
+            create: (_) => FilterBloc(),
           ),
         ],
         child: MaterialApp(
@@ -195,7 +167,6 @@ class PhotographersReferenceApp extends StatelessWidget {
           ),
           home: const MainScreen(),
           routes: {
-            // '/upload': (context) => const UploadScreen(),
             '/all_tags': (context) => const AllTagsScreen(),
             '/all_photos': (context) => const AllPhotosScreen(),
           },
@@ -206,7 +177,6 @@ class PhotographersReferenceApp extends StatelessWidget {
                 builder: (context) => FolderScreen(folder: folder),
               );
             } else if (settings.name == '/upload') {
-              // Проверяем, есть ли переданный folder
               final folder = settings.arguments as Folder?;
               return MaterialPageRoute(
                 builder: (context) => UploadScreen(folder: folder),

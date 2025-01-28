@@ -10,7 +10,6 @@ import 'package:device_info_plus/src/device_info_plus_web.dart';
 import 'package:file_picker/_internal/file_picker_web.dart';
 import 'package:flutter_native_splash/flutter_native_splash_web.dart';
 import 'package:geolocator_web/geolocator_web.dart';
-import 'package:get_thumbnail_video/video_thumbnail_web.dart';
 import 'package:image_picker_for_web/image_picker_for_web.dart';
 import 'package:package_info_plus/src/package_info_plus_web.dart';
 import 'package:permission_handler_html/permission_handler_html.dart';
@@ -27,7 +26,6 @@ void registerPlugins([final Registrar? pluginRegistrar]) {
   FilePickerWeb.registerWith(registrar);
   FlutterNativeSplashWeb.registerWith(registrar);
   GeolocatorPlugin.registerWith(registrar);
-  VideoThumbnailWeb.registerWith(registrar);
   ImagePickerPlugin.registerWith(registrar);
   PackageInfoPlusWebPlugin.registerWith(registrar);
   WebPermissionHandler.registerWith(registrar);

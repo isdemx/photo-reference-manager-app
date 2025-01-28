@@ -64,9 +64,9 @@ dependencies:
   flutter_map: ^7.0.2
   latlong2: ^0.9.1
   geolocator: ^13.0.1
-  get_thumbnail_video: ^0.7.3
+  # get_thumbnail_video: ^0.7.3
+  video_thumbnail: ^0.5.3
   video_player: ^2.9.2
-  # get_thumbnail_video: ^0.6.1
   ffmpeg_kit_flutter_min_gpl: ^6.0.3
 
 

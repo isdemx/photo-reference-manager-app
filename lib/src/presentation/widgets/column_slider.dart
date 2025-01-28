@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 class ColumnSlider extends StatelessWidget {
@@ -27,9 +29,9 @@ class ColumnSlider extends StatelessWidget {
                 const Color.fromARGB(255, 107, 107, 107).withOpacity(0.7),
             thumbColor:
                 const Color.fromARGB(255, 117, 116, 116).withOpacity(0.8),
-            min: 2,
-            max: 5,
-            divisions: 3,
+            min: Platform.isMacOS ? 5: 2,
+            max: Platform.isMacOS ? 12 : 5,
+            divisions: Platform.isMacOS ? 7 : 3,
             label: 'Columns: $columnCount',
             onChanged: (value) {
               onChanged(value.toInt());
