@@ -24,14 +24,15 @@ class VideoGeneratorWidget extends StatefulWidget {
 }
 
 class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
-  int sliderValue = 2; 
+  int sliderValue = 2;
   bool isShuffle = false;
   bool isGenerating = false;
   String? generatedVideoPath;
 
   @override
   Widget build(BuildContext context) {
-    print('build => isGenerating=$isGenerating, generatedVideoPath=$generatedVideoPath');
+    print(
+        'build => isGenerating=$isGenerating, generatedVideoPath=$generatedVideoPath');
     return Stack(
       children: [
         Column(
@@ -40,11 +41,14 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
             Card(
               margin: const EdgeInsets.all(16),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                 child: Column(
                   children: [
-                    const Text('This feature will create a slide show video', style: TextStyle(fontSize: 20)),
-                    const Text('Select slide show speed:', style: TextStyle(fontSize: 16)), 
+                    const Text('This feature will create a slide show video',
+                        style: TextStyle(fontSize: 20)),
+                    const Text('Select slide show speed:',
+                        style: TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
                     Slider(
                       min: 2,
@@ -121,7 +125,8 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
     try {
       final durationPerPhoto = _mapSliderToDuration();
       final frameRate = 1.0 / durationPerPhoto;
-      print('=== generateVideo START => each photo=$durationPerPhoto s => fr=$frameRate ===');
+      print(
+          '=== generateVideo START => each photo=$durationPerPhoto s => fr=$frameRate ===');
 
       // Папка для итогового файла
       final appDir = await getApplicationDocumentsDirectory();
@@ -145,7 +150,9 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
       }
 
       // Копируем фото
-      final photos = [...widget.photos];
+      final photos = [
+        ...widget.photos.where((photo) => photo.mediaType == 'image')
+      ];
       if (isShuffle) {
         photos.shuffle();
       }
@@ -158,7 +165,7 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
         }
 
         // Переименовываем всё в .jpg, начиная с 1
-        final newName = 'img_${i+1}.jpg';
+        final newName = 'img_${i + 1}.jpg';
         final copiedPath = p.join(videoDir.path, newName);
 
         // Просто копируем, несмотря на реальный формат
@@ -208,14 +215,14 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
           context.read<PhotoBloc>().add(LoadPhotos());
 
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Video generated & saved successfully!')),
+            const SnackBar(
+                content: Text('Video generated & saved successfully!')),
           );
 
           setState(() {
             generatedVideoPath = finalOutputPath;
           });
           Navigator.pop(context);
-
         } else {
           final logs = await session.getLogs();
           for (var line in logs) {

@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
@@ -13,12 +12,12 @@ class PhotoThumbnail extends StatefulWidget {
   final bool isPinterestLayout;
 
   const PhotoThumbnail({
-    super.key,
+    Key? key,
     required this.photo,
     required this.onPhotoTap,
     required this.onLongPress,
     required this.isPinterestLayout,
-  });
+  }) : super(key: key);
 
   @override
   _PhotoThumbnailState createState() => _PhotoThumbnailState();
@@ -28,70 +27,67 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
   bool _showDeleteIcon = false;
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final fullPath = PhotoPathHelper().getFullPath(widget.photo.fileName);
-    final isVideo = widget.photo.mediaType == 'video';
+    // Для видео используем относительное имя (videoPreview), преобразованное в абсолютный путь.
+    // Для изображений используем fileName, которое тоже должно храниться как относительное имя.
+    final imagePath = widget.photo.mediaType == 'video' &&
+            widget.photo.videoPreview != null &&
+            widget.photo.videoPreview!.isNotEmpty
+        ? PhotoPathHelper().getFullPath(widget.photo.videoPreview!)
+        : PhotoPathHelper().getFullPath(widget.photo.fileName);
 
-    Widget mediaWidget;
+    // Добавляем логирование для отладки
+    final file = File(imagePath);
+    if (file.existsSync()) {
+      final size = file.lengthSync();
+      print('Файл миниатюры существует: $imagePath, размер: $size байт');
+    } else {
+      print('Файл миниатюры НЕ существует: $imagePath');
+    }
 
-    if (isVideo) {
-      print('widget.photo.videoPreview ${widget.photo.videoPreview}');
-      // Если это видео, показываем превью
-      mediaWidget = Stack(
+    // Выбираем виджет для отображения изображения в зависимости от layout
+    Widget imageWidget = widget.isPinterestLayout
+        ? ExtendedImage.file(
+            file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            enableMemoryCache: false, // отключаем кэширование для диагностики
+            cacheWidth: 200,
+            clearMemoryCacheIfFailed: true,
+          )
+        : ExtendedImage.file(
+            file,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            enableMemoryCache: false, // отключаем кэширование для диагностики
+            cacheWidth: 200,
+            clearMemoryCacheIfFailed: true,
+          );
+
+    // Если у видео задано время, накладываем его поверх изображения
+    if (widget.photo.mediaType == 'video' &&
+        widget.photo.videoDuration != null &&
+        widget.photo.videoDuration!.isNotEmpty) {
+      imageWidget = Stack(
         alignment: Alignment.center,
         children: [
-          if (widget.photo.videoPreview != null)
-            Image.file(
-              File(widget.photo.videoPreview!),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            )
-          else
-            Container(
-              color: Colors.black,
-            ),
-          if (widget.photo.videoDuration != null)
-            Positioned(
-              bottom: 8,
-              right: 8,
-              child: Container(
-                padding: const EdgeInsets.all(0),
-                color: Colors.black.withOpacity(0.5),
-                child: Text(
-                  widget.photo.videoDuration!,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
+          imageWidget,
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: Container(
+              padding: const EdgeInsets.all(0),
+              color: Colors.black.withOpacity(0.5),
+              child: Text(
+                widget.photo.videoDuration!,
+                style: const TextStyle(color: Colors.white, fontSize: 12),
               ),
             ),
+          ),
         ],
       );
-    } else {
-      // Если это изображение, используем ExtendedImage
-      if (widget.isPinterestLayout) {
-        mediaWidget = ExtendedImage.file(
-          File(fullPath),
-          fit: BoxFit.cover,
-          enableMemoryCache: true,
-          cacheWidth: 200,
-          clearMemoryCacheIfFailed: true,
-        );
-      } else {
-        mediaWidget = ExtendedImage.file(
-          File(fullPath),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          cacheWidth: 200,
-          height: double.infinity,
-          enableMemoryCache: true,
-          clearMemoryCacheIfFailed: true,
-        );
-      }
     }
 
     return GestureDetector(
@@ -108,12 +104,7 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
         vibrate();
         widget.onLongPress();
       },
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          mediaWidget,
-        ],
-      ),
+      child: imageWidget,
     );
   }
 }

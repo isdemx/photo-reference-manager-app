@@ -15,32 +15,46 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
   if (video.mediaType != 'video') return null;
 
   try {
-    // Генерация превью
-    final thumbnailPath = await VideoThumbnail.thumbnailFile(
-      video: video.path, // Путь к видео
-      thumbnailPath:
-          (await getTemporaryDirectory()).path, // Временная директория
-      imageFormat: ImageFormat.JPEG, // Формат превью
-      maxHeight: 200, // Максимальная высота превью
-      quality: 75, // Качество превью
+    // Генерация миниатюры как данных в памяти
+    final uint8list = await VideoThumbnail.thumbnailData(
+      video: video.path,
+      imageFormat: ImageFormat.JPEG,
+      maxHeight: 200,
+      quality: 75,
     );
-
-    if (thumbnailPath == null) {
-      print('Error generating thumbnail: returned null');
+    if (uint8list == null) {
+      print('Error: thumbnailData вернул null');
       return null;
     }
 
-    // Перемещение превью в постоянную директорию
+    // Получаем каталог документов и путь к каталогу photos
     final appDocDir = await getApplicationDocumentsDirectory();
     final photosDir = Directory(p.join(appDocDir.path, 'photos'));
-    if (!photosDir.existsSync()) {
-      photosDir.createSync(recursive: true);
+    if (!await photosDir.exists()) {
+      await photosDir.create(recursive: true);
+      print('Создана директория для фотографий: ${photosDir.path}');
     }
 
-    final finalThumbnailPath =
-        p.join(photosDir.path, '${video.id}_thumbnail.jpg');
-    final thumbnailFile = File(thumbnailPath);
-    await thumbnailFile.copy(finalThumbnailPath);
+    // Формируем имя файла для миниатюры (относительное имя)
+    final thumbnailFileName = '${video.id}_thumbnail.jpg';
+    // Формируем полный путь для записи
+    final finalThumbnailPath = p.join(photosDir.path, thumbnailFileName);
+    final file = File(finalThumbnailPath);
+    await file.writeAsBytes(uint8list);
+    print('Миниатюра сохранена по пути: $finalThumbnailPath');
+
+    // Дополнительная проверка: существует ли файл и какой у него размер
+    if (!(await file.exists())) {
+      print('Ошибка: файл миниатюры не существует после записи');
+      return null;
+    } else {
+      final fileSize = await file.length();
+      print('Файл миниатюры существует. Размер: $fileSize байт');
+      if (fileSize == 0) {
+        print('Ошибка: размер файла миниатюры равен 0');
+        return null;
+      }
+    }
 
     // Получение длительности видео
     final videoPlayerController = VideoPlayerController.file(File(video.path));
@@ -48,12 +62,13 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
     final duration = videoPlayerController.value.duration;
     videoPlayerController.dispose();
 
+    // Возвращаем только имя файла вместо полного пути
     return {
-      'videoPreview': finalThumbnailPath,
+      'videoPreview': thumbnailFileName,
       'videoDuration': formatDuration(duration),
     };
   } catch (e) {
-    print('Error generating video thumbnail: $e');
+    print('Ошибка при генерации миниатюры видео: $e');
     return null;
   }
 }

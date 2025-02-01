@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:path/path.dart' as p;  // <--- Добавьте этот импорт
 
 // Импортируем все нужные сущности, адаптеры и репозитории
 import 'package:photographers_reference_app/src/data/repositories/category_repository_impl.dart';
@@ -75,14 +77,28 @@ void main() async {
 /// Пример миграции, если надо заполнить новые поля
 Future<void> migratePhotoBox(Box<Photo> photoBox) async {
   print('Starting migration...');
+  // Получаем актуальный каталог фотографий
+  final appDir = await getApplicationDocumentsDirectory();
+  final photosDir = p.join(appDir.path, 'photos');
+
   for (var key in photoBox.keys) {
     final photo = photoBox.get(key);
-
     if (photo != null) {
       // Убедитесь, что каждое новое поле имеет значение
       photo.mediaType ??= 'image';
       photo.videoPreview ??= '';
       photo.videoDuration ??= '';
+
+      // Если это видео и videoPreview хранит абсолютный путь,
+      // заменим его на basename
+      if (photo.mediaType == 'video' &&
+          photo.videoPreview != null &&
+          photo.videoPreview!.isNotEmpty) {
+        if (photo.videoPreview!.startsWith(photosDir)) {
+          photo.videoPreview = p.basename(photo.videoPreview!);
+          print('Updated videoPreview for photo ${photo.id} to relative path.');
+        }
+      }
 
       // Сохраните обновлённый объект
       await photoBox.put(key, photo);

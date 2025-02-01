@@ -54,6 +54,11 @@ class CollagePhotoState {
   /// Насыщенность (0..2), по умолчанию 1
   double saturation;
 
+  /// Оттенок (угол в радианах, -π/4..π/4), по умолчанию 0
+  double hue;
+
+  double temp;
+
   CollagePhotoState({
     required this.photo,
     required this.offset,
@@ -66,6 +71,8 @@ class CollagePhotoState {
     Rect? cropRect,
     this.brightness = 1.0,
     this.saturation = 1.0,
+    this.temp = 0.0,
+    this.hue = 0.0,
   }) : cropRect = cropRect ?? const Rect.fromLTWH(0, 0, 1, 1);
 }
 
@@ -105,7 +112,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   @override
   void initState() {
     super.initState();
-    // _initCollageItems();
     _checkTutorial(); // Проверяем, нужно ли показывать подсказку
     WidgetsBinding.instance.addPostFrameCallback((_) => _updateDeleteRect());
   }
@@ -131,13 +137,16 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _initCollageItems(); // Теперь метод будет вызван после полной инициализации context
   }
 
+  /// Инициализация списка фото для коллажа
   void _initCollageItems() {
-    _items = widget.photos.map(_createCollagePhotoState).toList();
+    _items = widget.photos
+        .where((photo) =>
+            photo.mediaType == 'image') // Фильтрация: оставляем только фото
+        .map(_createCollagePhotoState)
+        .toList();
 
     final canvasWidth = MediaQuery.of(context).size.width;
     final canvasHeight = MediaQuery.of(context).size.height;
-
-    // Распределяем фото
     final n = _items.length;
 
     // Если больше 6 фото, размещаем каскадом
@@ -156,7 +165,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
     _maxZIndex = _items.length;
 
-    setState(() {}); // Обновляем состояние
+    setState(() {});
   }
 
   CollagePhotoState _createCollagePhotoState(Photo photo) {
@@ -183,9 +192,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       cropRect: const Rect.fromLTWH(0, 0, 1, 1),
       brightness: 1.0,
       saturation: 1.0,
+      temp: 0.0,
+      hue: 0.0,
     );
   }
 
+  /// Обновляем прямоугольник иконки удаления
   void _updateDeleteRect() {
     final iconBox =
         _deleteIconKey.currentContext?.findRenderObject() as RenderBox?;
@@ -204,10 +216,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   @override
   Widget build(BuildContext context) {
-    // Сортируем по zIndex
+    // Сортируем по zIndex (чтобы последний всегда был сверху)
     final sorted = [..._items]..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
-    // Пытаемся найти, есть ли одна фотка в режиме редактирования
+    // Пытаемся найти элемент в режиме редактирования (если есть)
     final editingPhoto = sorted.firstWhere(
       (it) => it.isEditing,
       orElse: () => CollagePhotoState(
@@ -218,6 +230,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         zIndex: 0,
         baseWidth: 1,
         baseHeight: 1,
+        brightness: 1.0,
+        saturation: 1.0,
+        temp: 1.0,
+        hue: 0.0,
       ),
     );
     final isSomePhotoInEditMode = sorted.any((it) => it.isEditing);
@@ -233,7 +249,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   onPressed: _showHelp,
                 ),
                 IconButton(
-                  tooltip: 'Help / Info',
+                  tooltip: 'Toggle Fullscreen',
                   icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
                   onPressed: _toggleFullscreen,
                 ),
@@ -247,9 +263,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               Expanded(
                 child: Stack(
                   children: [
+                    // Цвет фона холста
                     Container(color: _backgroundColor),
 
-                    // RepaintBoundary для сохранения
+                    // RepaintBoundary для сохранения в CollageSaveHelper
                     RepaintBoundary(
                       key: _collageKey,
                       child: Stack(
@@ -262,7 +279,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       ),
                     ),
 
-                    // Иконка удаления
+                    // Иконка удаления (появляется, когда начинаем drag)
                     if (!isSomePhotoInEditMode &&
                         (showForInit || _draggingIndex != null))
                       Positioned(
@@ -301,10 +318,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                     'Move with one finger\n'
                                     'Zoom with two fingers\n'
                                     'Long Press to toggle Edit Mode\n'
-                                    'Rotate in bottom panel\n'
-                                    'Brightness & Saturation in bottom panel\n'
+                                    'Rotate + Brightness + Saturation + Temperature + Hue\n'
                                     'Crop corners when in Edit Mode\n'
-                                    'Place on top with a tap\n'
+                                    'Tap to bring to front\n'
                                     'Press check to save image',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
@@ -317,7 +333,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                   ElevatedButton(
                                     onPressed: () {
                                       setState(() => _showTutorial = false);
-                                      _markTutorialPassed(); // Запомнить в prefs
+                                      _markTutorialPassed();
                                     },
                                     child: const Text('Got it'),
                                   ),
@@ -331,9 +347,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 ),
               ),
 
-              // === Панель снизу ===
+              // Нижняя панель
               Container(
-                height: isSomePhotoInEditMode ? 160 : 80,
+                height: isSomePhotoInEditMode ? 220 : 80,
                 color: Colors.black54,
                 child: isSomePhotoInEditMode
                     ? _buildEditPanel(editingPhoto)
@@ -343,6 +359,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               ),
             ],
           ),
+
+          // Кнопка выхода из фуллскрина
           if (_isFullscreen)
             Positioned(
               top: 16,
@@ -363,7 +381,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
-  /// Панель, если никто не в edit mode
+  /// Панель, когда не редактируется конкретное фото
   Widget _buildDefaultPanel() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -392,7 +410,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  /// Панель, если какая-то фотка в edit mode (rotate, brightness, saturation, ok)
+  /// Панель при режиме редактирования (brightness, saturation, temp, hue, rotation)
   Widget _buildEditPanel(CollagePhotoState item) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -406,7 +424,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               label: const Text('Rotate Left'),
               onPressed: () {
                 setState(() {
-                  item.rotation -= math.pi / 2; // -90 градусов
+                  item.rotation -= math.pi / 2;
                 });
               },
             ),
@@ -415,48 +433,71 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               label: const Text('Rotate Right'),
               onPressed: () {
                 setState(() {
-                  item.rotation += math.pi / 2; // +90 градусов
+                  item.rotation += math.pi / 2;
                 });
               },
             ),
           ],
         ),
-        // Вторая строка — ползунки яркости и насыщенности
+        // Вторая строка — яркость, насыщенность
         Row(
           children: [
             const SizedBox(width: 16),
-            const Text('Brt', style: TextStyle(color: Colors.grey)),
-            Expanded(
-              child: Slider(
-                min: 0.0,
-                max: 2.0,
-                divisions: 20,
-                value: item.brightness,
-                onChanged: (val) {
-                  setState(() {
-                    item.brightness = val;
-                  });
-                },
-              ),
+            _buildSlider(
+              label: 'Brt',
+              min: 0.0,
+              max: 2.0,
+              divisions: 20,
+              value: item.brightness,
+              centerValue: 1.0,
+              onChanged: (val) {
+                setState(() => item.brightness = val);
+              },
             ),
-            const Text('Sat', style: TextStyle(color: Colors.grey)),
-            Expanded(
-              child: Slider(
-                min: 0.0,
-                max: 2.0,
-                divisions: 20,
-                value: item.saturation,
-                onChanged: (val) {
-                  setState(() {
-                    item.saturation = val;
-                  });
-                },
-              ),
+            _buildSlider(
+              label: 'Sat',
+              min: 0.0,
+              max: 2.0,
+              divisions: 20,
+              value: item.saturation,
+              centerValue: 1.0,
+              onChanged: (val) {
+                setState(() => item.saturation = val);
+              },
             ),
             const SizedBox(width: 16),
           ],
         ),
-        // Третья строка — кнопка OK
+        // Третья строка — контраст и hue
+        Row(
+          children: [
+            const SizedBox(width: 16),
+            _buildSlider(
+              label: 'Tmp',
+              min: -2.0,
+              max: 2.0,
+              divisions: 20,
+              value: item.temp,
+              centerValue: 0.0,
+              onChanged: (val) {
+                setState(() => item.temp = val);
+              },
+            ),
+            _buildSlider(
+              label: 'Hue',
+              min: -math.pi / 4,
+              max: math.pi / 4,
+              divisions: 20,
+              value: item.hue,
+              centerValue: 0.0,
+              onChanged: (val) {
+                setState(() => item.hue = val);
+              },
+            ),
+            const SizedBox(width: 16),
+          ],
+        ),
+        // Четвертая строка — кнопка OK
         ElevatedButton(
           child: const Text('OK'),
           onPressed: () {
@@ -540,10 +581,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  /// Яркость + насыщенность => итоговая ColorFilter
-  /// (в примере линейная матрица для яркости и насыщенности)
-  ColorFilter _combinedColorFilter(double brightness, double saturation) {
-    // brightnessMatrix
+  /// Комбинируем яркость + насыщенность + контраст + hue
+  ColorFilter _combinedColorFilter(
+    double brightness,
+    double saturation,
+    double temp,
+    double hue,
+  ) {
+    // 1) Матрица яркости (brightness)
     final b = brightness;
     final brightnessMatrix = [
       b,
@@ -568,9 +613,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       0,
     ];
 
-    // saturationMatrix (упрощённо)
-    // 1) Вычислим интенсивность серого: lumR, lumG, lumB
-    // 2) Формула для saturation
+    // 2) Матрица насыщенности (saturation)
     final s = saturation;
     const lumR = 0.3086, lumG = 0.6094, lumB = 0.0820;
     final sr = (1 - s) * lumR;
@@ -598,39 +641,86 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       1,
       0,
     ];
-    // multiply 2 matrices
-    final combined = _multiplyColorMatrices(
-        brightnessMatrix.map((e) => e.toDouble()).toList(),
-        saturationMatrix.map((e) => e.toDouble()).toList());
-    return ColorFilter.matrix(combined);
-  }
 
-  /// Умножаем две 4x5 матрицы
-  List<double> _multiplyColorMatrices(
-    List<double> a,
-    List<double> b,
-  ) {
-    // Матрицы A и B, размер 20 (4 строки, 5 столбцов)
-    // result = A x B
-    final out = List<double>.filled(20, 0.0);
+    // 3) Матрица контраста (temperature)
+    // Если temp в диапазоне [-1..1],
+// то при temp>0 картинка теплеет, при temp<0 – холодеет.
 
-    for (int row = 0; row < 4; row++) {
-      for (int col = 0; col < 5; col++) {
-        double sum = 0;
-        for (int k = 0; k < 4; k++) {
-          sum += a[row * 5 + k] * b[k * 5 + col];
+    final temperatureMatrix = [
+      // R' = R + 2*temp
+      1, 0, 0, 0, 2 * temp,
+      // G' = G
+      0, 1, 0, 0, 0,
+      // B' = B - 2*temp
+      0, 0, 1, 0, -2 * temp,
+      // A' = A
+      0, 0, 0, 1, 0,
+    ];
+
+    // 4) Матрица оттенка (hue)
+    final cosA = math.cos(hue);
+    final sinA = math.sin(hue);
+    // Пример поворота матрицы для hue
+    final hueMatrix = [
+      0.213 + cosA * 0.787 - sinA * 0.213,
+      0.715 - cosA * 0.715 - sinA * 0.715,
+      0.072 - cosA * 0.072 + sinA * 0.928,
+      0,
+      0,
+      0.213 - cosA * 0.213 + sinA * 0.143,
+      0.715 + cosA * 0.285 + sinA * 0.140,
+      0.072 - cosA * 0.072 - sinA * 0.283,
+      0,
+      0,
+      0.213 - cosA * 0.213 - sinA * 0.787,
+      0.715 - cosA * 0.715 + sinA * 0.715,
+      0.072 + cosA * 0.928 + sinA * 0.072,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+    ];
+
+    // Функция умножения матриц 4x5
+    List<double> multiply(List<double> m1, List<double> m2) {
+      final out = List<double>.filled(20, 0.0);
+      for (int row = 0; row < 4; row++) {
+        for (int col = 0; col < 5; col++) {
+          double sum = 0;
+          for (int k = 0; k < 4; k++) {
+            sum += m1[row * 5 + k] * m2[k * 5 + col];
+          }
+          // offset
+          if (col == 4) {
+            sum += m1[row * 5 + 4];
+          }
+          out[row * 5 + col] = sum;
         }
-        // + компонент смещения
-        if (col == 4) {
-          sum += a[row * 5 + 4];
-        }
-        out[row * 5 + col] = sum;
       }
+      return out;
     }
-    return out;
+
+    // Последовательно умножаем: brightness -> saturation -> temp -> hue
+    final m1 = multiply(
+      brightnessMatrix.map((e) => e.toDouble()).toList(),
+      saturationMatrix.map((e) => e.toDouble()).toList(),
+    );
+    final m2 = multiply(
+      m1.map((e) => e.toDouble()).toList(),
+      temperatureMatrix.map((e) => e.toDouble()).toList(),
+    );
+    final m3 = multiply(
+      m2.map((e) => e.toDouble()).toList(),
+      hueMatrix.map((e) => e.toDouble()).toList(),
+    );
+
+    return ColorFilter.matrix(m3);
   }
 
-  /// Собираем контент (учитываем cropRect + colorFilter)
+  /// Собираем контент (учитываем cropRect + полный colorFilter)
   Widget _buildEditableContent(
       CollagePhotoState item, double effectiveWidth, double effectiveHeight) {
     final cropLeft = item.cropRect.left * effectiveWidth;
@@ -638,12 +728,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final cropWidth = item.cropRect.width * effectiveWidth;
     final cropHeight = item.cropRect.height * effectiveHeight;
 
-    final filter = _combinedColorFilter(item.brightness, item.saturation);
+    final filter = _combinedColorFilter(
+      item.brightness,
+      item.saturation,
+      item.temp,
+      item.hue,
+    );
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Основное изображение + ClipRect
+        // Основное изображение + обрезка
         ClipRect(
           child: Align(
             alignment: Alignment.topLeft,
@@ -663,7 +758,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             ),
           ),
         ),
-        // Рамка и уголки, если edit mode
+        // Рамка и уголки при edit mode
         if (item.isEditing) ...[
           Positioned.fill(
             child: CustomPaint(painter: _CropBorderPainter()),
@@ -736,28 +831,25 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       });
     }
 
-    // Top-left
+    // Четыре угла
     handles.add(
       cornerWidget(
         alignment: Alignment.topLeft,
         onDrag: (delta) => updateCropRect(delta, true, true),
       ),
     );
-    // Top-right
     handles.add(
       cornerWidget(
         alignment: Alignment.topRight,
         onDrag: (delta) => updateCropRect(delta, false, true),
       ),
     );
-    // Bottom-left
     handles.add(
       cornerWidget(
         alignment: Alignment.bottomLeft,
         onDrag: (delta) => updateCropRect(delta, true, false),
       ),
     );
-    // Bottom-right
     handles.add(
       cornerWidget(
         alignment: Alignment.bottomRight,
@@ -766,6 +858,55 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
 
     return handles;
+  }
+
+  /// Специальный метод для Slider'а с поддержкой:
+  /// - double tap = сброс к centerValue
+  /// - «примагничивание» к centerValue при приближении
+  /// - лёгкая вибрация при примагничивании
+  Widget _buildSlider({
+    required String label,
+    required double min,
+    required double max,
+    required int divisions,
+    required double value,
+    required double centerValue,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onDoubleTap: () {
+          // Сброс в центр
+          vibrate(5);
+          onChanged(centerValue);
+        },
+        child: Row(
+          children: [
+            Text(label, style: const TextStyle(color: Colors.grey)),
+            Expanded(
+              child: Slider(
+                min: min,
+                max: max,
+                divisions: divisions,
+                value: value,
+                onChanged: (val) {
+                  // Примагничивание к centerValue
+                  final threshold = (max - min) * 0.05; // 5% от диапазона
+                  final diff = (val - centerValue).abs();
+                  if (diff < threshold) {
+                    // Считаем «достаточно близко», делаем привязку
+                    vibrate(5);
+                    onChanged(centerValue);
+                  } else {
+                    onChanged(val);
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Сохранение коллажа
@@ -819,7 +960,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     showModalBottomSheet(
       context: context,
       builder: (_) {
-        final all = widget.allPhotos;
+        final all = widget.allPhotos
+            .where((photo) => photo.mediaType == 'image')
+            .toList();
         return Container(
           color: Colors.black,
           padding: const EdgeInsets.all(8),
