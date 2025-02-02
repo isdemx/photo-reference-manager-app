@@ -7,7 +7,7 @@
 		<key>CFBundleExecutable</key>
 		<string>$(EXECUTABLE_NAME)</string>
 		<key>CFBundleIconFile</key>
-		<string></string>
+		<string>AppIcon</string>
 		<key>CFBundleIdentifier</key>
 		<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 		<key>CFBundleInfoDictionaryVersion</key>
@@ -39,5 +39,27 @@
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>This app requires access to the photo library to allow users to select and view
 			images.</string>
+		<key>CFBundleDocumentTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeName</key>
+				<string>Image</string>
+				<key>CFBundleTypeExtensions</key>
+				<array>
+					<string>jpg</string>
+					<string>jpeg</string>
+					<string>png</string>
+					<string>gif</string>
+					<string>bmp</string>
+					<string>tiff</string>
+					<string>heic</string>
+					<string>webp</string>
+				</array>
+				<key>CFBundleTypeRole</key>
+				<string>Viewer</string>
+				<key>LSHandlerRank</key>
+				<string>Owner</string>
+			</dict>
+		</array>
 	</dict>
 </plist>

@@ -30,7 +30,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
         File newFile = await File(photo.path).copy(newFilePath);
         print('newFile, $newFile');
 
-        if (photo.mediaType == 'image') {
+        if (photo.mediaType == 'image' && Platform.isIOS) {
           // Обрабатываем только изображения
           if (compressSizeKb != 0) {
             final fileSizeKb = newFile.lengthSync() ~/ 1024;

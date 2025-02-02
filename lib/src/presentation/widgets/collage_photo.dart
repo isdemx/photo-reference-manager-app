@@ -474,8 +474,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             const SizedBox(width: 16),
             _buildSlider(
               label: 'Tmp',
-              min: -2.0,
-              max: 2.0,
+              min: -5.0,
+              max: 5.0,
               divisions: 20,
               value: item.temp,
               centerValue: 0.0,
@@ -877,7 +877,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       child: GestureDetector(
         onDoubleTap: () {
           // Сброс в центр
-          vibrate(5);
+          vibrate(3);
           onChanged(centerValue);
         },
         child: Row(
@@ -891,7 +891,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 value: value,
                 onChanged: (val) {
                   // Примагничивание к centerValue
-                  final threshold = (max - min) * 0.05; // 5% от диапазона
+                  final threshold = (max - min) * 0.03; // 5% от диапазона
                   final diff = (val - centerValue).abs();
                   if (diff < threshold) {
                     // Считаем «достаточно близко», делаем привязку

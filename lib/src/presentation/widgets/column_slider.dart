@@ -18,8 +18,13 @@ class ColumnSlider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Positioned(
       bottom: 26.0,
-      left: 150.0,
+      left: Platform.isMacOS
+          ? null
+          : 150.0, // Если macOS, то left=null, иначе 150.0
       right: 50.0,
+      width: Platform.isMacOS
+          ? 200.0
+          : null, // Если macOS, то width=200, иначе null
       child: Column(
         children: [
           Slider(
@@ -29,7 +34,7 @@ class ColumnSlider extends StatelessWidget {
                 const Color.fromARGB(255, 107, 107, 107).withOpacity(0.7),
             thumbColor:
                 const Color.fromARGB(255, 117, 116, 116).withOpacity(0.8),
-            min: Platform.isMacOS ? 5: 2,
+            min: Platform.isMacOS ? 5 : 2,
             max: Platform.isMacOS ? 12 : 5,
             divisions: Platform.isMacOS ? 7 : 3,
             label: 'Columns: $columnCount',
