@@ -2,20 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;  // <--- Добавьте этот импорт
+import 'package:path/path.dart' as p; // <--- Добавьте этот импорт
 
 // Импортируем все нужные сущности, адаптеры и репозитории
 import 'package:photographers_reference_app/src/data/repositories/category_repository_impl.dart';
+import 'package:photographers_reference_app/src/data/repositories/collage_repository_impl.dart';
 import 'package:photographers_reference_app/src/data/repositories/folder_repository_impl.dart';
 import 'package:photographers_reference_app/src/data/repositories/photo_repository_impl.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_repository_impl.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
+import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/user_settings.dart';
 
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
@@ -26,6 +29,7 @@ import 'package:photographers_reference_app/src/presentation/screens/all_photos_
 import 'package:photographers_reference_app/src/presentation/screens/all_tags_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/folder_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
+import 'package:photographers_reference_app/src/presentation/screens/my_collages_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
@@ -45,12 +49,15 @@ void main() async {
   Hive.registerAdapter(PhotoAdapter());
   Hive.registerAdapter(TagAdapter());
   Hive.registerAdapter(UserSettingsAdapter());
+  Hive.registerAdapter(CollageAdapter()); // typeId=100
+  Hive.registerAdapter(CollageItemAdapter()); // typeId=101
 
   // 3. Открытие всех боксов (по одному разу).
   final tagBox = await Hive.openBox<Tag>('tags');
   final categoryBox = await Hive.openBox<Category>('categories');
   final folderBox = await Hive.openBox<Folder>('folders');
   final photoBox = await Hive.openBox<Photo>('photos');
+  final collageBox = await Hive.openBox<Collage>('collages');
 
   // 4. Запуск миграции (если нужно)
   await migratePhotoBox(photoBox);
@@ -62,6 +69,8 @@ void main() async {
   final categoryRepository = CategoryRepositoryImpl(categoryBox);
   await categoryRepository.initializeDefaultCategory();
 
+  final collageRepository = CollageRepositoryImpl(collageBox);
+
   // (Опционально) Инициализируем пути для фото
   await PhotoPathHelper().initialize();
 
@@ -71,6 +80,7 @@ void main() async {
     categoryBox: categoryBox,
     folderBox: folderBox,
     photoBox: photoBox,
+    collageBox: collageBox,
   ));
 }
 
@@ -113,6 +123,7 @@ class MyApp extends StatelessWidget {
   final Box<Category> categoryBox;
   final Box<Folder> folderBox;
   final Box<Photo> photoBox;
+  final Box<Collage> collageBox;
 
   const MyApp({
     Key? key,
@@ -120,6 +131,7 @@ class MyApp extends StatelessWidget {
     required this.categoryBox,
     required this.folderBox,
     required this.photoBox,
+    required this.collageBox,
   }) : super(key: key);
 
   @override
@@ -137,6 +149,9 @@ class MyApp extends StatelessWidget {
         ),
         RepositoryProvider<TagRepositoryImpl>(
           create: (_) => TagRepositoryImpl(tagBox),
+        ),
+        RepositoryProvider<CollageRepositoryImpl>(
+          create: (_) => CollageRepositoryImpl(collageBox),
         ),
       ],
       child: MultiBlocProvider(
@@ -170,6 +185,12 @@ class MyApp extends StatelessWidget {
           BlocProvider<FilterBloc>(
             create: (_) => FilterBloc(),
           ),
+          BlocProvider<CollageBloc>(
+            create: (context) => CollageBloc(
+              collageRepository:
+                  RepositoryProvider.of<CollageRepositoryImpl>(context),
+            )..add(LoadCollages()),
+          ),
         ],
         child: MaterialApp(
           title: 'Photographers Reference',
@@ -185,6 +206,7 @@ class MyApp extends StatelessWidget {
           routes: {
             '/all_tags': (context) => const AllTagsScreen(),
             '/all_photos': (context) => const AllPhotosScreen(),
+            '/my_collages': (context) => const MyCollagesScreen(),
           },
           onGenerateRoute: (settings) {
             if (settings.name == '/folder') {

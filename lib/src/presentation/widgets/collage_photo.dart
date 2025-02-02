@@ -5,11 +5,14 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image/image.dart' as img;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:photographers_reference_app/src/domain/entities/collage.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -84,11 +87,13 @@ class CollagePhotoState {
 class PhotoCollageWidget extends StatefulWidget {
   final List<Photo> photos; // Уже выбранные фото
   final List<Photo> allPhotos; // Все доступные фото
+  final Collage? initialCollage; // <-- добавили
 
   const PhotoCollageWidget({
     Key? key,
     required this.photos,
     required this.allPhotos,
+    this.initialCollage, // <-- добавили
   }) : super(key: key);
 
   @override
@@ -142,7 +147,66 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _initCollageItems(); // Теперь метод будет вызван после полной инициализации context
+    if (widget.initialCollage != null) {
+      // Если есть готовый коллаж из базы, инициализируем из него
+      _initCollageFromExisting(widget.initialCollage!);
+    } else {
+      // Иначе, как раньше
+      _initCollageItems();
+    }
+  }
+
+  void _initCollageFromExisting(Collage collage) {
+    // 1) Присваиваем цвет фона
+    _backgroundColor = Color(collage.backgroundColorValue);
+
+    // 2) Превращаем каждый CollageItem в CollagePhotoState
+    _items = collage.items.map((collageItem) {
+      // Найдём объект Photo из allPhotos по fileName:
+      // (либо, если нет, создадим Photo-заглушку)
+      final photo = widget.allPhotos.firstWhere(
+        (p) => p.fileName == collageItem.fileName,
+        orElse: () => Photo(
+            folderIds: [],
+            comment: '',
+            tagIds: [],
+            path: '',
+            id: 'dummy',
+            fileName: collageItem.fileName,
+            mediaType: 'image', // или что нужно
+            dateAdded: DateTime.now(),
+            sortOrder: 0),
+      );
+
+      return CollagePhotoState(
+        photo: photo,
+        offset: Offset(collageItem.offsetX, collageItem.offsetY),
+        scale: collageItem.scale,
+        rotation: collageItem.rotation,
+        zIndex: collageItem.zIndex,
+        baseWidth: collageItem.baseWidth,
+        baseHeight: collageItem.baseHeight,
+        brightness: collageItem.brightness,
+        saturation: collageItem.saturation,
+        temp: collageItem.temp,
+        hue: collageItem.hue,
+        cropRect: Rect.fromLTRB(
+          collageItem.cropRectLeft,
+          collageItem.cropRectTop,
+          collageItem.cropRectRight,
+          collageItem.cropRectBottom,
+        ),
+      )..internalOffset = Offset(
+          collageItem.internalOffsetX,
+          collageItem.internalOffsetY,
+        );
+    }).toList();
+
+    // Опционально, сортируем по zIndex или инициализируем _maxZIndex
+    _maxZIndex =
+        _items.isEmpty ? 0 : _items.map((e) => e.zIndex).reduce(math.max);
+
+    setState(() {});
   }
 
   /// Инициализация списка фото для коллажа
@@ -460,6 +524,90 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
+  void _onSaveCollageToDb() async {
+    // Генерируем дефолтное название в формате My_collage_20250101_20:45
+    final now = DateTime.now();
+    final formattedDate =
+        "My_collage_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+
+    // Контроллер для TextField
+    final TextEditingController titleController =
+        TextEditingController(text: formattedDate);
+
+    // Показываем модалку для ввода названия
+    final result = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Enter collage title'),
+          content: TextField(
+            controller: titleController,
+            decoration: const InputDecoration(hintText: "Enter collage title"),
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(null),
+            ),
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () => Navigator.of(context).pop(titleController.text),
+            ),
+          ],
+        );
+      },
+    );
+
+    // Если пользователь нажал "Cancel" или не ввел название — не сохраняем
+    if (result == null || result.trim().isEmpty) return;
+
+    // Генерируем уникальный id для коллажа
+    final collageId = const Uuid().v4();
+
+    // Собираем список CollageItem из _items
+    final itemsList = _items.map((it) {
+      return CollageItem(
+        fileName: it.photo.fileName,
+        offsetX: it.offset.dx,
+        offsetY: it.offset.dy,
+        scale: it.scale,
+        rotation: it.rotation,
+        baseWidth: it.baseWidth,
+        baseHeight: it.baseHeight,
+        internalOffsetX: it.internalOffset.dx,
+        internalOffsetY: it.internalOffset.dy,
+        brightness: it.brightness,
+        saturation: it.saturation,
+        temp: it.temp,
+        hue: it.hue,
+        cropRectLeft: it.cropRect.left,
+        cropRectTop: it.cropRect.top,
+        cropRectRight: it.cropRect.right,
+        cropRectBottom: it.cropRect.bottom,
+        zIndex: it.zIndex,
+      );
+    }).toList();
+
+    final collage = Collage(
+      id: collageId,
+      title: result.trim(), // Используем введённое пользователем название
+      backgroundColorValue: _backgroundColor.value,
+      items: itemsList,
+      dateCreated: now, // Устанавливаем текущую дату
+      dateUpdated:
+          now, // Устанавливаем текущую дату (первоначально совпадает с созданием)
+    );
+
+    // Отправляем в CollageBloc
+    context.read<CollageBloc>().add(AddCollage(collage));
+
+    // Показываем подтверждение
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Collage saved to DB!')),
+    );
+  }
+
   /// Панель, когда не редактируется конкретное фото
   Widget _buildDefaultPanel() {
     return Row(
@@ -475,8 +623,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           tooltip: 'Change background color',
           onPressed: _showColorPickerDialog,
         ),
+        // --- НОВАЯ КНОПКА ДЛЯ СОХРАНЕНИЯ В БАЗУ ---
         IconButton(
-          icon: const Icon(Icons.check, color: Colors.green),
+          icon: const Icon(Iconsax.save_2, color: Colors.white),
+          tooltip: 'Save collage',
+          onPressed: _onSaveCollageToDb,
+        ),
+        IconButton(
+          icon: const Icon(Iconsax.image, color: Colors.green),
           tooltip: 'Save collage as image',
           onPressed: _onGenerateCollage,
         ),

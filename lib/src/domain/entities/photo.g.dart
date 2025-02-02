@@ -25,9 +25,9 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       comment: fields[4] as String,
       dateAdded: fields[5] as DateTime,
       sortOrder: fields[6] as int,
-      mediaType: fields[10] as String? ?? 'image', // Установка значения по умолчанию
-      videoPreview: fields[11] as String? ?? '', // Установка пустой строки
-      videoDuration: fields[12] as String? ?? '', // Установка пустой строки
+      mediaType: fields[10] as String,
+      videoPreview: fields[11] as String?,
+      videoDuration: fields[12] as String?,
       isStoredInApp: fields[7] as bool,
       geoLocation: (fields[9] as Map?)?.cast<String, double>(),
     );
@@ -60,9 +60,9 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       ..writeByte(10)
       ..write(obj.mediaType)
       ..writeByte(11)
-      ..write(obj.videoPreview ?? '') // Безопасная запись
+      ..write(obj.videoPreview)
       ..writeByte(12)
-      ..write(obj.videoDuration ?? ''); // Безопасная запись
+      ..write(obj.videoDuration);
   }
 
   @override

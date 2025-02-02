@@ -155,6 +155,13 @@ class _MainScreenState extends State<MainScreen> {
             },
           ),
           IconButton(
+            icon: const Icon(Iconsax.grid_3),
+            tooltip: 'My collages',
+            onPressed: () {
+              Navigator.pushNamed(context, '/my_collages');
+            },
+          ),
+          IconButton(
             icon: const Icon(Iconsax.tag_2),
             onPressed: () {
               Navigator.pushNamed(context, '/all_tags');
