@@ -39,6 +39,10 @@
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>This app requires access to the photo library to allow users to select and view
 			images.</string>
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false />
+		<key>LSRequiresIPhoneOS</key>
+		<false />
 		<key>CFBundleDocumentTypes</key>
 		<array>
 			<dict>
