@@ -66,9 +66,12 @@ class _UploadScreenState extends State<UploadScreen> {
           allowMultiple: true,
           // Можно оставить только изображения, либо расширить для видео
           type: FileType.custom,
-          allowedExtensions: [
+          allowedExtensions: Platform.isIOS ? 
+          [
             'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', // фото
             'mp4', 'mov', 'avi', 'mkv', 'webm' // видео
+          ] : [
+            'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif',
           ],
         );
         if (result != null && result.files.isNotEmpty) {

@@ -186,6 +186,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
       MaterialPageRoute(
         builder: (context) => Scaffold(
           body: PhotoCollageWidget(
+            key: const ValueKey('photo_collage_widget'),
             photos: _selectedPhotos,
             allPhotos: widget.photos,
           ),

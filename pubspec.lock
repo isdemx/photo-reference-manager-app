@@ -952,14 +952,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.0.2"
-  photo_manager:
-    dependency: "direct main"
-    description:
-      name: photo_manager
-      sha256: "32a1ce1095aeaaa792a29f28c1f74613aa75109f21c2d4ab85be3ad9964230a4"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.5.0"
   photo_view:
     dependency: "direct main"
     description:
