@@ -222,13 +222,42 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final n = _items.length;
 
     // Если больше 6 фото, размещаем каскадом
-    const cascadeOffset = 50.0;
-    for (int i = 0; i < n; i++) {
-      final item = _items[i];
-      item.offset = Offset(
-        (i * cascadeOffset) % (canvasWidth - item.baseWidth),
-        (i * cascadeOffset) % (canvasHeight - item.baseHeight),
+
+    if (_items.length == 1) {
+      final singleItem = _items.first;
+      final canvasWidth = MediaQuery.of(context).size.width;
+      final canvasHeight = MediaQuery.of(context).size.height;
+
+      final photoAspectRatio = singleItem.baseWidth / singleItem.baseHeight;
+      final screenAspectRatio = canvasWidth / canvasHeight;
+
+      double scale;
+      if (photoAspectRatio > screenAspectRatio) {
+        scale = canvasWidth / singleItem.baseWidth; // Подгоняем по ширине
+      } else {
+        scale = canvasHeight / singleItem.baseHeight; // Подгоняем по высоте
+      }
+
+      final newWidth = singleItem.baseWidth * scale;
+      final newHeight = singleItem.baseHeight * scale;
+
+      singleItem.offset = Offset(
+        (canvasWidth - newWidth) / 2, // Центрируем по X
+        (canvasHeight - newHeight) / 2, // Центрируем по Y
       );
+      singleItem.scale = scale;
+
+      _activeItemIndex = 0; // Делаем фото активным
+    } else {
+      // твой каскад/раскладка
+      const cascadeOffset = 50.0;
+      for (int i = 0; i < n; i++) {
+        final item = _items[i];
+        item.offset = Offset(
+          (i * cascadeOffset) % (canvasWidth - item.baseWidth),
+          (i * cascadeOffset) % (canvasHeight - item.baseHeight),
+        );
+      }
     }
 
     // Устанавливаем zIndex
@@ -301,28 +330,77 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     setState(() {
       final newPhoto = widget.allPhotos[newIndex];
+
+      // Готовим размеры новой фотки
       final fullPath = PhotoPathHelper().getFullPath(newPhoto.fileName);
       final file = File(fullPath);
 
-      // Вычисляем новые baseWidth/baseHeight как при обычном добавлении
-      double newBaseW = 150;
-      double newBaseH = 150;
+      // Исходные «естественные» размеры фото
+      double naturalWidth = 150;
+      double naturalHeight = 150;
       if (file.existsSync()) {
         final decoded = img.decodeImage(file.readAsBytesSync());
         if (decoded != null && decoded.width > 0) {
-          newBaseH = decoded.height * (newBaseW / decoded.width);
+          naturalHeight = decoded.height * (naturalWidth / decoded.width);
         }
       }
 
-      // Сбрасываем масштаб, cropRect, internalOffset
-      item.baseWidth = newBaseW;
-      item.baseHeight = newBaseH;
-      item.scale = 1.0;
+      // Сбрасываем внутр. offset и crop
       item.internalOffset = Offset.zero;
       item.cropRect = const Rect.fromLTWH(0, 0, 1, 1);
 
-      // И только потом подменяем саму photo
+      // Подменяем саму photo
       item.photo = newPhoto;
+
+      // Если в коллаже всего одно фото
+      if (_items.length == 1) {
+        // Вписываем фото во весь экран:
+        final canvasWidth = MediaQuery.of(context).size.width;
+        final canvasHeight = MediaQuery.of(context).size.height;
+
+        final photoAspect = naturalWidth / naturalHeight;
+        final screenAspect = canvasWidth / canvasHeight;
+
+        double scale;
+        if (photoAspect > screenAspect) {
+          scale = canvasWidth / naturalWidth; // Подгоняем по ширине экрана
+        } else {
+          scale = canvasHeight / naturalHeight; // Подгоняем по высоте экрана
+        }
+
+        // Ставим baseWidth/baseHeight с учётом того, что scale будет 1.0
+        item.baseWidth = naturalWidth * scale;
+        item.baseHeight = naturalHeight * scale;
+
+        // Центрируем
+        item.offset = Offset(
+          (canvasWidth - item.baseWidth) / 2,
+          (canvasHeight - item.baseHeight) / 2,
+        );
+
+        item.scale = 1.0;
+      } else {
+        // В коллаже несколько фото —
+        // 1) Сохраняем прежний offset (не двигаем контейнер!)
+        final oldOffset = item.offset;
+
+        // 2) Сохраняем прежнюю высоту (контейнер)
+        final oldHeight = item.baseHeight;
+        // 3) Новая ширина по соотношению сторон
+        //    (фото должно «занять» всю высоту контейнера)
+        final newAspect = naturalWidth / naturalHeight;
+        final newWidth = oldHeight * newAspect;
+
+        // Обновляем baseWidth/baseHeight
+        item.baseWidth = newWidth;
+        item.baseHeight = oldHeight;
+
+        // Возвращаем offset на место
+        item.offset = oldOffset;
+
+        // Сбрасываем scale (равно 1.0, т.к. размеры уже «учтены»)
+        item.scale = 1.0;
+      }
     });
   }
 
@@ -534,38 +612,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final TextEditingController titleController =
         TextEditingController(text: formattedDate);
 
-    // Показываем модалку для ввода названия
-    final result = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Enter collage title'),
-          content: TextField(
-            controller: titleController,
-            decoration: const InputDecoration(hintText: "Enter collage title"),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(null),
-            ),
-            TextButton(
-              child: const Text('Save'),
-              onPressed: () => Navigator.of(context).pop(titleController.text),
-            ),
-          ],
-        );
-      },
-    );
-
-    // Если пользователь нажал "Cancel" или не ввел название — не сохраняем
-    if (result == null || result.trim().isEmpty) return;
-
-    // Генерируем уникальный id для коллажа
-    final collageId = const Uuid().v4();
-
-    // Собираем список CollageItem из _items
     final itemsList = _items.map((it) {
       return CollageItem(
         fileName: it.photo.fileName,
@@ -589,18 +635,59 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       );
     }).toList();
 
-    final collage = Collage(
-      id: collageId,
-      title: result.trim(), // Используем введённое пользователем название
-      backgroundColorValue: _backgroundColor.value,
-      items: itemsList,
-      dateCreated: now, // Устанавливаем текущую дату
-      dateUpdated:
-          now, // Устанавливаем текущую дату (первоначально совпадает с созданием)
-    );
+    if (widget.initialCollage == null) {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Enter collage title'),
+            content: TextField(
+              controller: titleController,
+              decoration:
+                  const InputDecoration(hintText: "Enter collage title"),
+              autofocus: true,
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(null),
+              ),
+              TextButton(
+                child: const Text('Save'),
+                onPressed: () =>
+                    Navigator.of(context).pop(titleController.text),
+              ),
+            ],
+          );
+        },
+      );
 
-    // Отправляем в CollageBloc
-    context.read<CollageBloc>().add(AddCollage(collage));
+      // Если пользователь нажал "Cancel" или не ввел название — не сохраняем
+      if (result == null || result.trim().isEmpty) return;
+      // Новый коллаж
+      final collageId = const Uuid().v4();
+      final newCollage = Collage(
+        id: collageId,
+        title: result.trim(),
+        backgroundColorValue: _backgroundColor.value,
+        items: itemsList,
+        dateCreated: now,
+        dateUpdated: now,
+      );
+      context.read<CollageBloc>().add(AddCollage(newCollage));
+    } else {
+      // Уже существующий - обновляем
+      final existing = widget.initialCollage!;
+      final updatedCollage = Collage(
+        id: existing.id,
+        title: existing.title,
+        backgroundColorValue: _backgroundColor.value,
+        items: itemsList,
+        dateCreated: existing.dateCreated, // не меняем дату создания
+        dateUpdated: now, // обновляем дату
+      );
+      context.read<CollageBloc>().add(UpdateCollage(updatedCollage));
+    }
 
     // Показываем подтверждение
     ScaffoldMessenger.of(context).showSnackBar(

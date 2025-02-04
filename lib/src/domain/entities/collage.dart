@@ -101,6 +101,10 @@ class Collage extends HiveObject {
   @HiveField(5) // <-- добавляем новое поле
   DateTime? dateUpdated;
 
+  // Новое поле для данных рисования
+  // @HiveField(6) // <-- следующий свободный индекс
+  // String? drawingData; // JSON или любая сериализация штрихов
+
   Collage({
     required this.id,
     required this.title,
@@ -108,5 +112,6 @@ class Collage extends HiveObject {
     required this.items,
     required this.dateCreated, // <-- добавили
     required this.dateUpdated, // <-- добавили
+    // this.drawingData,         // <-- необязательное
   });
 }

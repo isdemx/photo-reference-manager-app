@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:photographers_reference_app/src/domain/entities/collage.dart';
-import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:intl/intl.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
@@ -12,12 +11,14 @@ class MyCollagesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dateFormat =
+        DateFormat('yyyy-MM-dd HH:mm'); // Формат: ГГГГ-ММ-ДД ЧЧ:ММ
     return BlocBuilder<CollageBloc, CollageState>(
       builder: (context, state) {
         if (state is CollageLoading) {
           return Scaffold(
-            appBar: AppBar(title: Text('All Collages')),
-            body: Center(child: CircularProgressIndicator()),
+            appBar: AppBar(title: const Text('All Collages')),
+            body: const Center(child: CircularProgressIndicator()),
           );
         } else if (state is CollagesLoaded) {
           return BlocBuilder<PhotoBloc, PhotoState>(
@@ -26,18 +27,35 @@ class MyCollagesScreen extends StatelessWidget {
                 return const Center(child: CircularProgressIndicator());
               } else if (photoState is PhotoLoaded) {
                 final allPhotos = photoState.photos;
+
+                // Сортируем коллажи по дате создания (сначала новые)
+                final sortedCollages = state.collages.toList()
+                  ..sort((a, b) {
+                    final aDate = a.dateUpdated ?? DateTime(2000, 1, 1);
+                    final bDate = b.dateUpdated ?? DateTime(2000, 1, 1);
+                    return bDate.compareTo(aDate); // Сначала новые
+                  });
+
                 return Scaffold(
                   appBar: AppBar(title: const Text('All Collages')),
                   body: Column(
                     children: [
                       Expanded(
                         child: ListView.builder(
-                          itemCount: state.collages.length,
+                          itemCount: sortedCollages.length,
                           itemBuilder: (context, index) {
-                            final c = state.collages[index];
+                            final c = sortedCollages[index];
+
+                            // Определяем, какую дату показать: создание или обновление
+                            final bool isUpdated = c.dateUpdated != null &&
+                                c.dateUpdated != c.dateCreated;
+                            final String dateText = isUpdated
+                                ? 'Updated: ${dateFormat.format(c.dateUpdated!)}'
+                                : 'Created: ${dateFormat.format(c.dateCreated!)}';
+
                             return ListTile(
                               title: Text(c.title),
-                              subtitle: Text('Created: ${c.dateCreated}'),
+                              subtitle: Text(dateText),
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -103,7 +121,7 @@ class MyCollagesScreen extends StatelessWidget {
                     },
                     icon: const Icon(Iconsax.add),
                     label: const Text('Create New Collage'),
-                    backgroundColor: Colors.black, // Указываем нужный цвет
+                    backgroundColor: Colors.black, // Цвет кнопки
                   ),
                 );
               } else {

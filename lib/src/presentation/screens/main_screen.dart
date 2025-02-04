@@ -37,81 +37,101 @@ class _MainScreenState extends State<MainScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      logoTapCount++;
-                      _tapTimer?.cancel();
-                      _tapTimer = Timer(const Duration(seconds: 1), () {
-                        logoTapCount = 0;
-                      });
+                  Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          logoTapCount++;
+                          _tapTimer?.cancel();
+                          _tapTimer = Timer(const Duration(seconds: 1), () {
+                            logoTapCount = 0;
+                          });
 
-                      if (logoTapCount >= 3) {
-                        context
-                            .read<SessionBloc>()
-                            .add(ToggleShowPrivateEvent());
-                        logoTapCount = 0;
-                        _tapTimer?.cancel();
+                          if (logoTapCount >= 3) {
+                            context
+                                .read<SessionBloc>()
+                                .add(ToggleShowPrivateEvent());
+                            logoTapCount = 0;
+                            _tapTimer?.cancel();
 
-                        final showPrivate =
-                            context.read<SessionBloc>().state.showPrivate;
+                            final showPrivate =
+                                context.read<SessionBloc>().state.showPrivate;
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              showPrivate
-                                  ? 'Private mode enabled'
-                                  : 'Private mode disabled',
-                              style: const TextStyle(
-                                  color: Color.fromARGB(255, 190, 190, 190)),
-                              textAlign: TextAlign.center,
-                            ),
-                            duration: const Duration(seconds: 1),
-                            backgroundColor: const Color.fromARGB(255, 47, 47, 47),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 10,
-                          ),
-                        );
-                      }
-                    },
-                    child: BlocBuilder<SessionBloc, SessionState>(
-                      builder: (context, sessionState) {
-                        final bool showPrivate = sessionState.showPrivate;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: showPrivate
-                                  ? const Color.fromARGB(255, 82, 82, 82)
-                                  : Colors.transparent,
-                              width: 1.0,
-                            ),
-                            borderRadius: BorderRadius.circular(8.0),
-                          ),
-                          child: Image.asset(
-                            'assets/refma-logo.png',
-                            height: 30,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 5),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 5.0),
-                    child: Align(
-                      alignment: Alignment.bottomLeft,
-                      child: Text(
-                        'v${packageInfo.version}',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 10.0,
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  showPrivate
+                                      ? 'Private mode enabled'
+                                      : 'Private mode disabled',
+                                  style: const TextStyle(
+                                      color:
+                                          Color.fromARGB(255, 190, 190, 190)),
+                                  textAlign: TextAlign.center,
+                                ),
+                                duration: const Duration(seconds: 1),
+                                backgroundColor:
+                                    const Color.fromARGB(255, 47, 47, 47),
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 10,
+                              ),
+                            );
+                          }
+                        },
+                        child: BlocBuilder<SessionBloc, SessionState>(
+                          builder: (context, sessionState) {
+                            final bool showPrivate = sessionState.showPrivate;
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 2, vertical: 2),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: showPrivate
+                                      ? const Color.fromARGB(255, 82, 82, 82)
+                                      : Colors.transparent,
+                                  width: 1.0,
+                                ),
+                                borderRadius: BorderRadius.circular(8.0),
+                              ),
+                              child: Image.asset(
+                                'assets/refma-logo.png',
+                                height: 30,
+                              ),
+                            );
+                          },
                         ),
                       ),
-                    ),
-                  ),
+                      Positioned(
+                        bottom: -6, // Размещаем у нижнего края логотипа
+                        right: -2, // Небольшой отступ вправо
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color:
+                                Colors.transparent, // Полностью прозрачный фон
+                          ),
+                          child: Text(
+                            'v${packageInfo.version}',
+                            style: const TextStyle(
+                              color: Color.fromARGB(255, 236, 236, 236),
+                              fontSize: 10.0,
+                              shadows: [
+                                Shadow(
+                                  offset: Offset(1, 1),
+                                  blurRadius: 2.0,
+                                  color: Colors
+                                      .black54, // Легкая тень для читаемости
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    ],
+                  )
                 ],
               );
             } else {

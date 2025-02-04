@@ -68,6 +68,7 @@ dependencies:
   video_thumbnail: ^0.5.3
   video_player: ^2.9.2
   ffmpeg_kit_flutter_min_gpl: ^6.0.3
+  # scribble: ^0.10.0+1
 
 
 dev_dependencies:
