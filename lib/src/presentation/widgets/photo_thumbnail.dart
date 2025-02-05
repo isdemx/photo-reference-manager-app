@@ -28,15 +28,14 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
 
   @override
   Widget build(BuildContext context) {
-    // Для видео используем относительное имя (videoPreview), преобразованное в абсолютный путь.
-    // Для изображений используем fileName, которое тоже должно храниться как относительное имя.
+    // Для видео используем videoPreview, для изображений fileName
     final imagePath = widget.photo.mediaType == 'video' &&
             widget.photo.videoPreview != null &&
             widget.photo.videoPreview!.isNotEmpty
         ? PhotoPathHelper().getFullPath(widget.photo.videoPreview!)
         : PhotoPathHelper().getFullPath(widget.photo.fileName);
 
-    // Добавляем логирование для отладки
+    // Логирование для отладки
     final file = File(imagePath);
     if (file.existsSync()) {
       final size = file.lengthSync();
@@ -45,14 +44,12 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
       print('Файл миниатюры НЕ существует: $imagePath');
     }
 
-    // Выбираем виджет для отображения изображения в зависимости от layout
+    // Для режима Pinterest не задаём width/height, чтобы ExtendedImage занял размеры, определённые родителем.
     Widget imageWidget = widget.isPinterestLayout
         ? ExtendedImage.file(
             file,
             fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            enableMemoryCache: false, // отключаем кэширование для диагностики
+            enableMemoryCache: false,
             cacheWidth: 200,
             clearMemoryCacheIfFailed: true,
           )
@@ -61,12 +58,12 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
-            enableMemoryCache: false, // отключаем кэширование для диагностики
+            enableMemoryCache: false,
             cacheWidth: 200,
             clearMemoryCacheIfFailed: true,
           );
 
-    // Если у видео задано время, накладываем его поверх изображения
+    // Если это видео и задана длительность, накладываем её поверх изображения.
     if (widget.photo.mediaType == 'video' &&
         widget.photo.videoDuration != null &&
         widget.photo.videoDuration!.isNotEmpty) {

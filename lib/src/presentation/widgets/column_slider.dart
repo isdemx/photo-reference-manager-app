@@ -27,20 +27,30 @@ class ColumnSlider extends StatelessWidget {
           : null, // Если macOS, то width=200, иначе null
       child: Column(
         children: [
-          Slider(
-            value: columnCount.toDouble(),
-            inactiveColor: const Color.fromARGB(255, 0, 0, 0).withOpacity(0.3),
-            activeColor:
-                const Color.fromARGB(255, 107, 107, 107).withOpacity(0.7),
-            thumbColor:
-                const Color.fromARGB(255, 117, 116, 116).withOpacity(0.8),
-            min: Platform.isMacOS ? 5 : 2,
-            max: Platform.isMacOS ? 12 : 5,
-            divisions: Platform.isMacOS ? 7 : 3,
-            label: 'Columns: $columnCount',
-            onChanged: (value) {
-              onChanged(value.toInt());
-            },
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              valueIndicatorTextStyle: const TextStyle(
+                color: Colors.white, // Цвет текста в лейбле
+                fontWeight: FontWeight.bold,
+              ),
+              valueIndicatorColor: Colors.black, // Цвет фона лейбла
+            ),
+            child: Slider(
+              value: columnCount.toDouble(),
+              inactiveColor:
+                  const Color.fromARGB(255, 0, 0, 0).withOpacity(0.3),
+              activeColor:
+                  const Color.fromARGB(255, 107, 107, 107).withOpacity(0.7),
+              thumbColor:
+                  const Color.fromARGB(255, 117, 116, 116).withOpacity(0.8),
+              min: Platform.isMacOS ? 5 : 2,
+              max: Platform.isMacOS ? 12 : 5,
+              divisions: Platform.isMacOS ? 7 : 3,
+              label: 'Columns: $columnCount',
+              onChanged: (value) {
+                onChanged(value.toInt());
+              },
+            ),
           ),
         ],
       ),

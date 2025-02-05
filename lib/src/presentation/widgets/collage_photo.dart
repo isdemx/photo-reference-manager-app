@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -13,6 +14,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -456,141 +458,178 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         }
         return KeyEventResult.ignored;
       },
-      child: Scaffold(
-        appBar: !_isFullscreen
-            ? AppBar(
-                title: Text('Free collage (${_items.length} images)'),
-                actions: [
-                  IconButton(
-                    tooltip: 'Help / Info',
-                    icon: const Icon(Icons.info_outline),
-                    onPressed: _showHelp,
-                  ),
-                  IconButton(
-                    tooltip: 'Toggle Fullscreen',
-                    icon:
-                        const Icon(Icons.fullscreen_exit, color: Colors.white),
-                    onPressed: _toggleFullscreen,
-                  ),
-                ],
-              )
-            : null,
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: Stack(
-                    children: [
-                      // Цвет фона холста
-                      Container(color: _backgroundColor),
+      child: DropTarget(
+        // 1) Когда файл(ы) «перетащили и бросили»
+        onDragDone: (DropDoneDetails details) async {
+          for (final xfile in details.files) {
+            final file = File(xfile.path); // Превращаем XFile в File
+            final bytes = await file.readAsBytes(); // Читаем как Uint8List
+            final fileName = p.basename(file.path); // Извлекаем имя файла
 
-                      // RepaintBoundary для сохранения в CollageSaveHelper
-                      RepaintBoundary(
-                        key: _collageKey,
-                        child: Stack(
-                          children: [
-                            Positioned.fill(
-                              child: Container(color: _backgroundColor),
-                            ),
-                            for (final item in sorted) _buildPhotoItem(item),
-                          ],
-                        ),
-                      ),
+            // Сохраняем фото через PhotoSaveHelper
+            final newPhoto = await PhotoSaveHelper.savePhoto(
+              fileName: fileName,
+              bytes: bytes,
+              context: context,
+            );
 
-                      // Иконка удаления (появляется, когда начинаем drag)
-                      if (!isSomePhotoInEditMode &&
-                          (showForInit || _draggingIndex != null))
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 50,
-                          child: Center(
-                            child: Container(
-                              key: _deleteIconKey,
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color:
-                                    _deleteHover ? Colors.red : Colors.white30,
-                                shape: BoxShape.circle,
+            // Добавляем фото в коллаж
+            setState(() {
+              _addPhotoToCollage(newPhoto);
+            });
+          }
+        },
+
+        // 2) Опционально: когда курсор «влетел» в DropTarget
+        onDragEntered: (details) {
+          // Можно включить «подсветку» области
+          // setState(() => _dragOver = true);
+        },
+
+        // 3) Когда курсор «улетел»
+        onDragExited: (details) {
+          // setState(() => _dragOver = false);
+        },
+
+        // 4) UI-контейнер, внутри которого ваша логика
+        child: Scaffold(
+          appBar: !_isFullscreen
+              ? AppBar(
+                  title: Text('Free collage (${_items.length} images)'),
+                  actions: [
+                    IconButton(
+                      tooltip: 'Help / Info',
+                      icon: const Icon(Icons.info_outline),
+                      onPressed: _showHelp,
+                    ),
+                    IconButton(
+                      tooltip: 'Toggle Fullscreen',
+                      icon: const Icon(Icons.fullscreen_exit,
+                          color: Colors.white),
+                      onPressed: _toggleFullscreen,
+                    ),
+                  ],
+                )
+              : null,
+          body: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // Цвет фона холста
+                        Container(color: _backgroundColor),
+
+                        // RepaintBoundary для сохранения в CollageSaveHelper
+                        RepaintBoundary(
+                          key: _collageKey,
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: Container(color: _backgroundColor),
                               ),
-                              child:
-                                  const Icon(Icons.delete, color: Colors.black),
-                            ),
+                              for (final item in sorted) _buildPhotoItem(item),
+                            ],
                           ),
                         ),
 
-                      // Туториал поверх всего
-                      if (_showTutorial)
-                        Positioned.fill(
-                          child: Container(
-                            color: Colors.black.withOpacity(0.8),
+                        // Иконка удаления (появляется, когда начинаем drag)
+                        if (!isSomePhotoInEditMode &&
+                            (showForInit || _draggingIndex != null))
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 50,
                             child: Center(
-                              child: SingleChildScrollView(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.touch_app,
-                                        size: 60, color: Colors.white),
-                                    const SizedBox(height: 20),
-                                    const Text(
-                                      'Move with one finger\n'
-                                      'Zoom with two fingers\n'
-                                      'Long Press to toggle Edit Mode\n'
-                                      'Rotate + Brightness + Saturation + Temperature + Hue\n'
-                                      'Crop corners when in Edit Mode\n'
-                                      'Tap to bring to front\n'
-                                      'Press check to save image',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.bold,
+                              child: Container(
+                                key: _deleteIconKey,
+                                width: 64,
+                                height: 64,
+                                decoration: BoxDecoration(
+                                  color: _deleteHover
+                                      ? Colors.red
+                                      : Colors.white30,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.delete,
+                                    color: Colors.black),
+                              ),
+                            ),
+                          ),
+
+                        // Туториал поверх всего
+                        if (_showTutorial)
+                          Positioned.fill(
+                            child: Container(
+                              color: Colors.black.withOpacity(0.8),
+                              child: Center(
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.touch_app,
+                                          size: 60, color: Colors.white),
+                                      const SizedBox(height: 20),
+                                      const Text(
+                                        'Move with one finger\n'
+                                        'Zoom with two fingers\n'
+                                        'Long Press to toggle Edit Mode\n'
+                                        'Rotate + Brightness + Saturation + Temperature + Hue\n'
+                                        'Crop corners when in Edit Mode\n'
+                                        'Tap to bring to front\n'
+                                        'Press check to save image',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 20),
-                                    ElevatedButton(
-                                      onPressed: () {
-                                        setState(() => _showTutorial = false);
-                                        _markTutorialPassed();
-                                      },
-                                      child: const Text('Got it'),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 20),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          setState(() => _showTutorial = false);
+                                          _markTutorialPassed();
+                                        },
+                                        child: const Text('Got it'),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
+                  ),
+
+                  // Нижняя панель
+                  Container(
+                    height: isSomePhotoInEditMode ? 220 : 80,
+                    color: Colors.black54,
+                    child: isSomePhotoInEditMode
+                        ? _buildEditPanel(editingPhoto)
+                        : _isFullscreen
+                            ? null
+                            : _buildDefaultPanel(),
+                  ),
+                ],
+              ),
+
+              // Кнопка выхода из фуллскрина
+              if (_isFullscreen)
+                Positioned(
+                  top: 16,
+                  right: 16,
+                  child: IconButton(
+                    icon:
+                        const Icon(Icons.fullscreen_exit, color: Colors.white),
+                    onPressed: _toggleFullscreen,
                   ),
                 ),
-
-                // Нижняя панель
-                Container(
-                  height: isSomePhotoInEditMode ? 220 : 80,
-                  color: Colors.black54,
-                  child: isSomePhotoInEditMode
-                      ? _buildEditPanel(editingPhoto)
-                      : _isFullscreen
-                          ? null
-                          : _buildDefaultPanel(),
-                ),
-              ],
-            ),
-
-            // Кнопка выхода из фуллскрина
-            if (_isFullscreen)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: IconButton(
-                  icon: const Icon(Icons.fullscreen_exit, color: Colors.white),
-                  onPressed: _toggleFullscreen,
-                ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

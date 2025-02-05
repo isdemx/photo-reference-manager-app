@@ -3,6 +3,7 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  desktop_drop
   file_selector_windows
   geolocator_windows
   permission_handler_windows
