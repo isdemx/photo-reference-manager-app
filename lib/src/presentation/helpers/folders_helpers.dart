@@ -3,9 +3,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/add_folder_dialog.dart';
 import 'package:uuid/uuid.dart';
 
 class FoldersHelpers {
@@ -115,113 +117,140 @@ class FoldersHelpers {
       builder: (context) {
         return BlocBuilder<FolderBloc, FolderState>(
           builder: (context, folderState) {
-            if (folderState is FolderLoaded) {
-              final folders = folderState.folders;
+            return BlocBuilder<CategoryBloc, CategoryState>(
+              builder: (context, categoryState) {
+                if (folderState is FolderLoaded &&
+                    categoryState is CategoryLoaded) {
+                  final folders = folderState.folders;
+                  final categories = {
+                    for (var category in categoryState.categories)
+                      category.id: category.name
+                  };
 
-              // Получаем ID существующих папок
-              final existingFolderIds =
-                  folders.map((folder) => folder.id).toSet();
+                  final existingFolderIds =
+                      folders.map((folder) => folder.id).toSet();
 
-              // Собираем ID папок для всех фотографий
-              final Set<String> commonFolderIds =
-                  Set<String>.from(photos.first.folderIds);
-              for (var photo in photos.skip(1)) {
-                commonFolderIds
-                    .retainAll(photo.folderIds); // Оставляем только общие папки
-              }
+                  final Set<String> commonFolderIds =
+                      Set<String>.from(photos.first.folderIds);
+                  for (var photo in photos.skip(1)) {
+                    commonFolderIds.retainAll(photo.folderIds);
+                  }
 
-              return StatefulBuilder(
-                builder: (context, setState) {
-                  return AlertDialog(
-                    title: const Text('Add Photos to Folder'),
-                    content: SizedBox(
-                      width: double.maxFinite,
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        itemCount: folders.length,
-                        itemBuilder: (context, index) {
-                          final folder = folders[index];
+                  return StatefulBuilder(
+                    builder: (context, setState) {
+                      return AlertDialog(
+                        title: const Text('Add Photos to Folder'),
+                        content: SizedBox(
+                          width: double.maxFinite,
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: folders.length,
+                            itemBuilder: (context, index) {
+                              final folder = folders[index];
+                              final categoryName =
+                                  categories[folder.categoryId] ?? 'Unknown';
 
-                          // Проверяем статус для папки: все фото добавлены, частично или ни одно
-                          bool allSelected = true;
-                          bool noneSelected = true;
+                              bool allSelected = true;
+                              bool noneSelected = true;
 
-                          for (var photo in photos) {
-                            if (!photo.folderIds.contains(folder.id)) {
-                              allSelected = false;
-                            } else {
-                              noneSelected = false;
-                            }
-                          }
-
-                          var isSelected = allSelected
-                              ? true
-                              : noneSelected
-                                  ? false
-                                  : null; // null для частичного состояния (тире)
-
-                          return CheckboxListTile(
-                            title: Text(folder.name),
-                            value: isSelected,
-                            tristate:
-                                true, // Включаем тире для частичного состояния
-                            onChanged: (bool? value) {
-                              setState(() {
-                                // Если значение true, добавляем фото в папку
-                                if (value == true) {
-                                  for (var photo in photos) {
-                                    photo.folderIds.add(
-                                        folder.id); // Добавляем фото в папку
-                                  }
+                              for (var photo in photos) {
+                                if (!photo.folderIds.contains(folder.id)) {
+                                  allSelected = false;
+                                } else {
+                                  noneSelected = false;
                                 }
-                                // Если false, удаляем фото из папки
-                                else {
-                                  for (var photo in photos) {
-                                    photo.folderIds.remove(
-                                        folder.id); // Убираем фото из папки
-                                  }
-                                }
-                              });
+                              }
+
+                              var isSelected = allSelected
+                                  ? true
+                                  : noneSelected
+                                      ? false
+                                      : null;
+
+                              return CheckboxListTile(
+                                title: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      folder.name,
+                                      style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                    Text(
+                                      categoryName,
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic,
+                                          color: Colors.grey),
+                                    ),
+                                  ],
+                                ),
+                                value: isSelected,
+                                tristate: true,
+                                onChanged: (bool? value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      for (var photo in photos) {
+                                        photo.folderIds.add(folder.id);
+                                      }
+                                    } else {
+                                      for (var photo in photos) {
+                                        photo.folderIds.remove(folder.id);
+                                      }
+                                    }
+                                  });
+                                },
+                              );
                             },
-                          );
-                        },
-                      ),
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () {
-                          Navigator.of(context)
-                              .pop(false); // Возвращаем false при отмене
-                        },
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          // Обновляем список папок для каждой фотографии
-                          for (var photo in photos) {
-                            photo.folderIds.removeWhere(
-                                (id) => !existingFolderIds.contains(id));
-                            context
-                                .read<PhotoBloc>()
-                                .add(UpdatePhoto(photo)); // Обновляем фото
-                          }
-                          Navigator.of(context)
-                              .pop(true); // Возвращаем true при подтверждении
-                        },
-                        child: const Text('OK'),
-                      ),
-                    ],
+                          ),
+                        ),
+                        actions: [
+                          IconButton(
+                            icon: const Icon(Iconsax.add_circle,
+                                color: Colors.blue),
+                            tooltip: 'Create New Folder',
+                            onPressed: () async {
+                              await showDialog(
+                                context: context,
+                                builder: (context) => const AddFolderDialog(),
+                              );
+                              setState(() {});
+                            },
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              for (var photo in photos) {
+                                photo.folderIds.removeWhere(
+                                    (id) => !existingFolderIds.contains(id));
+                                context
+                                    .read<PhotoBloc>()
+                                    .add(UpdatePhoto(photo));
+                              }
+                              Navigator.of(context).pop(true);
+                            },
+                            child: const Text('OK'),
+                          ),
+                        ],
+                      );
+                    },
                   );
-                },
-              );
-            } else if (folderState is FolderLoading) {
-              return const Center(child: CircularProgressIndicator());
-            } else {
-              return const Center(child: Text('Failed to load folders.'));
-            }
+                } else if (folderState is FolderLoading ||
+                    categoryState is CategoryLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else {
+                  return const Center(
+                      child: Text('Failed to load folders or categories.'));
+                }
+              },
+            );
           },
         );
       },
-    ).then((value) => value ?? false); // Если результат null, возвращаем false
+    ).then((value) => value ?? false);
   }
 }

@@ -1,5 +1,3 @@
-// photo_grid_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -7,6 +5,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
@@ -46,17 +45,23 @@ class PhotoGridView extends StatefulWidget {
 class _PhotoGridViewState extends State<PhotoGridView> {
   bool _isMultiSelect = false;
   final List<Photo> _selectedPhotos = [];
-  int _columnCount = 3; // Начальное значение колонок
+
+  // --- Новые поля для drag-select ---
+  bool _isDragSelecting = false; // Активен ли сейчас «свайповый» выбор
+  final Set<int> _dragToggledIndices =
+      {}; // Индексы уже переключённые в текущем «протаскивании»
+  final GlobalKey _scrollKey = GlobalKey(); // Ключ для ScrollView
+  List<GlobalKey> _itemKeys = []; // Ключи для каждого элемента (фото)
+
+  int _columnCount = 3;
   bool _isPinterestLayout = false;
-
-  bool _showFilterPanel = false; // Для отображения панели фильтров
-
+  bool _showFilterPanel = false;
   bool _isSharing = false;
 
   @override
   void initState() {
     super.initState();
-    _loadPreferences(); // Загружаем значения при инициализации
+    _loadPreferences();
   }
 
   // Логика фильтрации фотографий
@@ -66,10 +71,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     required FilterState filterState,
   }) {
     return photos.where((photo) {
-      // Фильтрация по тегам из фильтров
       final filters = filterState.filters;
-
-      // Если есть теги со значением true
+      // Теги со значением true
       if (filters.values.contains(TagFilterState.trueState)) {
         final hasRequiredTag = photo.tagIds.any((tagId) {
           return filters[tagId] == TagFilterState.trueState;
@@ -78,8 +81,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           return false;
         }
       }
-
-      // Если есть теги со значением false
+      // Теги со значением false
       if (filters.values.contains(TagFilterState.falseState)) {
         final hasExcludedTag = photo.tagIds.any((tagId) {
           return filters[tagId] == TagFilterState.falseState;
@@ -88,45 +90,26 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           return false;
         }
       }
-
       return true;
     }).toList();
   }
 
-  void _showPhotoViewerOverlay(BuildContext context, int index) {
+  void _showPhotoViewerOverlay(
+      BuildContext context, int index, List<Photo> currentList) {
     showPhotoViewerOverlay(
       context,
       PhotoViewerScreen(
-        photos: _filterPhotos(
-          photos: widget.photos,
-          tags: widget.tags,
-          filterState: context.read<FilterBloc>().state,
-        ),
+        photos: currentList,
         initialIndex: index,
       ),
     );
   }
 
-  // void _onPhotoTap(BuildContext context, int index) {
-  //   if (_isMultiSelect) {
-  //     _toggleSelection(widget.photos[index]);
-  //   } else {
-  //     Navigator.push(
-  //       context,
-  //       MaterialPageRoute(
-  //         builder: (context) => PhotoViewerScreen(
-  //           photos: widget.photos,
-  //           initialIndex: index,
-  //         ),
-  //       ),
-  //     );
-  //   }
-  // }
-  void _onPhotoTap(BuildContext context, int index) {
+  void _onPhotoTap(BuildContext context, int index, List<Photo> currentList) {
     if (_isMultiSelect) {
-      _toggleSelection(widget.photos[index]);
+      _toggleSelection(currentList[index]);
     } else {
-      _showPhotoViewerOverlay(context, index); // Показываем оверлей
+      _showPhotoViewerOverlay(context, index, currentList);
     }
   }
 
@@ -134,15 +117,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     setState(() {
       _isMultiSelect = true;
     });
-
     _toggleSelection(photo);
-  }
-
-  void _onDeleteLongTap() {
-    setState(() {
-      _selectedPhotos
-          .clear(); // Очистка списка выбранных при начале мультиселекта
-    });
   }
 
   void _toggleSelection(Photo photo) {
@@ -153,11 +128,22 @@ class _PhotoGridViewState extends State<PhotoGridView> {
         _selectedPhotos.add(photo);
       }
 
-      // Если список пуст, выключаем режим мультиселекта
       if (_selectedPhotos.isEmpty) {
         _isMultiSelect = false;
       }
     });
+  }
+
+  // Завершаем мультиселект
+  void _turnMultiSelectModeOff() {
+    setState(() {
+      _isMultiSelect = false;
+      _selectedPhotos.clear();
+    });
+  }
+
+  void _onDonePressed() {
+    _turnMultiSelectModeOff();
   }
 
   void _onSelectedViewPressed() {
@@ -172,7 +158,32 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     );
   }
 
-  // Новый метод _onVideoGeneratorPressed
+  Future<void> _onSelectedSharePressed(BuildContext context) async {
+    setState(() {
+      _isSharing = true;
+    });
+    try {
+      bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
+      if (res) {
+        _turnMultiSelectModeOff();
+      }
+    } catch (e) {
+      print('Error while sharing: $e');
+    } finally {
+      setState(() {
+        _isSharing = false;
+      });
+    }
+  }
+
+  Future<void> _onDeletePressed(
+      BuildContext context, List<Photo> photos) async {
+    var res = await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
+    if (res) {
+      _turnMultiSelectModeOff();
+    }
+  }
+
   void _onVideoGeneratorPressed(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -195,58 +206,77 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     );
   }
 
-  void _onCollageGridGeneratorPressed(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          body: GridCollageWidget(photos: _selectedPhotos),
-        ),
-      ),
-    );
-  }
+  // Если хотите вернуть Grid-коллаж, раскомментируйте
+  // void _onCollageGridGeneratorPressed(BuildContext context) {
+  //   Navigator.push(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => Scaffold(
+  //         body: GridCollageWidget(photos: _selectedPhotos),
+  //       ),
+  //     ),
+  //   );
+  // }
 
-  Future<void> _onSelectedSharePressed(BuildContext context) async {
-    setState(() {
-      _isSharing = true; // Включаем лоадер
-    });
-
-    try {
-      bool res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
-      if (res) {
-        _turnMultiSelectModeOff();
-      }
-    } catch (e) {
-      print('Error while sharing: $e');
-      // Здесь можно показать сообщение об ошибке, если нужно
-    } finally {
+  // --- Обработка свайпа для drag-select ---
+  void _onPanStart(DragStartDetails details, List<Photo> currentList) {
+    // Начинаем отслеживать только если в мультиселекте
+    if (_isMultiSelect) {
       setState(() {
-        _isSharing = false; // Выключаем лоадер
+        _isDragSelecting = true;
+        _dragToggledIndices.clear();
       });
+      _handleDrag(details.globalPosition, currentList);
     }
   }
 
-  Future<void> _onDeletePressed(
-      BuildContext context, List<Photo> photos) async {
-    var res = await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
-    if (res) {
-      _turnMultiSelectModeOff();
+  void _onPanUpdate(DragUpdateDetails details, List<Photo> currentList) {
+    if (_isDragSelecting) {
+      _handleDrag(details.globalPosition, currentList);
     }
   }
 
-  void _turnMultiSelectModeOff() {
-    setState(() {
-      _isMultiSelect = false;
-      _selectedPhotos.clear(); // Очистка списка после выхода из мультиселекта
-    });
+  void _onPanEnd(DragEndDetails details) {
+    _isDragSelecting = false;
+    _dragToggledIndices.clear();
   }
 
-  void _onDonePressed() {
-    _turnMultiSelectModeOff();
+  void _handleDrag(Offset globalPosition, List<Photo> currentList) {
+    final scrollBox =
+        _scrollKey.currentContext?.findRenderObject() as RenderBox?;
+    if (scrollBox == null) return;
+
+    // Преобразуем global в локальные координаты
+    final localPos = scrollBox.globalToLocal(globalPosition);
+
+    // Проходим по всем itemKeys, проверяем, лежит ли точка внутри
+    for (int i = 0; i < currentList.length; i++) {
+      final key = _itemKeys[i];
+      final context = key.currentContext;
+      if (context == null) continue;
+
+      final renderBox = context.findRenderObject() as RenderBox?;
+      if (renderBox == null) continue;
+
+      // Верхний левый угол элемента в координатах scrollBox
+      final itemOffset =
+          renderBox.localToGlobal(Offset.zero, ancestor: scrollBox);
+      final size = renderBox.size;
+      final itemRect = itemOffset & size;
+
+      if (itemRect.contains(localPos)) {
+        // Если ещё не переключался, переключим
+        if (!_dragToggledIndices.contains(i)) {
+          _dragToggledIndices.add(i);
+          vibrate(); // Лёгкая вибрация при первом заходе
+          _toggleSelection(currentList[i]);
+        }
+      }
+    }
   }
 
   Future<void> _loadPreferences() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     setState(() {
       _columnCount = prefs.getInt('columnCount') ?? 3;
       _isPinterestLayout = prefs.getBool('isPinterestLayout') ?? false;
@@ -254,7 +284,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   Future<void> _savePreferences() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('columnCount', _columnCount);
     await prefs.setBool('isPinterestLayout', _isPinterestLayout);
   }
@@ -262,14 +292,14 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   void _togglePinterestLayout() {
     setState(() {
       _isPinterestLayout = !_isPinterestLayout;
-      _savePreferences(); // Сохраняем при изменении
+      _savePreferences();
     });
   }
 
   void _updateColumnCount(int value) {
     setState(() {
       _columnCount = value;
-      _savePreferences(); // Сохраняем при изменении
+      _savePreferences();
     });
   }
 
@@ -277,7 +307,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   Widget build(BuildContext context) {
     final filterState = context.watch<FilterBloc>().state;
 
-    // Применяем фильтрацию только если showFilter = true
     final List<Photo> photosFiltered = widget.showFilter
         ? _filterPhotos(
             photos: widget.photos,
@@ -286,209 +315,155 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           )
         : widget.photos;
 
-    // Debugging: print the number of filtered photos
-    print('Filtered photos count !!: ${photosFiltered.length}');
+    // Список ключей для каждого элемента (каждый рендерится в том же порядке, что и в списке)
+    _itemKeys = List.generate(photosFiltered.length, (_) => GlobalKey());
 
-    // Используем отфильтрованный список для подсчета количества фотографий
-    String titleText = '${widget.title} (${photosFiltered.length})';
-
-    print('titleText !!: ${titleText}');
-
-    bool hasActiveFilters = filterState.filters.isNotEmpty && widget.showFilter;
+    final titleText = '${widget.title} (${photosFiltered.length})';
+    final hasActiveFilters =
+        filterState.filters.isNotEmpty && widget.showFilter;
 
     return Stack(
       children: [
-        CustomScrollView(
-          slivers: [
-            SliverAppBar(
-              backgroundColor: Colors.black.withOpacity(0.5),
-              pinned: true,
-              title: Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8.0),
-                      child: Text(
-                        _isMultiSelect
-                            ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
-                            : '${widget.title} (${photosFiltered.length})',
-                        style: TextStyle(
-                          color: _isMultiSelect
-                              ? Colors.yellow
-                              : (filterState.filters.isNotEmpty &&
-                                      widget.showFilter
-                                  ? Colors.yellow
-                                  : Colors.white), // Подсветка заголовка
+        // GestureDetector для обработки драга
+        GestureDetector(
+          key: _scrollKey,
+          behavior: HitTestBehavior.translucent,
+          onPanStart: (details) => _onPanStart(details, photosFiltered),
+          onPanUpdate: (details) => _onPanUpdate(details, photosFiltered),
+          onPanEnd: _onPanEnd,
+          child: CustomScrollView(
+            slivers: [
+              SliverAppBar(
+                backgroundColor: Colors.black.withOpacity(0.5),
+                pinned: true,
+                title: Row(
+                  children: [
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                        child: Text(
+                          _isMultiSelect
+                              ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
+                              : titleText,
+                          style: TextStyle(
+                            color: _isMultiSelect
+                                ? Colors.yellow
+                                : (hasActiveFilters
+                                    ? Colors.yellow
+                                    : Colors.white),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              actions: !_isMultiSelect
-                  ? [
-                      if (widget.actionFromParent != null)
-                        widget.actionFromParent!,
-                      IconButton(
-                        icon: Icon(_isPinterestLayout
-                            ? Icons.grid_on
-                            : Icons.dashboard),
-                        onPressed: _togglePinterestLayout,
-                        tooltip: _isPinterestLayout
-                            ? 'Switch to Grid View'
-                            : 'Switch to Masonry View',
-                      ),
-                      if (widget.showFilter)
+                  ],
+                ),
+                actions: !_isMultiSelect
+                    ? [
+                        if (widget.actionFromParent != null)
+                          widget.actionFromParent!,
                         IconButton(
-                          icon: Icon(Icons.filter_list,
-                              color: filterState.filters.isNotEmpty
-                                  ? Colors.yellow
-                                  : Colors.white),
-                          onPressed: () {
-                            setState(() {
-                              _showFilterPanel = !_showFilterPanel;
-                            });
-                          },
-                          tooltip: 'Filters',
+                          icon: Icon(_isPinterestLayout
+                              ? Icons.grid_on
+                              : Icons.dashboard),
+                          onPressed: _togglePinterestLayout,
+                          tooltip: _isPinterestLayout
+                              ? 'Switch to Grid View'
+                              : 'Switch to Masonry View',
                         ),
-                      if (widget.showShareBtn == true)
-                        IconButton(
-                          icon: const Icon(Icons.share),
-                          onPressed: () => ImagesHelpers.sharePhotos(
-                              context, _selectedPhotos),
-                        ),
-                    ]
-                  : [
-                      IconButton(
-                        icon: const Icon(Icons.cancel),
-                        onPressed: _onDonePressed,
-                      ),
-                    ],
-            ),
-            // Остальная часть вашего SliverPadding и SliverGrid
-
-            SliverPadding(
-              padding: const EdgeInsets.all(8.0),
-              sliver: _isPinterestLayout
-                  ? SliverMasonryGrid.count(
-                      crossAxisCount: _columnCount,
-                      mainAxisSpacing: 8.0,
-                      crossAxisSpacing: 8.0,
-                      childCount: photosFiltered.length,
-                      itemBuilder: (context, index) {
-                        final photo = photosFiltered[index];
-                        return Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                border: _isMultiSelect &&
-                                        _selectedPhotos.contains(photo)
-                                    ? Border.all(
-                                        color: Colors.white, width: 3.0)
-                                    : null,
-                              ),
-                              child: PhotoThumbnail(
-                                photo: photo,
-                                onPhotoTap: () => _onPhotoTap(context, index),
-                                isPinterestLayout: true,
-                                onLongPress: () => {
-                                  vibrate(),
-                                  _onThumbnailLongPress(context, photo),
-                                },
-                              ),
+                        if (widget.showFilter)
+                          IconButton(
+                            icon: Icon(Icons.filter_list,
+                                color: hasActiveFilters
+                                    ? Colors.yellow
+                                    : Colors.white),
+                            onPressed: () {
+                              setState(() {
+                                _showFilterPanel = !_showFilterPanel;
+                              });
+                            },
+                            tooltip: 'Filters',
+                          ),
+                        if (widget.showShareBtn == true)
+                          IconButton(
+                            icon: const Icon(Icons.share),
+                            onPressed: () => ImagesHelpers.sharePhotos(
+                              context,
+                              _selectedPhotos,
                             ),
-                            if (_isMultiSelect &&
-                                _selectedPhotos.contains(photo))
-                              Positioned(
-                                bottom: 8,
-                                right: 8,
-                                child: Container(
-                                  width: 24,
-                                  height: 24,
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue, // Синий фон
-                                    shape: BoxShape.circle, // Круглая форма
-                                  ),
-                                  child: const Icon(
-                                    Icons.check, // Иконка галочки
-                                    color: Colors.white, // Белый цвет иконки
-                                    size: 16, // Размер иконки
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    )
-                  : SliverGrid(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          ),
+                      ]
+                    : [
+                        IconButton(
+                          icon: const Icon(Icons.cancel),
+                          onPressed: _onDonePressed,
+                        ),
+                      ],
+              ),
+              SliverPadding(
+                padding: EdgeInsets.only(
+                  left: 8.0,
+                  right: 8.0,
+                  top: 8.0,
+                  bottom: _isMultiSelect
+                      ? 80.0
+                      : 8.0, // Увеличиваем отступ, если включен мультиселект
+                ),
+                sliver: _isPinterestLayout
+                    ? SliverMasonryGrid.count(
                         crossAxisCount: _columnCount,
-                        mainAxisSpacing: 4.0,
-                        crossAxisSpacing: 4.0,
-                      ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
+                        mainAxisSpacing: 8.0,
+                        crossAxisSpacing: 8.0,
+                        childCount: photosFiltered.length,
+                        itemBuilder: (context, index) {
                           final photo = photosFiltered[index];
-                          return Stack(
-                            children: [
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: _isMultiSelect &&
-                                          _selectedPhotos.contains(photo)
-                                      ? Border.all(
-                                          color: Colors.white, width: 3.0)
-                                      : null,
-                                ),
-                                child: PhotoThumbnail(
-                                  photo: photo,
-                                  onPhotoTap: () => _onPhotoTap(context, index),
-                                  isPinterestLayout: false,
-                                  onLongPress: () => {
-                                    vibrate(),
-                                    _onThumbnailLongPress(context, photo),
-                                  },
-                                ),
-                              ),
-                              if (_isMultiSelect &&
-                                  _selectedPhotos.contains(photo))
-                                Positioned(
-                                  bottom: 8,
-                                  right: 8,
-                                  child: Container(
-                                    width: 24,
-                                    height: 24,
-                                    decoration: BoxDecoration(
-                                      color: Colors.blue, // Синий фон
-                                      shape: BoxShape.circle, // Круглая форма
-                                    ),
-                                    child: const Icon(
-                                      Icons.check, // Иконка галочки
-                                      color: Colors.white, // Белый цвет иконки
-                                      size: 16, // Размер иконки
-                                    ),
-                                  ),
-                                ),
-                            ],
+                          return _buildGridItem(
+                            context,
+                            index,
+                            photo,
+                            isPinterest: true,
+                            currentList: photosFiltered,
                           );
                         },
-                        childCount: photosFiltered.length,
+                      )
+                    : SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _columnCount,
+                          mainAxisSpacing: 4.0,
+                          crossAxisSpacing: 4.0,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            final photo = photosFiltered[index];
+                            return _buildGridItem(
+                              context,
+                              index,
+                              photo,
+                              isPinterest: false,
+                              currentList: photosFiltered,
+                            );
+                          },
+                          childCount: photosFiltered.length,
+                        ),
                       ),
-                    ),
-            ),
-          ],
-        ),
-        if (_isSharing)
-        Container(
-          color: Colors.black.withOpacity(0.5), // Полупрозрачный фон
-          child: const Center(
-            child: CircularProgressIndicator(), // Индикатор загрузки
+              ),
+            ],
           ),
         ),
+
+        if (_isSharing)
+          Container(
+            color: Colors.black.withOpacity(0.5),
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+
         ColumnSlider(
           initialCount: _columnCount,
           columnCount: _columnCount,
           onChanged: (value) => _updateColumnCount(value),
         ),
+
         if (_isMultiSelect)
           Align(
             alignment: Alignment.bottomCenter,
@@ -500,7 +475,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                 children: [
                   IconButton(
                     icon: const Icon(Iconsax.eye, color: Colors.white),
-                    tooltip: 'View choosed media in Fullscreen',
+                    tooltip: 'View chosen media in Fullscreen',
                     onPressed: _onSelectedViewPressed,
                   ),
                   AddToFolderWidget(
@@ -513,52 +488,98 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                   IconButton(
                     icon: const Icon(Iconsax.video_add, color: Colors.white),
                     tooltip: 'Create video slideshow',
-                    onPressed: () =>
-                        _onVideoGeneratorPressed(context), // Генерация видео
+                    onPressed: () => _onVideoGeneratorPressed(context),
                   ),
                   IconButton(
-                    icon: const Icon(Iconsax.grid_3,
-                        color: Colors.white), // Пример иконки коллажа
+                    icon: const Icon(Iconsax.grid_3, color: Colors.white),
                     tooltip: 'Create free collage',
                     onPressed: () => _onCollageGeneratorPressed(context),
                   ),
+                  // Пример кнопки для Grid-коллажа
                   // IconButton(
-                  //   icon: const Icon(Iconsax.grid_2,
-                  //       color: Colors.white), // Пример иконки коллажа
+                  //   icon: const Icon(Iconsax.grid_2, color: Colors.white),
                   //   tooltip: 'Create grid collage',
                   //   onPressed: () => _onCollageGridGeneratorPressed(context),
                   // ),
                   IconButton(
                     icon: const Icon(Iconsax.export, color: Colors.white),
-                    tooltip: 'Share choosed media',
+                    tooltip: 'Share chosen media',
                     onPressed: () => _onSelectedSharePressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.trash,
                         color: Color.fromARGB(255, 255, 0, 0)),
-                    tooltip: 'Delete choosed media',
+                    tooltip: 'Delete chosen media',
                     onPressed: () => _onDeletePressed(context, _selectedPhotos),
                   ),
                 ],
               ),
             ),
           ),
-        if (_showFilterPanel &&
-            widget.showFilter) // Проверяем, нужно ли показывать панель фильтров
+
+        if (_showFilterPanel && widget.showFilter)
           Align(
             alignment: Alignment.topCenter,
             child: Container(
               constraints: const BoxConstraints(
                 maxHeight: 300,
               ),
-              margin: const EdgeInsets.only(
-                  top: kToolbarHeight + 40), // Отступ от AppBar
-              width: double.infinity, // Занять 100% ширины
+              margin: const EdgeInsets.only(top: kToolbarHeight + 40),
+              width: double.infinity,
               color: Colors.black54,
               child: FilterPanel(tags: widget.tags),
             ),
           ),
       ],
+    );
+  }
+
+  /// Виджет одного элемента сетки
+  Widget _buildGridItem(
+    BuildContext context,
+    int index,
+    Photo photo, {
+    required bool isPinterest,
+    required List<Photo> currentList,
+  }) {
+    return Container(
+      key: _itemKeys[index], // <-- Привязываем GlobalKey к каждому элементу
+      decoration: BoxDecoration(
+        border: _isMultiSelect && _selectedPhotos.contains(photo)
+            ? Border.all(color: Colors.white, width: 3.0)
+            : null,
+      ),
+      child: Stack(
+        children: [
+          PhotoThumbnail(
+            photo: photo,
+            onPhotoTap: () => _onPhotoTap(context, index, currentList),
+            isPinterestLayout: isPinterest,
+            onLongPress: () {
+              vibrate();
+              _onThumbnailLongPress(context, photo);
+            },
+          ),
+          if (_isMultiSelect && _selectedPhotos.contains(photo))
+            Positioned(
+              bottom: 8,
+              right: 8,
+              child: Container(
+                width: 24,
+                height: 24,
+                decoration: const BoxDecoration(
+                  color: Colors.blue,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -5,6 +5,7 @@ import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/add_folder_dialog.dart';
 import 'package:photographers_reference_app/src/utils/sort_categories.dart';
 import 'package:uuid/uuid.dart';
 
@@ -131,7 +132,8 @@ class CategoriesHelpers {
                     ),
                     IconButton(
                       icon: const Icon(Iconsax.trash, color: Colors.red),
-                      tooltip: 'Delete category and pholders inside (No media will be deleted)',
+                      tooltip:
+                          'Delete category and pholders inside (No media will be deleted)',
                       onPressed: () {
                         Navigator.of(context).pop();
                         confirmDeleteCategory(context, category);
@@ -169,68 +171,11 @@ class CategoriesHelpers {
   }
 
   static void showAddFolderDialog(BuildContext context, Category category) {
-    final TextEditingController controller = TextEditingController();
-    final FocusNode focusNode = FocusNode(); // Добавляем FocusNode
-    bool isPrivate = false;
-
     showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Add Folder'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    focusNode: focusNode, // Устанавливаем FocusNode
-                    decoration: const InputDecoration(hintText: 'Folder Name'),
-                  ),
-                  const SizedBox(height: 16.0),
-                  CheckboxListTile(
-                    title: const Text('Is Private (3 taps on logo to show)'),
-                    value: isPrivate,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        isPrivate = value ?? false;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    final String name = controller.text.trim();
-                    if (name.isNotEmpty) {
-                      final Folder folder = Folder(
-                        id: const Uuid().v4(),
-                        name: name,
-                        categoryId: category.id,
-                        photoIds: [],
-                        dateCreated: DateTime.now(),
-                        isPrivate: isPrivate,
-                        sortOrder: 0,
-                      );
-                      context.read<FolderBloc>().add(AddFolder(folder));
-                      Navigator.of(context).pop();
-                    }
-                  },
-                  child: const Text('Add'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      barrierDismissible: true,
+      builder: (context) => AddFolderDialog(category: category),
     );
-
-    // Устанавливаем фокус после открытия диалога
-    Future.delayed(Duration.zero, () {
-      focusNode.requestFocus();
-    });
   }
 
   static void confirmDeleteCategory(BuildContext context, Category category) {

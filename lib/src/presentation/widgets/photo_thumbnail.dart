@@ -49,18 +49,20 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
         ? ExtendedImage.file(
             file,
             fit: BoxFit.cover,
-            enableMemoryCache: false,
+            enableMemoryCache: true,
             cacheWidth: 200,
             clearMemoryCacheIfFailed: true,
+            cacheRawData: true,
           )
         : ExtendedImage.file(
             file,
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
-            enableMemoryCache: false,
+            enableMemoryCache: true,
             cacheWidth: 200,
             clearMemoryCacheIfFailed: true,
+            cacheRawData: true,
           );
 
     // Если это видео и задана длительность, накладываем её поверх изображения.
