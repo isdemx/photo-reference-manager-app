@@ -140,26 +140,6 @@ class _FolderScreenState extends State<FolderScreen> {
                             photos: photos,
                             actionFromParent: null,
                           ),
-
-                    // Добавленный FloatingActionButton, который появляется, когда есть фотографии
-                    floatingActionButton: photos.isNotEmpty 
-                        ? Padding(
-                            padding: const EdgeInsets.only(
-                                bottom: 80), // Поднимаем кнопку вверх на 20px
-                            child: FloatingActionButton.extended(
-                              onPressed: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  '/upload',
-                                  arguments: widget.folder,
-                                );
-                              },
-                              icon: const Icon(Iconsax.import_1),
-                              label: const Text('Upload'),
-                              backgroundColor: Colors.black,
-                            ),
-                          )
-                        : null,
                   );
                 } else {
                   return const Scaffold(
