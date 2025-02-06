@@ -10,49 +10,52 @@ import 'package:photographers_reference_app/src/data/repositories/photo_reposito
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 
 class PhotoSaveHelper {
-  /// Saves the [bytes] under [fileName] into the app's "photos" directory,
-  /// creates a [Photo] entry, stores it in the DB, and returns that [Photo].
+  /// Сохраняет фото из байтов [bytes] с именем [fileName] в папку "photos" приложения,
+  /// создаёт объект [Photo], добавляет его в базу данных и возвращает.
   static Future<Photo> savePhoto({
     required String fileName,
     required Uint8List bytes,
     required BuildContext context,
   }) async {
-    // 1. Locate app documents directory and ensure a "photos" subdirectory.
-    final appDir = await getApplicationDocumentsDirectory();
-    final photosDir = Directory(p.join(appDir.path, 'photos'));
-    if (!photosDir.existsSync()) {
-      photosDir.createSync(recursive: true);
-    }
+    try {
+      // 1. Получаем директорию приложения и создаём папку "photos".
+      final appDir = await getApplicationDocumentsDirectory();
+      final photosDir = Directory(p.join(appDir.path, 'photos'));
+      if (!photosDir.existsSync()) {
+        await photosDir.create(recursive: true);
+      }
 
-    // 2. Create a path for the output file.
-    final outPath = p.join(photosDir.path, fileName);
+      // 2. Создаём путь для сохранения файла.
+      final outPath = p.join(photosDir.path, fileName);
+      final outFile = File(outPath);
 
-    // 3. If it doesn't exist, write the raw bytes to that file path.
-    final outFile = File(outPath);
-    if (!outFile.existsSync()) {
+      // 3. Записываем байты в файл.
       await outFile.writeAsBytes(bytes);
+
+      // 4. Создаём объект [Photo].
+      final newPhoto = Photo(
+        id: const Uuid().v4(),
+        fileName: fileName,
+        path: outPath,
+        mediaType: 'image',
+        dateAdded: DateTime.now(),
+        folderIds: [],
+        comment: '',
+        tagIds: [],
+        sortOrder: 0,
+      );
+
+      // 5. Добавляем фото в базу данных.
+      final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
+      await repo.addPhoto(newPhoto);
+
+      // 6. Обновляем состояние блока PhotoBloc.
+      context.read<PhotoBloc>().add(LoadPhotos());
+
+      return newPhoto;
+    } catch (e) {
+      debugPrint('Ошибка сохранения фото: $e');
+      throw Exception('Не удалось сохранить фото');
     }
-
-    // 4. Construct the new [Photo] entity.
-    final newPhoto = Photo(
-      id: const Uuid().v4(),
-      fileName: fileName,
-      path: outPath,
-      mediaType: 'image',
-      dateAdded: DateTime.now(),
-      folderIds: [],
-      comment: '',
-      tagIds: [],
-      sortOrder: 0,
-    );
-
-    // 5. Insert the [Photo] into your repository/DB.
-    final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
-    await repo.addPhoto(newPhoto);
-
-    // 6. Optionally, refresh your PhotoBloc state.
-    context.read<PhotoBloc>().add(LoadPhotos());
-
-    return newPhoto;
   }
 }
