@@ -8,6 +8,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.da
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_folder_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 class FoldersHelpers {
@@ -112,6 +113,10 @@ class FoldersHelpers {
 
   static Future<bool> showAddToFolderDialog(
       BuildContext context, List<Photo> photos) async {
+    final prefs = await SharedPreferences.getInstance();
+    bool groupedView = prefs.getBool('groupedView') ?? false;
+    String? expandedCategory = prefs.getString('expandedCategory');
+
     return await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -136,74 +141,61 @@ class FoldersHelpers {
                     commonFolderIds.retainAll(photo.folderIds);
                   }
 
+                  Map<String, List<Folder>> categorizedFolders = {};
+                  for (var folder in folders) {
+                    categorizedFolders
+                        .putIfAbsent(folder.categoryId, () => [])
+                        .add(folder);
+                  }
+
                   return StatefulBuilder(
                     builder: (context, setState) {
                       return AlertDialog(
                         title: const Text('Add Photos to Folder'),
                         content: SizedBox(
                           width: double.maxFinite,
-                          child: ListView.builder(
-                            shrinkWrap: true,
-                            itemCount: folders.length,
-                            itemBuilder: (context, index) {
-                              final folder = folders[index];
-                              final categoryName =
-                                  categories[folder.categoryId] ?? 'Unknown';
+                          child: groupedView
+                              ? ListView(
+                                  children: categories.entries.map((entry) {
+                                    final categoryId = entry.key;
+                                    final categoryName = entry.value;
+                                    final categoryFolders =
+                                        categorizedFolders[categoryId] ?? [];
 
-                              bool allSelected = true;
-                              bool noneSelected = true;
-
-                              for (var photo in photos) {
-                                if (!photo.folderIds.contains(folder.id)) {
-                                  allSelected = false;
-                                } else {
-                                  noneSelected = false;
-                                }
-                              }
-
-                              var isSelected = allSelected
-                                  ? true
-                                  : noneSelected
-                                      ? false
-                                      : null;
-
-                              return CheckboxListTile(
-                                title: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      folder.name,
-                                      style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    Text(
-                                      categoryName,
-                                      style: TextStyle(
-                                          fontSize: 12,
-                                          fontStyle: FontStyle.italic,
-                                          color: Colors.grey),
-                                    ),
-                                  ],
+                                    return ExpansionTile(
+                                      title: Text(
+                                        categoryName,
+                                        style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                      initiallyExpanded:
+                                          expandedCategory == categoryId,
+                                      onExpansionChanged: (expanded) {
+                                        expandedCategory =
+                                            expanded ? categoryId : null;
+                                        prefs.setString('expandedCategory',
+                                            expandedCategory ?? '');
+                                        setState(() {
+                                          expandedCategory =
+                                              expanded ? categoryId : null;
+                                        });
+                                      },
+                                      children: categoryFolders
+                                          .map((folder) => _buildFolderTile(
+                                              folder, photos, setState))
+                                          .toList(),
+                                    );
+                                  }).toList(),
+                                )
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  itemCount: folders.length,
+                                  itemBuilder: (context, index) {
+                                    return _buildFolderTile(
+                                        folders[index], photos, setState);
+                                  },
                                 ),
-                                value: isSelected,
-                                tristate: true,
-                                onChanged: (bool? value) {
-                                  setState(() {
-                                    if (value == true) {
-                                      for (var photo in photos) {
-                                        photo.folderIds.add(folder.id);
-                                      }
-                                    } else {
-                                      for (var photo in photos) {
-                                        photo.folderIds.remove(folder.id);
-                                      }
-                                    }
-                                  });
-                                },
-                              );
-                            },
-                          ),
                         ),
                         actions: [
                           IconButton(
@@ -215,6 +207,16 @@ class FoldersHelpers {
                                 context: context,
                                 builder: (context) => const AddFolderDialog(),
                               );
+                              setState(() {});
+                            },
+                          ),
+                          IconButton(
+                            icon:
+                                Icon(groupedView ? Iconsax.menu : Iconsax.category),
+                            tooltip: 'Switch Mode',
+                            onPressed: () async {
+                              groupedView = !groupedView;
+                              await prefs.setBool('groupedView', groupedView);
                               setState(() {});
                             },
                           ),
@@ -252,5 +254,38 @@ class FoldersHelpers {
         );
       },
     ).then((value) => value ?? false);
+  }
+
+  static Widget _buildFolderTile(
+      Folder folder, List<Photo> photos, StateSetter setState) {
+    bool allSelected =
+        photos.every((photo) => photo.folderIds.contains(folder.id));
+    bool noneSelected =
+        photos.every((photo) => !photo.folderIds.contains(folder.id));
+    var isSelected = allSelected
+        ? true
+        : noneSelected
+            ? false
+            : null;
+
+    return CheckboxListTile(
+      title: Text(
+        folder.name,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      value: isSelected,
+      tristate: true,
+      onChanged: (bool? value) {
+        setState(() {
+          for (var photo in photos) {
+            if (value == true) {
+              photo.folderIds.add(folder.id);
+            } else {
+              photo.folderIds.remove(folder.id);
+            }
+          }
+        });
+      },
+    );
   }
 }
