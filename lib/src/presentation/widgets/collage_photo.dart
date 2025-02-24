@@ -15,6 +15,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -107,8 +108,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   final GlobalKey _deleteIconKey = GlobalKey(); // для иконки удаления
   FocusNode _focusNode = FocusNode(); // Фокус на виджете
   int? _activeItemIndex;
-
-  late List<CollagePhotoState> _items;
+  double _collageScale = 1.0;
+  late List<CollagePhotoState> _items = [];
   int _maxZIndex = 0;
   int? _draggingIndex;
   bool _deleteHover = false;
@@ -122,6 +123,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   /// Нужно при первом построении
   bool showForInit = true;
+  Offset _collageOffset = Offset.zero; // Опционально
+  /// Индикатор, что мы уже делали один раз auto-fit
+  bool _hasAutoFitted = false;
 
   @override
   void initState() {
@@ -149,13 +153,67 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (widget.initialCollage != null) {
-      // Если есть готовый коллаж из базы, инициализируем из него
-      _initCollageFromExisting(widget.initialCollage!);
-    } else {
-      // Иначе, как раньше
-      _initCollageItems();
+
+    // Если массив items уже не пуст (значит, мы уже инициализировали), пропускаем
+    if (_items.isEmpty) {
+      if (widget.initialCollage != null) {
+        _initCollageFromExisting(widget.initialCollage!);
+      } else {
+        _initCollageItems();
+      }
     }
+
+    if (!_hasAutoFitted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _autoFitCollage();
+        _hasAutoFitted = true;
+      });
+    }
+  }
+
+  /// Пример: вычисляем bounding box всех фото и пытаемся влезть в экран
+  void _autoFitCollage() {
+    if (_items.isEmpty) return;
+
+    final size = MediaQuery.of(context).size;
+    final screenWidth = size.width;
+    final screenHeight = size.height;
+
+    // Находим минимальные/максимальные координаты,
+    // чтобы определить реальную «ширину/высоту» коллажа.
+    double minX = double.infinity, maxX = -double.infinity;
+    double minY = double.infinity, maxY = -double.infinity;
+
+    for (final item in _items) {
+      final w = item.baseWidth * item.scale;
+      final h = item.baseHeight * item.scale;
+      // Левая и правая границы
+      final left = item.offset.dx;
+      final right = item.offset.dx + w;
+      // Верх и низ
+      final top = item.offset.dy;
+      final bottom = item.offset.dy + h;
+      if (left < minX) minX = left;
+      if (right > maxX) maxX = right;
+      if (top < minY) minY = top;
+      if (bottom > maxY) maxY = bottom;
+    }
+
+    final collageWidth = maxX - minX;
+    final collageHeight = maxY - minY;
+    if (collageWidth <= 0 || collageHeight <= 0) return;
+
+    // Какую часть экрана хотим занять? Например, 80%
+    const double desiredFraction = 0.8;
+
+    final scaleX = (screenWidth * desiredFraction) / collageWidth;
+    final scaleY = (screenHeight * desiredFraction) / collageHeight;
+    final newScale = math.min(scaleX, scaleY);
+
+    // Если коллаж и так маленький, можно не масштабировать больше 1.0
+    setState(() {
+      _collageScale = math.min(newScale, 1.0);
+    });
   }
 
   void _initCollageFromExisting(Collage collage) {
@@ -521,16 +579,32 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         // Цвет фона холста
                         Container(color: _backgroundColor),
 
-                        // RepaintBoundary для сохранения в CollageSaveHelper
-                        RepaintBoundary(
-                          key: _collageKey,
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: Container(color: _backgroundColor),
+                        InteractiveViewer(
+                          boundaryMargin: const EdgeInsets.all(999999),
+                          // теперь глобальный зум отключен
+                          scaleEnabled: false,
+                          panEnabled: false,
+                          clipBehavior: Clip.none,
+                          child: Transform.scale(
+                            scale: _collageScale,
+                            alignment: Alignment.topLeft,
+                            child: RepaintBoundary(
+                              key: _collageKey,
+                              child: SizedBox(
+                                width: 5000,
+                                height: 5000,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Positioned.fill(
+                                      child: Container(color: _backgroundColor),
+                                    ),
+                                    for (final item in sorted)
+                                      _buildPhotoItem(item),
+                                  ],
+                                ),
                               ),
-                              for (final item in sorted) _buildPhotoItem(item),
-                            ],
+                            ),
                           ),
                         ),
 
@@ -739,6 +813,25 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
+        if (Platform.isMacOS)
+          Expanded(
+              child: Row(
+            children: [
+              SizedBox(
+                width: 120, // фиксированная ширина
+                child: Slider(
+                  min: 0.1,
+                  max: 2.0,
+                  value: _collageScale,
+                  onChanged: (val) {
+                    setState(() {
+                      _collageScale = val;
+                    });
+                  },
+                ),
+              ),
+            ],
+          )),
         IconButton(
           icon: const Icon(Iconsax.add, color: Colors.white),
           tooltip: 'Add photo',
@@ -1338,32 +1431,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _showAllPhotosSheet() {
     showModalBottomSheet(
       context: context,
-      builder: (_) {
-        final all = widget.allPhotos
-            .where((photo) => photo.mediaType == 'image')
-            .toList();
-        return Container(
-          color: Colors.black,
-          padding: const EdgeInsets.all(8),
-          child: GridView.builder(
-            itemCount: all.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-            ),
-            itemBuilder: (_, index) {
-              final p = all[index];
-              final path = PhotoPathHelper().getFullPath(p.fileName);
-              return GestureDetector(
-                onTap: () {
-                  Navigator.pop(context);
-                  _addPhotoToCollage(p);
-                },
-                child: Image.file(File(path), fit: BoxFit.cover),
-              );
-            },
-          ),
+      builder: (ctx) {
+        return PhotoPickerWidget(
+          onPhotoSelected: (photo) {
+            // Закрываем BottomSheet
+            Navigator.pop(context);
+
+            // Например, добавляем фото в ваш коллаж:
+            _addPhotoToCollage(photo);
+          },
         );
       },
     );
