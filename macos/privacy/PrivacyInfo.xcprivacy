@@ -1,0 +1,21 @@
+<plist version="1.0">
+<dict>
+    <key>PrivacyManifestVersion</key>
+    <string>1.0</string>
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>Location</string>
+            <key>NSPrivacyCollectedDataUsage</key>
+            <string>AppFunctionality</string>
+        </dict>
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>DeviceIdentifiers</string>
+            <key>NSPrivacyCollectedDataUsage</key>
+            <string>AppFunctionality</string>
+        </dict>
+    </array>
+</dict>
+</plist>

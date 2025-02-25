@@ -3,15 +3,21 @@
   "packages": [
     {
       "name": "_fe_analyzer_shared",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/_fe_analyzer_shared-67.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/_fe_analyzer_shared-72.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "_macros",
+      "rootUri": "file:///Users/sergeykudryashov/Development/flutter/bin/cache/dart-sdk/pkg/_macros",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
     },
     {
       "name": "analyzer",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/analyzer-6.4.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/analyzer-6.7.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
     },
     {
       "name": "ansicolor",
@@ -21,15 +27,15 @@
     },
     {
       "name": "archive",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/archive-3.6.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/archive-4.0.3",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
       "name": "args",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/args-2.5.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/args-2.6.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
     },
     {
       "name": "async",
@@ -39,9 +45,9 @@
     },
     {
       "name": "bloc",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/bloc-8.1.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/bloc-9.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "2.14"
     },
     {
       "name": "boolean_selector",
@@ -63,9 +69,9 @@
     },
     {
       "name": "build_daemon",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/build_daemon-4.0.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/build_daemon-4.0.2",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.4"
     },
     {
       "name": "build_resolvers",
@@ -75,15 +81,15 @@
     },
     {
       "name": "build_runner",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/build_runner-2.4.9",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/build_runner-2.4.13",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.5"
     },
     {
       "name": "build_runner_core",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/build_runner_core-7.3.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/build_runner_core-7.3.2",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.5"
     },
     {
       "name": "built_collection",
@@ -93,7 +99,7 @@
     },
     {
       "name": "built_value",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/built_value-8.9.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/built_value-8.9.3",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
@@ -117,9 +123,9 @@
     },
     {
       "name": "code_builder",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/code_builder-4.10.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/code_builder-4.10.1",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.5"
     },
     {
       "name": "collection",
@@ -129,9 +135,9 @@
     },
     {
       "name": "convert",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/convert-3.1.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/convert-3.1.2",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.4"
     },
     {
       "name": "cross_file",
@@ -141,15 +147,15 @@
     },
     {
       "name": "crypto",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/crypto-3.0.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/crypto-3.0.6",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.4"
     },
     {
       "name": "csslib",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/csslib-1.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/csslib-1.0.2",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.1"
     },
     {
       "name": "cupertino_icons",
@@ -159,19 +165,19 @@
     },
     {
       "name": "dart_earcut",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dart_earcut-1.1.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dart_earcut-1.2.0",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
       "name": "dart_style",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dart_style-2.3.6",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dart_style-2.3.7",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
       "name": "dbus",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dbus-0.7.10",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/dbus-0.7.11",
       "packageUri": "lib/",
       "languageVersion": "2.17"
     },
@@ -183,19 +189,19 @@
     },
     {
       "name": "device_info_plus",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/device_info_plus-10.1.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/device_info_plus-11.3.0",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "device_info_plus_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/device_info_plus_platform_interface-7.0.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/device_info_plus_platform_interface-7.0.2",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
     {
       "name": "equatable",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/equatable-2.0.5",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/equatable-2.0.7",
       "packageUri": "lib/",
       "languageVersion": "2.12"
     },
@@ -207,13 +213,13 @@
     },
     {
       "name": "extended_image",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image-8.3.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image-9.1.0",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
     {
       "name": "extended_image_library",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image_library-4.0.5",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image_library-4.0.6",
       "packageUri": "lib/",
       "languageVersion": "3.2"
     },
@@ -243,25 +249,25 @@
     },
     {
       "name": "file",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file-7.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
       "name": "file_picker",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_picker-8.1.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_picker-9.0.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
     {
       "name": "file_selector_linux",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_selector_linux-0.9.2+1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_selector_linux-0.9.3+2",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.3"
     },
     {
       "name": "file_selector_macos",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_selector_macos-0.9.4+1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_selector_macos-0.9.4+2",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -273,15 +279,15 @@
     },
     {
       "name": "file_selector_windows",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_selector_windows-0.9.3+2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file_selector_windows-0.9.3+4",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.4"
     },
     {
       "name": "fixnum",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/fixnum-1.1.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/fixnum-1.1.1",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.1"
     },
     {
       "name": "flutter",
@@ -291,9 +297,9 @@
     },
     {
       "name": "flutter_bloc",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_bloc-8.1.6",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_bloc-9.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "2.14"
     },
     {
       "name": "flutter_colorpicker",
@@ -303,9 +309,9 @@
     },
     {
       "name": "flutter_lints",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_lints-4.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_lints-5.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.1"
+      "languageVersion": "3.5"
     },
     {
       "name": "flutter_map",
@@ -315,19 +321,19 @@
     },
     {
       "name": "flutter_native_splash",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_native_splash-2.4.4",
       "packageUri": "lib/",
       "languageVersion": "3.0"
     },
     {
       "name": "flutter_plugin_android_lifecycle",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.19",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.24",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.5"
     },
     {
       "name": "flutter_slidable",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_slidable-3.1.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_slidable-3.1.2",
       "packageUri": "lib/",
       "languageVersion": "2.17"
     },
@@ -357,7 +363,7 @@
     },
     {
       "name": "geolocator",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator-13.0.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator-13.0.2",
       "packageUri": "lib/",
       "languageVersion": "2.15"
     },
@@ -369,7 +375,7 @@
     },
     {
       "name": "geolocator_apple",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.7",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/geolocator_apple-2.3.9",
       "packageUri": "lib/",
       "languageVersion": "2.15"
     },
@@ -393,21 +399,21 @@
     },
     {
       "name": "get",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/get-4.6.6",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/get-4.7.2",
       "packageUri": "lib/",
       "languageVersion": "2.15"
     },
     {
       "name": "glob",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/glob-2.1.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/glob-2.1.3",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.3"
     },
     {
       "name": "graphs",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/graphs-2.3.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/graphs-2.3.2",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.4"
     },
     {
       "name": "hive",
@@ -429,15 +435,15 @@
     },
     {
       "name": "html",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/html-0.15.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/html-0.15.5",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.2"
     },
     {
       "name": "http",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/http-1.2.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/http-1.3.0",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "http_client_helper",
@@ -447,9 +453,9 @@
     },
     {
       "name": "http_multi_server",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/http_multi_server-3.2.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/http_multi_server-3.2.2",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.2"
     },
     {
       "name": "http_parser",
@@ -465,9 +471,9 @@
     },
     {
       "name": "image",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image-4.2.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image-4.5.3",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.0"
     },
     {
       "name": "image_picker",
@@ -477,21 +483,21 @@
     },
     {
       "name": "image_picker_android",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_android-0.8.12+1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_android-0.8.12+21",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.5"
     },
     {
       "name": "image_picker_for_web",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_for_web-3.0.5",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_for_web-3.0.6",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "image_picker_ios",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_ios-0.8.12",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_ios-0.8.12+2",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "image_picker_linux",
@@ -501,15 +507,15 @@
     },
     {
       "name": "image_picker_macos",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_macos-0.2.1+1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_macos-0.2.1+2",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.4"
     },
     {
       "name": "image_picker_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_platform_interface-2.10.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker_platform_interface-2.10.1",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "image_picker_windows",
@@ -519,15 +525,15 @@
     },
     {
       "name": "intl",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/intl-0.19.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/intl-0.20.2",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
     },
     {
       "name": "io",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/io-1.0.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/io-1.0.5",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.4"
     },
     {
       "name": "js",
@@ -567,9 +573,9 @@
     },
     {
       "name": "lints",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/lints-4.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/lints-5.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.1"
+      "languageVersion": "3.5"
     },
     {
       "name": "lists",
@@ -579,15 +585,21 @@
     },
     {
       "name": "logger",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/logger-2.4.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/logger-2.5.0",
       "packageUri": "lib/",
       "languageVersion": "2.17"
     },
     {
       "name": "logging",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/logging-1.2.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/logging-1.3.0",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "macros",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/macros-0.1.2-main.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
     },
     {
       "name": "matcher",
@@ -615,7 +627,7 @@
     },
     {
       "name": "mime",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/mime-1.0.6",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/mime-2.0.0",
       "packageUri": "lib/",
       "languageVersion": "3.2"
     },
@@ -627,19 +639,19 @@
     },
     {
       "name": "package_config",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_config-2.1.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_config-2.1.1",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.4"
     },
     {
       "name": "package_info_plus",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_info_plus-8.0.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_info_plus-8.3.0",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
     {
       "name": "package_info_plus_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_info_plus_platform_interface-3.0.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/package_info_plus_platform_interface-3.2.0",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
@@ -651,21 +663,21 @@
     },
     {
       "name": "path_provider",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/path_provider-2.1.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/path_provider-2.1.5",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.4"
     },
     {
       "name": "path_provider_android",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/path_provider_android-2.2.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/path_provider_android-2.2.15",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.5"
     },
     {
       "name": "path_provider_foundation",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/path_provider_foundation-2.4.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/path_provider_foundation-2.4.1",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.3"
     },
     {
       "name": "path_provider_linux",
@@ -687,33 +699,33 @@
     },
     {
       "name": "permission_handler",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler-11.3.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler-11.4.0",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "permission_handler_android",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_android-12.0.12",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_android-12.1.0",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.5"
     },
     {
       "name": "permission_handler_apple",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.5",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_apple-9.4.6",
       "packageUri": "lib/",
       "languageVersion": "2.15"
     },
     {
       "name": "permission_handler_html",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_html-0.1.3+2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_html-0.1.3+5",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
     {
       "name": "permission_handler_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_platform_interface-4.2.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/permission_handler_platform_interface-4.3.0",
       "packageUri": "lib/",
-      "languageVersion": "2.14"
+      "languageVersion": "3.5"
     },
     {
       "name": "permission_handler_windows",
@@ -735,7 +747,7 @@
     },
     {
       "name": "platform",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/platform-3.1.5",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/platform-3.1.6",
       "packageUri": "lib/",
       "languageVersion": "3.2"
     },
@@ -758,6 +770,12 @@
       "languageVersion": "2.12"
     },
     {
+      "name": "posix",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/posix-6.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "proj4dart",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/proj4dart-2.1.0",
       "packageUri": "lib/",
@@ -771,45 +789,45 @@
     },
     {
       "name": "pub_semver",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/pub_semver-2.1.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/pub_semver-2.1.5",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.4"
     },
     {
       "name": "pubspec_parse",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/pubspec_parse-1.3.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/pubspec_parse-1.4.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.2"
     },
     {
       "name": "share_plus",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/share_plus-10.0.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/share_plus-10.1.4",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "share_plus_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/share_plus_platform_interface-5.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/share_plus_platform_interface-5.0.2",
       "packageUri": "lib/",
       "languageVersion": "2.18"
     },
     {
       "name": "shared_preferences",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences-2.3.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences-2.5.2",
       "packageUri": "lib/",
-      "languageVersion": "3.4"
+      "languageVersion": "3.5"
     },
     {
       "name": "shared_preferences_android",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_android-2.3.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.6",
       "packageUri": "lib/",
       "languageVersion": "3.5"
     },
     {
       "name": "shared_preferences_foundation",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_foundation-2.5.4",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "shared_preferences_linux",
@@ -825,7 +843,7 @@
     },
     {
       "name": "shared_preferences_web",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_web-2.4.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shared_preferences_web-2.4.3",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -843,9 +861,9 @@
     },
     {
       "name": "shelf_web_socket",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shelf_web_socket-1.0.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shelf_web_socket-2.0.1",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.3"
     },
     {
       "name": "sky_engine",
@@ -861,9 +879,9 @@
     },
     {
       "name": "source_helper",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/source_helper-1.3.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/source_helper-1.3.5",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.4"
     },
     {
       "name": "source_span",
@@ -891,9 +909,9 @@
     },
     {
       "name": "stream_transform",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/stream_transform-2.1.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/stream_transform-2.1.1",
       "packageUri": "lib/",
-      "languageVersion": "2.14"
+      "languageVersion": "3.1"
     },
     {
       "name": "string_scanner",
@@ -915,15 +933,15 @@
     },
     {
       "name": "timing",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/timing-1.0.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/timing-1.0.2",
       "packageUri": "lib/",
-      "languageVersion": "2.14"
+      "languageVersion": "3.4"
     },
     {
       "name": "typed_data",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/typed_data-1.3.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/typed_data-1.4.0",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.5"
     },
     {
       "name": "unicode",
@@ -939,7 +957,7 @@
     },
     {
       "name": "url_launcher_linux",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/url_launcher_linux-3.2.1",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
@@ -957,9 +975,9 @@
     },
     {
       "name": "url_launcher_windows",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/url_launcher_windows-3.1.4",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.4"
     },
     {
       "name": "uuid",
@@ -975,21 +993,21 @@
     },
     {
       "name": "vibration",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/vibration-2.0.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/vibration-3.1.3",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
     },
     {
       "name": "vibration_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/vibration_platform_interface-0.0.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/vibration_platform_interface-0.1.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.0"
     },
     {
       "name": "video_player",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player-2.9.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player-2.9.3",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "video_player_android",
@@ -999,19 +1017,19 @@
     },
     {
       "name": "video_player_avfoundation",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_avfoundation-2.6.7",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_avfoundation-2.7.0",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
     {
       "name": "video_player_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_platform_interface-6.2.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_platform_interface-6.3.0",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "video_player_web",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_web-2.3.3",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/video_player_web-2.3.4",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -1029,21 +1047,21 @@
     },
     {
       "name": "wakelock_plus",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/wakelock_plus-1.2.8",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/wakelock_plus-1.2.10",
       "packageUri": "lib/",
-      "languageVersion": "3.3"
+      "languageVersion": "3.4"
     },
     {
       "name": "wakelock_plus_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/wakelock_plus_platform_interface-1.2.1",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/wakelock_plus_platform_interface-1.2.2",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
     {
       "name": "watcher",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/watcher-1.1.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/watcher-1.1.1",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.1"
     },
     {
       "name": "web",
@@ -1052,14 +1070,20 @@
       "languageVersion": "3.4"
     },
     {
-      "name": "web_socket_channel",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/web_socket_channel-2.4.0",
+      "name": "web_socket",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/web_socket-0.1.6",
       "packageUri": "lib/",
-      "languageVersion": "2.15"
+      "languageVersion": "3.3"
+    },
+    {
+      "name": "web_socket_channel",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/web_socket_channel-3.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "win32",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/win32-5.5.5",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/win32-5.10.1",
       "packageUri": "lib/",
       "languageVersion": "3.5"
     },
@@ -1077,9 +1101,9 @@
     },
     {
       "name": "xdg_directories",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/xdg_directories-1.0.4",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/xdg_directories-1.1.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.3"
     },
     {
       "name": "xml",
@@ -1089,9 +1113,9 @@
     },
     {
       "name": "yaml",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/yaml-3.1.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/yaml-3.1.3",
       "packageUri": "lib/",
-      "languageVersion": "2.19"
+      "languageVersion": "3.4"
     },
     {
       "name": "photographers_reference_app",
@@ -1100,7 +1124,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2025-02-07T13:44:20.258399Z",
+  "generated": "2025-02-25T13:51:39.998749Z",
   "generator": "pub",
   "generatorVersion": "3.5.3",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

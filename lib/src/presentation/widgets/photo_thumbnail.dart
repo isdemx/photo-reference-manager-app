@@ -49,7 +49,6 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
         ? ExtendedImage.file(
             file,
             fit: BoxFit.cover,
-            enableMemoryCache: true,
             cacheWidth: 200,
             clearMemoryCacheIfFailed: true,
             cacheRawData: true,
@@ -59,7 +58,6 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
-            enableMemoryCache: true,
             cacheWidth: 200,
             clearMemoryCacheIfFailed: true,
             cacheRawData: true,
