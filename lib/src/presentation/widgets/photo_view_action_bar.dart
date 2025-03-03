@@ -93,37 +93,37 @@ class ActionBar extends StatelessWidget {
                   //     tooltip: 'Share Images',
                   //   ),
                   // ),
-                  Expanded(
-                    child: IconButton(
-                      icon: Icon(
-                        Iconsax.location,
-                        color: photo.geoLocation != null
-                            ? Colors.blue
-                            : Colors.grey, // серый, если нет геолокации
-                      ),
-                      onPressed: () {
-                        if (photos.any((photo) => photo.geoLocation != null)) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PhotoMapWidget(
-                                photos: photos,
-                                activePhoto: photo,
-                              ),
-                            ),
-                          );
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'No location data available for photos.'),
-                            ),
-                          );
-                        }
-                      },
-                      tooltip: 'View Photos on Map',
-                    ),
-                  ),
+                  // Expanded(
+                  //   child: IconButton(
+                  //     icon: Icon(
+                  //       Iconsax.location,
+                  //       color: photo.geoLocation != null
+                  //           ? Colors.blue
+                  //           : Colors.grey, // серый, если нет геолокации
+                  //     ),
+                  //     onPressed: () {
+                  //       if (photos.any((photo) => photo.geoLocation != null)) {
+                  //         Navigator.push(
+                  //           context,
+                  //           MaterialPageRoute(
+                  //             builder: (context) => PhotoMapWidget(
+                  //               photos: photos,
+                  //               activePhoto: photo,
+                  //             ),
+                  //           ),
+                  //         );
+                  //       } else {
+                  //         ScaffoldMessenger.of(context).showSnackBar(
+                  //           const SnackBar(
+                  //             content: Text(
+                  //                 'No location data available for photos.'),
+                  //           ),
+                  //         );
+                  //       }
+                  //     },
+                  //     tooltip: 'View Photos on Map',
+                  //   ),
+                  // ),
                   Expanded(
                     child: IconButton(
                       icon: const Icon(Iconsax.trash,

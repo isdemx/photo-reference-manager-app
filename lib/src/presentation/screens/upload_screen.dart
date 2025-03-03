@@ -66,13 +66,19 @@ class _UploadScreenState extends State<UploadScreen> {
           allowMultiple: true,
           // Можно оставить только изображения, либо расширить для видео
           type: FileType.custom,
-          allowedExtensions: Platform.isIOS ? 
-          [
-            'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', // фото
-            'mp4', 'mov', 'avi', 'mkv', 'webm' // видео
-          ] : [
-            'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif',
-          ],
+          allowedExtensions: (Platform.isIOS || Platform.isAndroid)
+              ? [
+                  'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', // фото
+                  'mp4', 'mov', 'avi', 'mkv', 'webm' // видео
+                ]
+              : [
+                  'jpg',
+                  'jpeg',
+                  'png',
+                  'gif',
+                  'heic',
+                  'heif',
+                ],
         );
         if (result != null && result.files.isNotEmpty) {
           selectedFiles = result.files
@@ -136,7 +142,7 @@ class _UploadScreenState extends State<UploadScreen> {
       /// 2. Создаём объект Photo и записываем в Hive
       final photo = Photo(
         id: const Uuid().v4(),
-        path: savedPath,                // Уже в постоянной директории
+        path: savedPath, // Уже в постоянной директории
         folderIds: folderIds,
         tagIds: [],
         comment: '',
