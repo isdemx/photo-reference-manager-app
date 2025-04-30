@@ -10,6 +10,7 @@ class PhotoThumbnail extends StatefulWidget {
   final VoidCallback onPhotoTap;
   final VoidCallback onLongPress;
   final bool isPinterestLayout;
+  final bool isSelected;
 
   const PhotoThumbnail({
     Key? key,
@@ -17,6 +18,7 @@ class PhotoThumbnail extends StatefulWidget {
     required this.onPhotoTap,
     required this.onLongPress,
     required this.isPinterestLayout,
+    required this.isSelected, // <-- добавили
   }) : super(key: key);
 
   @override
@@ -90,18 +92,42 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
     return GestureDetector(
       onTap: () {
         if (_showDeleteIcon) {
-          setState(() {
-            _showDeleteIcon = false;
-          });
+          setState(() => _showDeleteIcon = false);
         } else {
           widget.onPhotoTap();
         }
       },
-      onLongPress: () async {
+      onLongPress: () {
         vibrate();
         widget.onLongPress();
       },
-      child: imageWidget,
+      child: Stack(
+        children: [
+          // 1️⃣ изображение диктует высоту Masonry-ячейки
+          imageWidget,
+
+          // 2️⃣ иконка удаления (если нужна)
+          if (_showDeleteIcon)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: const Icon(Icons.delete, color: Colors.red),
+            ),
+
+          // 3️⃣ рамка выбора, не влияющая на лайаут
+          if (widget.isSelected)
+            Positioned.fill(
+              child: IgnorePointer(
+                // не блокируем тапы
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white, width: 3),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

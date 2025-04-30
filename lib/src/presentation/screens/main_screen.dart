@@ -9,6 +9,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/categories_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/app_drop_target.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/category_widget.dart';
 
 class MainScreen extends StatefulWidget {
@@ -24,7 +25,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return AppDropTarget(
+        child: Scaffold(
       appBar: AppBar(
         title: FutureBuilder<PackageInfo>(
           future: PackageInfo.fromPlatform(),
@@ -246,6 +248,6 @@ class _MainScreenState extends State<MainScreen> {
           );
         },
       ),
-    );
+    ));
   }
 }

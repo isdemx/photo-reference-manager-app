@@ -311,6 +311,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         WakelockPlus.enable();
       }
     });
+
+    // Важно: после setState, чтобы скролл миниатюр был правильный
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollThumbnailsToCenter(_currentIndex);
+    });
   }
 
   /// Шарим выбранные фото
@@ -428,8 +433,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 _enableSelectPhotoMode(!_selectPhotoMode);
               },
               onVerticalDragEnd: (details) {
-                if(Platform.isMacOS) return;
-                
+                if (Platform.isMacOS) return;
+
                 const double velocityThreshold =
                     1000; // Порог скорости для закрытия
                 if (details.primaryVelocity != null &&

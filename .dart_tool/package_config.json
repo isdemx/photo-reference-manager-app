@@ -213,15 +213,15 @@
     },
     {
       "name": "extended_image",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image-9.1.0",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image-10.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.18"
+      "languageVersion": "3.7"
     },
     {
       "name": "extended_image_library",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image_library-4.0.6",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/extended_image_library-5.0.0",
       "packageUri": "lib/",
-      "languageVersion": "3.2"
+      "languageVersion": "3.7"
     },
     {
       "name": "fake_async",
@@ -236,10 +236,10 @@
       "languageVersion": "3.7"
     },
     {
-      "name": "ffmpeg_kit_flutter_min_gpl",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_min_gpl-6.0.3",
+      "name": "ffmpeg_kit_flutter_new",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_new-1.1.0",
       "packageUri": "lib/",
-      "languageVersion": "2.12"
+      "languageVersion": "3.1"
     },
     {
       "name": "ffmpeg_kit_flutter_platform_interface",
@@ -315,9 +315,9 @@
     },
     {
       "name": "flutter_map",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_map-7.0.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_map-8.1.0",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.6"
     },
     {
       "name": "flutter_native_splash",
@@ -333,9 +333,9 @@
     },
     {
       "name": "flutter_slidable",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_slidable-3.1.2",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/flutter_slidable-4.0.0",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.6"
     },
     {
       "name": "flutter_staggered_grid_view",
@@ -1088,7 +1088,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2025-03-03T17:00:29.566625Z",
+  "generated": "2025-04-30T07:07:52.773327Z",
   "generator": "pub",
   "generatorVersion": "3.7.0",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

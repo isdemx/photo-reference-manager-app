@@ -1,7 +1,5 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '12.1'
+platform :ios, '13.0'
 
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -39,12 +37,17 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    if target.name == 'ffmpeg-kit-ios-min-gpl'
+      target.build_configurations.each do |config|
+        config.build_settings['PODS_ROOT'] = '${SRCROOT}/Pods'
+      end
+    end
+
     flutter_additional_ios_build_settings(target)
-    
+
     # Указываем путь к Privacy Manifest
     target.build_configurations.each do |config|
       config.build_settings['PRIVACY_MANIFEST_PATHS'] = '${PODS_ROOT}/../privacy/PrivacyInfo.xcprivacy'
     end
   end
 end
-÷

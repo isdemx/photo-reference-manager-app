@@ -37,7 +37,7 @@ dependencies:
   hive_flutter: ^1.1.0
   path_provider: ^2.1.4
   image_picker: ^1.1.2
-  flutter_slidable: ^3.1.1
+  flutter_slidable: ^4.0.0
   photo_view: ^0.15.0
   flutter_colorpicker: ^1.0.0
   image: ^4.0.0
@@ -51,7 +51,7 @@ dependencies:
   # share_plus: ^10.0.2
   # file_saver: ^0.2.14
   flutter_staggered_grid_view: ^0.7.0
-  extended_image: ^9.1.0
+  extended_image: ^10.0.0
   wakelock_plus: ^1.2.8
   flutter_native_splash: ^2.4.1
   share_plus: ^10.0.2
@@ -61,13 +61,14 @@ dependencies:
   shared_preferences: ^2.3.2
   get: ^4.6.6
   exif: ^3.3.0
-  flutter_map: ^7.0.2
+  flutter_map: ^8.1.0
   latlong2: ^0.9.1
   # geolocator: ^13.0.1
   # get_thumbnail_video: ^0.7.3
   video_thumbnail: ^0.5.3
   video_player: ^2.9.2
-  ffmpeg_kit_flutter_min_gpl: ^6.0.3
+  # ffmpeg_kit_flutter_min_gpl: ^6.0.3 - REPO DELETED
+  ffmpeg_kit_flutter_new: ^1.1.0   # Fork
   desktop_drop: ^0.5.0
   # scribble: ^0.10.0+1
 

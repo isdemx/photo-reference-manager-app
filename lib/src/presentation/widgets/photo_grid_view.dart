@@ -51,7 +51,9 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   final Set<int> _dragToggledIndices =
       {}; // Индексы уже переключённые в текущем «протаскивании»
   final GlobalKey _scrollKey = GlobalKey(); // Ключ для ScrollView
-  List<GlobalKey> _itemKeys = []; // Ключи для каждого элемента (фото)
+  final Map<String, GlobalKey> _itemKeys = {}; // вместо List
+
+  final Set<String> _dragToggledIds = {};
 
   int _columnCount = 3;
   bool _isPinterestLayout = false;
@@ -241,35 +243,28 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     _dragToggledIndices.clear();
   }
 
-  void _handleDrag(Offset globalPosition, List<Photo> currentList) {
+  void _handleDrag(Offset globalPosition, List<Photo> list) {
     final scrollBox =
         _scrollKey.currentContext?.findRenderObject() as RenderBox?;
     if (scrollBox == null) return;
 
-    // Преобразуем global в локальные координаты
     final localPos = scrollBox.globalToLocal(globalPosition);
 
-    // Проходим по всем itemKeys, проверяем, лежит ли точка внутри
-    for (int i = 0; i < currentList.length; i++) {
-      final key = _itemKeys[i];
-      final context = key.currentContext;
-      if (context == null) continue;
+    for (final photo in list) {
+      final key = _itemKeys[photo.id];
+      if (key == null) continue;
+      final ctx = key.currentContext;
+      final box = ctx?.findRenderObject() as RenderBox?;
+      if (box == null) continue;
 
-      final renderBox = context.findRenderObject() as RenderBox?;
-      if (renderBox == null) continue;
+      final topLeft = box.localToGlobal(Offset.zero, ancestor: scrollBox);
+      final rect = topLeft & box.size;
 
-      // Верхний левый угол элемента в координатах scrollBox
-      final itemOffset =
-          renderBox.localToGlobal(Offset.zero, ancestor: scrollBox);
-      final size = renderBox.size;
-      final itemRect = itemOffset & size;
-
-      if (itemRect.contains(localPos)) {
-        // Если ещё не переключался, переключим
-        if (!_dragToggledIndices.contains(i)) {
-          _dragToggledIndices.add(i);
-          vibrate(); // Лёгкая вибрация при первом заходе
-          _toggleSelection(currentList[i]);
+      if (rect.contains(localPos)) {
+        if (_dragToggledIds.add(photo.id)) {
+          // true если добавилось впервые
+          vibrate();
+          _toggleSelection(photo);
         }
       }
     }
@@ -316,7 +311,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
         : widget.photos;
 
     // Список ключей для каждого элемента (каждый рендерится в том же порядке, что и в списке)
-    _itemKeys = List.generate(photosFiltered.length, (_) => GlobalKey());
+    // _itemKeys = List.generate(photosFiltered.length, (_) => GlobalKey());
 
     final titleText = '${widget.title} (${photosFiltered.length})';
     final hasActiveFilters =
@@ -542,41 +537,30 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     required bool isPinterest,
     required List<Photo> currentList,
   }) {
+    final GlobalKey itemKey =
+        _itemKeys.putIfAbsent(photo.id, () => GlobalKey());
+
     return Container(
-      key: _itemKeys[index], // <-- Привязываем GlobalKey к каждому элементу
-      decoration: BoxDecoration(
-        border: _isMultiSelect && _selectedPhotos.contains(photo)
-            ? Border.all(color: Colors.white, width: 3.0)
-            : null,
-      ),
+      key: itemKey, // ключ теперь постоянный
       child: Stack(
         children: [
           PhotoThumbnail(
+            key: ValueKey(
+                'thumb_${photo.id}'), // можно оставить, но не обязателен
             photo: photo,
-            onPhotoTap: () => _onPhotoTap(context, index, currentList),
             isPinterestLayout: isPinterest,
+            isSelected: _isMultiSelect && _selectedPhotos.contains(photo),
+            onPhotoTap: () => _onPhotoTap(context, index, currentList),
             onLongPress: () {
               vibrate();
               _onThumbnailLongPress(context, photo);
             },
           ),
           if (_isMultiSelect && _selectedPhotos.contains(photo))
-            Positioned(
+            const Positioned(
               bottom: 8,
               right: 8,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  color: Colors.blue,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.check,
-                  color: Colors.white,
-                  size: 16,
-                ),
-              ),
+              child: Icon(Icons.check_circle, color: Colors.blue, size: 24),
             ),
         ],
       ),
