@@ -13,10 +13,10 @@ class Photo extends HiveObject {
   String path;
 
   @HiveField(2)
-  final List<String> folderIds; // Список идентификаторов папок
+  final List<String> folderIds;
 
   @HiveField(3)
-  final List<String> tagIds; // Список идентификаторов тегов
+  final List<String> tagIds;
 
   @HiveField(4)
   final String comment;
@@ -28,16 +28,16 @@ class Photo extends HiveObject {
   final int sortOrder;
 
   @HiveField(7)
-  bool isStoredInApp; // Новое поле
+  bool isStoredInApp;
 
   @HiveField(8)
-  String fileName; // Храните только имя файла
+  String fileName;
 
   @HiveField(9)
-  final Map<String, double>? geoLocation; // Новое поле для геолокации
+  final Map<String, double>? geoLocation;
 
   @HiveField(10)
-  String mediaType; // Убрано final
+  String mediaType;
 
   @HiveField(11)
   String? videoPreview;
@@ -69,7 +69,6 @@ class Photo extends HiveObject {
   bool get isImage => mediaType == 'image';
   bool get isVideo => mediaType == 'video';
 
-  /// Метод copyWith для создания нового объекта с изменёнными полями
   Photo copyWith({
     String? id,
     String? path,
@@ -100,5 +99,43 @@ class Photo extends HiveObject {
       isStoredInApp: isStoredInApp ?? this.isStoredInApp,
       geoLocation: geoLocation ?? this.geoLocation,
     );
+  }
+
+  factory Photo.fromJson(Map<String, dynamic> json) {
+    return Photo(
+      id: json['id'],
+      path: json['path'],
+      fileName: json['fileName'],
+      folderIds: List<String>.from(json['folderIds'] ?? []),
+      tagIds: List<String>.from(json['tagIds'] ?? []),
+      comment: json['comment'],
+      dateAdded: DateTime.parse(json['dateAdded']),
+      sortOrder: json['sortOrder'],
+      mediaType: json['mediaType'],
+      videoPreview: json['videoPreview'],
+      videoDuration: json['videoDuration'],
+      isStoredInApp: json['isStoredInApp'] ?? false,
+      geoLocation: json['geoLocation'] != null
+          ? Map<String, double>.from(json['geoLocation'])
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'path': path,
+      'fileName': fileName,
+      'folderIds': folderIds,
+      'tagIds': tagIds,
+      'comment': comment,
+      'dateAdded': dateAdded.toIso8601String(),
+      'sortOrder': sortOrder,
+      'mediaType': mediaType,
+      'videoPreview': videoPreview,
+      'videoDuration': videoDuration,
+      'isStoredInApp': isStoredInApp,
+      'geoLocation': geoLocation,
+    };
   }
 }

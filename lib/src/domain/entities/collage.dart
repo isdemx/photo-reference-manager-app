@@ -1,10 +1,10 @@
 import 'package:hive/hive.dart';
-part 'collage.g.dart'; // <-- для генерации адаптера
+part 'collage.g.dart';
 
-@HiveType(typeId: 101) // <-- используйте свой уникальный ID
+@HiveType(typeId: 101)
 class CollageItem extends HiveObject {
   @HiveField(0)
-  String fileName; // имя файла, который содержит фото
+  String fileName;
 
   @HiveField(1)
   double offsetX;
@@ -77,9 +77,51 @@ class CollageItem extends HiveObject {
     required this.cropRectBottom,
     required this.zIndex,
   });
+
+  factory CollageItem.fromJson(Map<String, dynamic> json) => CollageItem(
+        fileName: json['fileName'],
+        offsetX: json['offsetX'],
+        offsetY: json['offsetY'],
+        scale: json['scale'],
+        rotation: json['rotation'],
+        baseWidth: json['baseWidth'],
+        baseHeight: json['baseHeight'],
+        internalOffsetX: json['internalOffsetX'],
+        internalOffsetY: json['internalOffsetY'],
+        brightness: json['brightness'],
+        saturation: json['saturation'],
+        temp: json['temp'],
+        hue: json['hue'],
+        cropRectLeft: json['cropRectLeft'],
+        cropRectTop: json['cropRectTop'],
+        cropRectRight: json['cropRectRight'],
+        cropRectBottom: json['cropRectBottom'],
+        zIndex: json['zIndex'],
+      );
+
+  Map<String, dynamic> toJson() => {
+        'fileName': fileName,
+        'offsetX': offsetX,
+        'offsetY': offsetY,
+        'scale': scale,
+        'rotation': rotation,
+        'baseWidth': baseWidth,
+        'baseHeight': baseHeight,
+        'internalOffsetX': internalOffsetX,
+        'internalOffsetY': internalOffsetY,
+        'brightness': brightness,
+        'saturation': saturation,
+        'temp': temp,
+        'hue': hue,
+        'cropRectLeft': cropRectLeft,
+        'cropRectTop': cropRectTop,
+        'cropRectRight': cropRectRight,
+        'cropRectBottom': cropRectBottom,
+        'zIndex': zIndex,
+      };
 }
 
-@HiveType(typeId: 100) // <-- используйте свой уникальный ID
+@HiveType(typeId: 100)
 class Collage extends HiveObject {
   @HiveField(0)
   String id;
@@ -87,31 +129,48 @@ class Collage extends HiveObject {
   @HiveField(1)
   String title;
 
-  /// Сохраняем цвет фона (Color.value)
   @HiveField(2)
   int backgroundColorValue;
 
-  /// Список элементов-«фото» (CollageItem)
   @HiveField(3)
   List<CollageItem> items;
 
-  @HiveField(4) // <-- добавляем новое поле
+  @HiveField(4)
   DateTime? dateCreated;
 
-  @HiveField(5) // <-- добавляем новое поле
+  @HiveField(5)
   DateTime? dateUpdated;
-
-  // Новое поле для данных рисования
-  // @HiveField(6) // <-- следующий свободный индекс
-  // String? drawingData; // JSON или любая сериализация штрихов
 
   Collage({
     required this.id,
     required this.title,
     required this.backgroundColorValue,
     required this.items,
-    required this.dateCreated, // <-- добавили
-    required this.dateUpdated, // <-- добавили
-    // this.drawingData,         // <-- необязательное
+    required this.dateCreated,
+    required this.dateUpdated,
   });
+
+  factory Collage.fromJson(Map<String, dynamic> json) => Collage(
+        id: json['id'],
+        title: json['title'],
+        backgroundColorValue: json['backgroundColorValue'],
+        items: (json['items'] as List<dynamic>)
+            .map((e) => CollageItem.fromJson(e))
+            .toList(),
+        dateCreated: json['dateCreated'] != null
+            ? DateTime.parse(json['dateCreated'])
+            : null,
+        dateUpdated: json['dateUpdated'] != null
+            ? DateTime.parse(json['dateUpdated'])
+            : null,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'backgroundColorValue': backgroundColorValue,
+        'items': items.map((e) => e.toJson()).toList(),
+        'dateCreated': dateCreated?.toIso8601String(),
+        'dateUpdated': dateUpdated?.toIso8601String(),
+      };
 }

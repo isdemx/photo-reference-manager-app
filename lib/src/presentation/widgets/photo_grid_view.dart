@@ -187,10 +187,10 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   void _onVideoGeneratorPressed(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
-    );
+    // showModalBottomSheet(
+    //   context: context,
+    //   builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
+    // );
   }
 
   void _onCollageGeneratorPressed(BuildContext context) {

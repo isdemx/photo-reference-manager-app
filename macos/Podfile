@@ -21,7 +21,6 @@ def flutter_root
   end
   raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Flutter-Generated.xcconfig, then run 'flutter pub get'"
 end
-ENV['EXCLUDED_PLUGINS'] = 'ffmpeg_kit_flutter_new'
 
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 

@@ -236,18 +236,6 @@
       "languageVersion": "3.7"
     },
     {
-      "name": "ffmpeg_kit_flutter_new",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_new-1.1.0",
-      "packageUri": "lib/",
-      "languageVersion": "3.1"
-    },
-    {
-      "name": "ffmpeg_kit_flutter_platform_interface",
-      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_platform_interface-0.2.1",
-      "packageUri": "lib/",
-      "languageVersion": "2.12"
-    },
-    {
       "name": "file",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
@@ -1088,7 +1076,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2025-04-30T07:07:52.773327Z",
+  "generated": "2025-04-30T15:35:00.952724Z",
   "generator": "pub",
   "generatorVersion": "3.7.0",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

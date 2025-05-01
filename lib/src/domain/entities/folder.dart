@@ -20,7 +20,7 @@ class Folder extends HiveObject {
   DateTime dateCreated;
 
   @HiveField(6)
-  String? avatarPath; // Путь к аватару
+  String? avatarPath;
 
   @HiveField(5)
   int sortOrder;
@@ -35,11 +35,11 @@ class Folder extends HiveObject {
     required this.photoIds,
     required this.dateCreated,
     required this.sortOrder,
+    this.avatarPath,
     this.isPrivate,
-    this.avatarPath
   });
 
-  // Метод copyWith
+  /// Создание копии с изменениями
   Folder copyWith({
     String? id,
     String? name,
@@ -47,8 +47,8 @@ class Folder extends HiveObject {
     List<String>? photoIds,
     DateTime? dateCreated,
     int? sortOrder,
+    String? avatarPath,
     bool? isPrivate,
-    String? avatarPath, // Новое поле
   }) {
     return Folder(
       id: id ?? this.id,
@@ -57,8 +57,34 @@ class Folder extends HiveObject {
       photoIds: photoIds ?? this.photoIds,
       dateCreated: dateCreated ?? this.dateCreated,
       sortOrder: sortOrder ?? this.sortOrder,
+      avatarPath: avatarPath ?? this.avatarPath,
       isPrivate: isPrivate ?? this.isPrivate,
-      avatarPath: avatarPath ?? this.avatarPath, // Новое поле
+    );
+  }
+
+  /// Экспорт в JSON
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'categoryId': categoryId,
+        'photoIds': photoIds,
+        'dateCreated': dateCreated.toIso8601String(),
+        'sortOrder': sortOrder,
+        'avatarPath': avatarPath,
+        'isPrivate': isPrivate,
+      };
+
+  /// Импорт из JSON
+  factory Folder.fromJson(Map<String, dynamic> json) {
+    return Folder(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      categoryId: json['categoryId'] as String,
+      photoIds: List<String>.from(json['photoIds'] ?? []),
+      dateCreated: DateTime.parse(json['dateCreated'] as String),
+      sortOrder: json['sortOrder'] as int,
+      avatarPath: json['avatarPath'] as String?,
+      isPrivate: json['isPrivate'] as bool?,
     );
   }
 }

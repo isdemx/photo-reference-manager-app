@@ -16,10 +16,10 @@ class Category extends HiveObject {
   @HiveField(3)
   int sortOrder;
 
-  @HiveField(4) // Новое поле
+  @HiveField(4)
   bool? isPrivate;
 
-  @HiveField(5) // Новое поле
+  @HiveField(5)
   bool? collapsed;
 
   Category({
@@ -27,26 +27,48 @@ class Category extends HiveObject {
     required this.name,
     required this.folderIds,
     required this.sortOrder,
-    this.isPrivate, // Новое поле
-    this.collapsed, // Новое поле
+    this.isPrivate,
+    this.collapsed,
   });
 
-  // Метод copyWith
+  /// Копирование с частичной заменой
   Category copyWith({
     String? id,
     String? name,
     List<String>? folderIds,
     int? sortOrder,
-    bool? isPrivate,  // Новое поле
-    bool? collapsed,  // Новое поле
+    bool? isPrivate,
+    bool? collapsed,
   }) {
     return Category(
       id: id ?? this.id,
       name: name ?? this.name,
       folderIds: folderIds ?? this.folderIds,
       sortOrder: sortOrder ?? this.sortOrder,
-      isPrivate: isPrivate ?? this.isPrivate,  // Новое поле
-      collapsed: collapsed ?? this.collapsed,  // Новое поле
+      isPrivate: isPrivate ?? this.isPrivate,
+      collapsed: collapsed ?? this.collapsed,
+    );
+  }
+
+  /// Преобразование в JSON
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'folderIds': folderIds,
+        'sortOrder': sortOrder,
+        'isPrivate': isPrivate,
+        'collapsed': collapsed,
+      };
+
+  /// Создание из JSON
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      folderIds: List<String>.from(json['folderIds'] ?? []),
+      sortOrder: json['sortOrder'] as int,
+      isPrivate: json['isPrivate'] as bool?,
+      collapsed: json['collapsed'] as bool?,
     );
   }
 }

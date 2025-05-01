@@ -33,6 +33,7 @@ import 'package:photographers_reference_app/src/presentation/screens/my_collages
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/services/export_service.dart';
 
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
@@ -51,6 +52,9 @@ void main() async {
   Hive.registerAdapter(UserSettingsAdapter());
   Hive.registerAdapter(CollageAdapter()); // typeId=100
   Hive.registerAdapter(CollageItemAdapter()); // typeId=101
+
+  // await ExportService.run();
+  // await ImportJsonService.run();
 
   // 3. Открытие всех боксов (по одному разу).
   final tagBox = await Hive.openBox<Tag>('tags');

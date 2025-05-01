@@ -21,10 +21,7 @@ class Tag extends HiveObject with EquatableMixin {
     required this.colorValue,
   });
 
-  // Геттер для получения объекта Color из colorValue
   Color get color => Color(colorValue);
-
-  // Сеттер для установки colorValue из объекта Color
   set color(Color newColor) => colorValue = newColor.value;
 
   @override
@@ -33,5 +30,21 @@ class Tag extends HiveObject with EquatableMixin {
   @override
   String toString() {
     return 'Tag{id: $id, name: $name, colorValue: $colorValue}';
+  }
+
+  factory Tag.fromJson(Map<String, dynamic> json) {
+    return Tag(
+      id: json['id'] as String,
+      name: json['name'] as String,
+      colorValue: json['colorValue'] as int,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'colorValue': colorValue,
+    };
   }
 }
