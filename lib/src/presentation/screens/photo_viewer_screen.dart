@@ -6,8 +6,11 @@ import 'package:iconsax/iconsax.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
@@ -475,6 +478,22 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                           // Ваш метод
                         },
                         onCancel: _clearSelection,
+                        onAddToFolderMulti: () async {
+                          if (_selectedPhotos.isEmpty) return;
+                          final ok = await FoldersHelpers.showAddToFolderDialog(
+                            context,
+                            _selectedPhotos,
+                          );
+                          if (ok) _clearSelection();
+                        },
+                        onAddToTag: () async {
+                          if (_selectedPhotos.isEmpty) return;
+                          final ok = await TagsHelpers.showAddTagToImagesDialog(
+                            context,
+                            _selectedPhotos,
+                          );
+                          if (ok) _clearSelection();
+                        },
                       ),
                     ),
                 ],
@@ -530,7 +549,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             // Можно разный heroTag задать, если нужно
             heroAttributes: PhotoViewHeroAttributes(tag: 'video_$index'),
             // Виджет отображения видео
-            child: _buildVideoView(index, photo),
+            child: VideoView(index, photo, _currentIndex, _videoController),
           );
         } else {
           // Если это изображение — обычный PhotoView, но с "переворотом" при необходимости
@@ -572,68 +591,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     );
   }
 
-  /// Отображение видео
-  Widget _buildVideoView(int index, Photo photo) {
-    if (index == _currentIndex && _videoController != null) {
-      final controller = _videoController!;
-      if (controller.value.isInitialized) {
-        final duration = controller.value.duration;
-        final position = controller.value.position;
-
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AspectRatio(
-              aspectRatio: controller.value.aspectRatio,
-              child: VideoPlayer(controller),
-            ),
-            // Прогресс-бар + перемотка
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Row(
-                children: [
-                  Text(formatDuration(position)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: VideoProgressIndicator(
-                      controller,
-                      allowScrubbing: true,
-                      colors: const VideoProgressColors(
-                        playedColor: Colors.blue,
-                        bufferedColor: Colors.white54,
-                        backgroundColor: Colors.black26,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(formatDuration(duration)),
-                ],
-              ),
-            ),
-            IconButton(
-              icon: Icon(
-                controller.value.isPlaying ? Iconsax.pause : Iconsax.play,
-              ),
-              onPressed: () {
-                setState(() {
-                  if (controller.value.isPlaying) {
-                    controller.pause();
-                  } else {
-                    controller.play();
-                  }
-                });
-              },
-            ),
-          ],
-        );
-      } else {
-        return const Center(child: CircularProgressIndicator());
-      }
-    } else {
-      // Пока контроллер не готов или мы на другом экране
-      return const Center(child: CircularProgressIndicator());
-    }
-  }
 
   /// Миниатюры внизу
   Widget _buildThumbnails() {

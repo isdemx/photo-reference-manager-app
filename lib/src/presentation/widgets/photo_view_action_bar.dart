@@ -15,6 +15,8 @@ class ActionBar extends StatelessWidget {
   final VoidCallback enableSelectPhotoMode;
   final VoidCallback deletePhoto;
   final VoidCallback onAddToFolder;
+  final VoidCallback onAddToFolderMulti;
+  final VoidCallback onAddToTag;
 
   const ActionBar({
     super.key,
@@ -26,6 +28,8 @@ class ActionBar extends StatelessWidget {
     required this.enableSelectPhotoMode,
     required this.deletePhoto,
     required this.onAddToFolder,
+    required this.onAddToFolderMulti,
+    required this.onAddToTag,
   });
 
   @override
@@ -43,29 +47,56 @@ class ActionBar extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     onPressed: onCancel,
-                    icon: const Icon(Iconsax.close_circle),
-                    label: const Text('Cancel'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 172, 46, 37),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                      minimumSize: const Size(48, 48),
                     ),
+                    child:
+                        const Icon(Iconsax.close_circle, color: Colors.white),
                   ),
-                  ElevatedButton.icon(
+                  ElevatedButton(
+                    onPressed: onAddToTag,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 30, 136, 82),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: const Icon(Iconsax.tag, color: Colors.white),
+                  ),
+                  ElevatedButton(
+                    onPressed: onAddToFolderMulti,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 37, 96, 155),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: const Icon(Iconsax.folder_add, color: Colors.white),
+                  ),
+                  ElevatedButton(
                     onPressed: onShare,
-                    icon: const Icon(Iconsax.export_1),
-                    label: const Text('Share'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 35, 107, 166),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                      minimumSize: const Size(48, 48),
                     ),
+                    child: const Icon(Iconsax.export_1, color: Colors.white),
                   ),
-                  ElevatedButton.icon(
+                  ElevatedButton(
                     onPressed: deletePhoto,
-                    icon: const Icon(Iconsax.trash),
-                    label: const Text('Delete'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 237, 75, 6),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                      minimumSize: const Size(48, 48),
                     ),
+                    child: const Icon(Iconsax.trash, color: Colors.white),
                   ),
                 ],
               )

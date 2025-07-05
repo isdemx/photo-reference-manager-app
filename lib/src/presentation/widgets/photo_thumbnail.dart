@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
@@ -47,23 +48,45 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
     }
 
     // Для режима Pinterest не задаём width/height, чтобы ExtendedImage занял размеры, определённые родителем.
-    Widget imageWidget = widget.isPinterestLayout
-        ? ExtendedImage.file(
-            file,
-            fit: BoxFit.cover,
-            cacheWidth: 200,
-            clearMemoryCacheIfFailed: true,
-            cacheRawData: true,
-          )
-        : ExtendedImage.file(
-            file,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-            cacheWidth: 200,
-            clearMemoryCacheIfFailed: true,
-            cacheRawData: true,
-          );
+    // ── чем рендерим превью? ────────────────────────────────────────────────
+    Widget imageWidget;
+    if (widget.photo.mediaType == 'video') {
+      // для видео — маленький VideoView (звук 0, без UI)
+      imageWidget = Container(
+        height: 100,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: Text(
+          widget.photo.fileName,
+          style: const TextStyle(fontSize: 14, color: Colors.white70),
+          textAlign: TextAlign.center,
+          softWrap: true,
+          maxLines:
+              3, // или любое другое число, сколько строк максимум разрешено
+        ),
+      );
+    } else {
+      // для фото — ExtendedImage, как было
+      final imgFile =
+          File(PhotoPathHelper().getFullPath(widget.photo.fileName));
+      imageWidget = widget.isPinterestLayout
+          ? ExtendedImage.file(
+              imgFile,
+              fit: BoxFit.cover,
+              cacheWidth: 200,
+              clearMemoryCacheIfFailed: true,
+              cacheRawData: true,
+            )
+          : ExtendedImage.file(
+              imgFile,
+              fit: BoxFit.cover,
+              width: double.infinity,
+              height: double.infinity,
+              cacheWidth: 200,
+              clearMemoryCacheIfFailed: true,
+              cacheRawData: true,
+            );
+    }
 
     // Если это видео и задана длительность, накладываем её поверх изображения.
     if (widget.photo.mediaType == 'video' &&

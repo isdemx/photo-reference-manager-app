@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
@@ -287,5 +288,90 @@ class TagsHelpers {
       }
     }
     return counts;
+  }
+
+  /// Диалог массового назначения тега нескольким фотографиям.
+  /// Возвращает true, если были изменения.
+  /// Показывает тот же диалог, но для массива фото.
+  /// Возвращает true, если пользователь нажал "OK"
+  static Future<bool> showAddTagToImagesDialog(
+    BuildContext context,
+    List<Photo> photos,
+  ) async {
+    bool anyChanged = false;
+
+    // прогоняем диалог для всех тегов сразу
+    final tagBloc = context.read<TagBloc>();
+    if (tagBloc.state is! TagLoaded) tagBloc.add(LoadTags());
+
+    return await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return BlocBuilder<TagBloc, TagState>(
+          builder: (context, tagState) {
+            if (tagState is! TagLoaded) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final tags = tagState.tags;
+            return AlertDialog(
+              title: const Text('Add tags to selected images'),
+              content: SingleChildScrollView(
+                child: Wrap(
+                  spacing: 8,
+                  children: tags.map((tag) {
+                    final allHave =
+                        photos.every((p) => p.tagIds.contains(tag.id));
+                    final someHave =
+                        photos.any((p) => p.tagIds.contains(tag.id));
+
+                    IconData? icon;
+                    if (allHave)
+                      icon = Icons.check;
+                    else if (someHave)
+                      icon = Icons.remove;
+                    else
+                      icon = null;
+
+                    return ChoiceChip(
+                      avatar: Icon(icon, size: 16, color: Colors.white),
+                      label: Text(tag.name),
+                      selected: allHave,
+                      selectedColor: Color(tag.colorValue).withOpacity(0.5),
+                      backgroundColor: Color(tag.colorValue),
+                      labelStyle: const TextStyle(color: Colors.white),
+                      onSelected: (_) {
+                        for (final photo in photos) {
+                          if (allHave || someHave) {
+                            photo.tagIds.remove(tag.id);
+                          } else {
+                            if (!photo.tagIds.contains(tag.id)) {
+                              photo.tagIds.add(tag.id);
+                            }
+                          }
+                          context.read<PhotoBloc>().add(UpdatePhoto(photo));
+                        }
+                        anyChanged = true;
+                        (context as Element).markNeedsBuild();
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, anyChanged),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    ).then((v) => v ?? false);
   }
 }

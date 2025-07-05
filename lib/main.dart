@@ -33,6 +33,7 @@ import 'package:photographers_reference_app/src/presentation/screens/my_collages
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 import 'package:photographers_reference_app/src/services/export_service.dart';
 
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
@@ -79,6 +80,7 @@ void main() async {
   await PhotoPathHelper().initialize();
 
   // 5. Запуск приложения. Передаём открытые боксы в MyApp, чтобы дальше не открывать их повторно.
+
   runApp(MyApp(
     tagBox: tagBox,
     categoryBox: categoryBox,
@@ -206,7 +208,16 @@ class MyApp extends StatelessWidget {
               color: Colors.black,
             ),
           ),
-          home: const MainScreen(),
+          home: Builder(
+            builder: (context) {
+              Future.delayed(const Duration(seconds: 1), () async {
+                if (await RatingPromptHandler.shouldShowPrompt()) {
+                  RatingPromptHandler.showRatingDialog(context);
+                }
+              });
+              return const MainScreen();
+            },
+          ),
           routes: {
             '/all_tags': (context) => const AllTagsScreen(),
             '/all_photos': (context) => const AllPhotosScreen(),

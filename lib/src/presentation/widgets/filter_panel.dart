@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 
 class FilterPanel extends StatelessWidget {
   final List<Tag> tags;
+
+  bool get isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
 
   const FilterPanel({super.key, required this.tags});
 
@@ -14,7 +18,7 @@ class FilterPanel extends StatelessWidget {
       builder: (context, filterState) {
         return Container(
           padding: const EdgeInsets.all(8.0),
-          color: Colors.black.withOpacity(0.27),
+          color: Colors.black.withOpacity(isMacOS ? 0.9 : 0.27),
           child: Column(
             children: [
               Expanded(
@@ -23,8 +27,8 @@ class FilterPanel extends StatelessWidget {
                     spacing: 8.0,
                     runSpacing: 8.0,
                     children: tags.map((tag) {
-                      final tagFilterState =
-                          filterState.filters[tag.id] ?? TagFilterState.undefined;
+                      final tagFilterState = filterState.filters[tag.id] ??
+                          TagFilterState.undefined;
                       return GestureDetector(
                         onTap: () {
                           context

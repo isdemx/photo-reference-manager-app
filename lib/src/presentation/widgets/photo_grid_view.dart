@@ -8,6 +8,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.da
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/video_generator.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
@@ -19,6 +20,8 @@ import 'package:photographers_reference_app/src/presentation/widgets/photo_thumb
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_overlay.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 
 class PhotoGridView extends StatefulWidget {
   final List<Photo> photos;
@@ -54,6 +57,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   final Map<String, GlobalKey> _itemKeys = {}; // вместо List
 
   final Set<String> _dragToggledIds = {};
+
+  bool get _isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
 
   int _columnCount = 3;
   bool _isPinterestLayout = false;
@@ -320,129 +325,149 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     return Stack(
       children: [
         // GestureDetector для обработки драга
-        GestureDetector(
-          key: _scrollKey,
-          behavior: HitTestBehavior.translucent,
-          onPanStart: (details) => _onPanStart(details, photosFiltered),
-          onPanUpdate: (details) => _onPanUpdate(details, photosFiltered),
-          onPanEnd: _onPanEnd,
-          child: CustomScrollView(
-            slivers: [
-              SliverAppBar(
-                backgroundColor: Colors.black.withOpacity(0.5),
-                pinned: true,
-                title: Row(
-                  children: [
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                        child: Text(
-                          _isMultiSelect
-                              ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
-                              : titleText,
-                          style: TextStyle(
-                            color: _isMultiSelect
-                                ? Colors.yellow
-                                : (hasActiveFilters
-                                    ? Colors.yellow
-                                    : Colors.white),
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                key: _scrollKey,
+                behavior: HitTestBehavior.translucent,
+                onPanStart: (details) => _onPanStart(details, photosFiltered),
+                onPanUpdate: (details) => _onPanUpdate(details, photosFiltered),
+                onPanEnd: _onPanEnd,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverAppBar(
+                      backgroundColor: Colors.black.withOpacity(0.5),
+                      pinned: true,
+                      title: Row(
+                        children: [
+                          Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 8.0),
+                              child: Text(
+                                _isMultiSelect
+                                    ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
+                                    : titleText,
+                                style: TextStyle(
+                                  color: _isMultiSelect
+                                      ? Colors.yellow
+                                      : (hasActiveFilters
+                                          ? Colors.yellow
+                                          : Colors.white),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
+                      actions: !_isMultiSelect
+                          ? [
+                              if (widget.actionFromParent != null)
+                                widget.actionFromParent!,
+                              IconButton(
+                                icon: Icon(_isPinterestLayout
+                                    ? Icons.grid_on
+                                    : Icons.dashboard),
+                                onPressed: _togglePinterestLayout,
+                                tooltip: _isPinterestLayout
+                                    ? 'Switch to Grid View'
+                                    : 'Switch to Masonry View',
+                              ),
+                              if (widget.showFilter)
+                                IconButton(
+                                  icon: Icon(Icons.filter_list,
+                                      color: hasActiveFilters
+                                          ? Colors.yellow
+                                          : Colors.white),
+                                  onPressed: () {
+                                    setState(() {
+                                      _showFilterPanel = !_showFilterPanel;
+                                    });
+                                  },
+                                  tooltip: 'Filters',
+                                ),
+                              if (widget.showShareBtn == true)
+                                IconButton(
+                                  icon: const Icon(Icons.share),
+                                  onPressed: () => ImagesHelpers.sharePhotos(
+                                    context,
+                                    _selectedPhotos,
+                                  ),
+                                ),
+                            ]
+                          : [
+                              IconButton(
+                                icon: const Icon(Icons.cancel),
+                                onPressed: _onDonePressed,
+                              ),
+                            ],
+                    ),
+                    SliverPadding(
+                      padding: EdgeInsets.only(
+                        left: 8.0,
+                        right: 8.0,
+                        top: 8.0,
+                        bottom: _isMultiSelect
+                            ? 80.0
+                            : 8.0, // Увеличиваем отступ, если включен мультиселект
+                      ),
+                      sliver: _isPinterestLayout
+                          ? SliverMasonryGrid.count(
+                              crossAxisCount: _columnCount,
+                              mainAxisSpacing: 8.0,
+                              crossAxisSpacing: 8.0,
+                              childCount: photosFiltered.length,
+                              itemBuilder: (context, index) {
+                                final photo = photosFiltered[index];
+                                return _buildGridItem(
+                                  context,
+                                  index,
+                                  photo,
+                                  isPinterest: true,
+                                  currentList: photosFiltered,
+                                );
+                              },
+                            )
+                          : SliverGrid(
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: _columnCount,
+                                mainAxisSpacing: 4.0,
+                                crossAxisSpacing: 4.0,
+                              ),
+                              delegate: SliverChildBuilderDelegate(
+                                (context, index) {
+                                  final photo = photosFiltered[index];
+                                  return _buildGridItem(
+                                    context,
+                                    index,
+                                    photo,
+                                    isPinterest: false,
+                                    currentList: photosFiltered,
+                                  );
+                                },
+                                childCount: photosFiltered.length,
+                              ),
+                            ),
                     ),
                   ],
                 ),
-                actions: !_isMultiSelect
-                    ? [
-                        if (widget.actionFromParent != null)
-                          widget.actionFromParent!,
-                        IconButton(
-                          icon: Icon(_isPinterestLayout
-                              ? Icons.grid_on
-                              : Icons.dashboard),
-                          onPressed: _togglePinterestLayout,
-                          tooltip: _isPinterestLayout
-                              ? 'Switch to Grid View'
-                              : 'Switch to Masonry View',
-                        ),
-                        if (widget.showFilter)
-                          IconButton(
-                            icon: Icon(Icons.filter_list,
-                                color: hasActiveFilters
-                                    ? Colors.yellow
-                                    : Colors.white),
-                            onPressed: () {
-                              setState(() {
-                                _showFilterPanel = !_showFilterPanel;
-                              });
-                            },
-                            tooltip: 'Filters',
-                          ),
-                        if (widget.showShareBtn == true)
-                          IconButton(
-                            icon: const Icon(Icons.share),
-                            onPressed: () => ImagesHelpers.sharePhotos(
-                              context,
-                              _selectedPhotos,
-                            ),
-                          ),
-                      ]
-                    : [
-                        IconButton(
-                          icon: const Icon(Icons.cancel),
-                          onPressed: _onDonePressed,
-                        ),
-                      ],
               ),
-              SliverPadding(
-                padding: EdgeInsets.only(
-                  left: 8.0,
-                  right: 8.0,
-                  top: 8.0,
-                  bottom: _isMultiSelect
-                      ? 80.0
-                      : 8.0, // Увеличиваем отступ, если включен мультиселект
+            ),
+            if (_isMacOS)
+              AnimatedContainer(
+                width: _showFilterPanel ? 300 : 0,
+                duration: const Duration(milliseconds: 300),
+                decoration: const BoxDecoration(
+                  boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black54)],
                 ),
-                sliver: _isPinterestLayout
-                    ? SliverMasonryGrid.count(
-                        crossAxisCount: _columnCount,
-                        mainAxisSpacing: 8.0,
-                        crossAxisSpacing: 8.0,
-                        childCount: photosFiltered.length,
-                        itemBuilder: (context, index) {
-                          final photo = photosFiltered[index];
-                          return _buildGridItem(
-                            context,
-                            index,
-                            photo,
-                            isPinterest: true,
-                            currentList: photosFiltered,
-                          );
-                        },
-                      )
-                    : SliverGrid(
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: _columnCount,
-                          mainAxisSpacing: 4.0,
-                          crossAxisSpacing: 4.0,
-                        ),
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            final photo = photosFiltered[index];
-                            return _buildGridItem(
-                              context,
-                              index,
-                              photo,
-                              isPinterest: false,
-                              currentList: photosFiltered,
-                            );
-                          },
-                          childCount: photosFiltered.length,
-                        ),
-                      ),
+                curve: Curves.easeInOut,
+                child: _showFilterPanel
+                    ? FilterPanel(tags: widget.tags)
+                    : const SizedBox.shrink(),
               ),
-            ],
-          ),
+          ],
         ),
 
         if (_isSharing)
@@ -472,6 +497,16 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                     icon: const Icon(Iconsax.eye, color: Colors.white),
                     tooltip: 'View chosen media in Fullscreen',
                     onPressed: _onSelectedViewPressed,
+                  ),
+                  IconButton(
+                    icon: const Icon(Iconsax.tag, color: Colors.white),
+                    tooltip: 'Add / remove tag for selected photos',
+                    onPressed: () async {
+                      final changed =
+                          await TagsHelpers.showAddTagToImagesDialog(
+                              context, _selectedPhotos);
+                      if (changed) _turnMultiSelectModeOff();
+                    },
                   ),
                   AddToFolderWidget(
                     photos: _selectedPhotos,
@@ -512,7 +547,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
             ),
           ),
 
-        if (_showFilterPanel && widget.showFilter)
+        if (!_isMacOS && _showFilterPanel && widget.showFilter)
           Align(
             alignment: Alignment.topCenter,
             child: Container(

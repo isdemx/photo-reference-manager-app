@@ -16,6 +16,7 @@ class PhotoSaveHelper {
     required String fileName,
     required Uint8List bytes,
     required BuildContext context,
+    required String mediaType,
   }) async {
     try {
       // 1. Получаем директорию приложения и создаём папку "photos".
@@ -37,7 +38,7 @@ class PhotoSaveHelper {
         id: const Uuid().v4(),
         fileName: fileName,
         path: outPath,
-        mediaType: 'image',
+        mediaType: mediaType,
         dateAdded: DateTime.now(),
         folderIds: [],
         comment: '',

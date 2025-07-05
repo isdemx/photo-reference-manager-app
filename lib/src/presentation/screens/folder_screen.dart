@@ -10,6 +10,7 @@ import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
 
@@ -35,11 +36,13 @@ class _FolderScreenState extends State<FolderScreen> {
             final file = File(xfile.path);
             final bytes = await file.readAsBytes();
             final fileName = p.basename(file.path);
+            final mediaType = getMediaType(file.path);
 
             final newPhoto = await PhotoSaveHelper.savePhoto(
               fileName: fileName,
               bytes: bytes,
               context: context,
+              mediaType: mediaType
             );
 
             newPhoto.folderIds.add(widget.folder.id);

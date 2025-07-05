@@ -14,8 +14,12 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
+import 'package:photographers_reference_app/src/utils/edit_build_crop_handlers.dart';
+import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -23,9 +27,12 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/collage_save_helper.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:video_player/video_player.dart';
 
 /// Состояние одного фото (drag + zoom + zIndex + edit + brightness + saturation + rotation).
 class CollagePhotoState {
+  final String id;
+
   Photo photo;
 
   /// Позиция (drag)
@@ -71,6 +78,7 @@ class CollagePhotoState {
   double temp;
 
   CollagePhotoState({
+    required this.id,
     required this.photo,
     required this.offset,
     required this.scale,
@@ -117,6 +125,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Color _backgroundColor = Colors.black;
   bool _isFullscreen = false;
+
+  bool _overviewMode = false;
+  late List<Offset> _originalOffsets = [];
+  late List<double> _originalScales = [];
 
   /// Туториал
   bool _showTutorial = false; // Проверим SharedPreferences
@@ -165,55 +177,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     if (!_hasAutoFitted) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _autoFitCollage();
+        _loadCollageScale();
         _hasAutoFitted = true;
       });
     }
   }
 
-  /// Пример: вычисляем bounding box всех фото и пытаемся влезть в экран
-  void _autoFitCollage() {
-    if (_items.isEmpty) return;
-
-    final size = MediaQuery.of(context).size;
-    final screenWidth = size.width;
-    final screenHeight = size.height;
-
-    // Находим минимальные/максимальные координаты,
-    // чтобы определить реальную «ширину/высоту» коллажа.
-    double minX = double.infinity, maxX = -double.infinity;
-    double minY = double.infinity, maxY = -double.infinity;
-
-    for (final item in _items) {
-      final w = item.baseWidth * item.scale;
-      final h = item.baseHeight * item.scale;
-      // Левая и правая границы
-      final left = item.offset.dx;
-      final right = item.offset.dx + w;
-      // Верх и низ
-      final top = item.offset.dy;
-      final bottom = item.offset.dy + h;
-      if (left < minX) minX = left;
-      if (right > maxX) maxX = right;
-      if (top < minY) minY = top;
-      if (bottom > maxY) maxY = bottom;
+  Future<void> _loadCollageScale() async {
+    final prefs = await SharedPreferences.getInstance();
+    final scale = prefs.getDouble('collage_scale');
+    if (scale != null) {
+      setState(() {
+        _collageScale = scale;
+        _hasAutoFitted = true; // чтобы не сбросилось autoFit-ом
+      });
     }
+  }
 
-    final collageWidth = maxX - minX;
-    final collageHeight = maxY - minY;
-    if (collageWidth <= 0 || collageHeight <= 0) return;
-
-    // Какую часть экрана хотим занять? Например, 80%
-    const double desiredFraction = 0.8;
-
-    final scaleX = (screenWidth * desiredFraction) / collageWidth;
-    final scaleY = (screenHeight * desiredFraction) / collageHeight;
-    final newScale = math.min(scaleX, scaleY);
-
-    // Если коллаж и так маленький, можно не масштабировать больше 1.0
-    setState(() {
-      _collageScale = math.min(newScale, 1.0);
-    });
+  Future<void> _saveCollageScale(double scale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble('collage_scale', scale);
   }
 
   void _initCollageFromExisting(Collage collage) {
@@ -239,6 +222,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       );
 
       return CollagePhotoState(
+        id: const Uuid().v4(),
         photo: photo,
         offset: Offset(collageItem.offsetX, collageItem.offsetY),
         scale: collageItem.scale,
@@ -342,6 +326,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       }
     }
     return CollagePhotoState(
+      id: const Uuid().v4(),
       photo: photo,
       offset: Offset.zero,
       scale: 1.0,
@@ -473,6 +458,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final editingPhoto = sorted.firstWhere(
       (it) => it.isEditing,
       orElse: () => CollagePhotoState(
+        id: const Uuid().v4(),
         photo: widget.photos.first,
         offset: Offset.zero,
         scale: 1.0,
@@ -523,12 +509,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             final file = File(xfile.path); // Превращаем XFile в File
             final bytes = await file.readAsBytes(); // Читаем как Uint8List
             final fileName = p.basename(file.path); // Извлекаем имя файла
+            final mediaType = getMediaType(file.path);
 
             // Сохраняем фото через PhotoSaveHelper
             final newPhoto = await PhotoSaveHelper.savePhoto(
               fileName: fileName,
               bytes: bytes,
               context: context,
+              mediaType: mediaType,
             );
 
             // Добавляем фото в коллаж
@@ -574,107 +562,127 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               Column(
                 children: [
                   Expanded(
-                    child: Stack(
-                      children: [
-                        // Цвет фона холста
-                        Container(color: _backgroundColor),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onTap: () {
+                        setState(() {
+                          for (final it in _items) {
+                            it.isEditing = false;
+                          }
+                        });
+                      },
+                      child: Stack(
+                        children: [
+                          // Цвет фона холста
+                          Container(color: _backgroundColor),
 
-                        InteractiveViewer(
-                          boundaryMargin: const EdgeInsets.all(999999),
-                          // теперь глобальный зум отключен
-                          scaleEnabled: false,
-                          panEnabled: false,
-                          clipBehavior: Clip.none,
-                          child: Transform.scale(
-                            scale: _collageScale,
-                            alignment: Alignment.topLeft,
-                            child: RepaintBoundary(
-                              key: _collageKey,
-                              child: SizedBox(
-                                width: 5000,
-                                height: 5000,
-                                child: Stack(
-                                  clipBehavior: Clip.none,
-                                  children: [
-                                    Positioned.fill(
-                                      child: Container(color: _backgroundColor),
-                                    ),
-                                    for (final item in sorted)
-                                      _buildPhotoItem(item),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Иконка удаления (появляется, когда начинаем drag)
-                        if (!isSomePhotoInEditMode &&
-                            (showForInit || _draggingIndex != null))
-                          Positioned(
-                            left: 0,
-                            right: 0,
-                            bottom: 50,
-                            child: Center(
-                              child: Container(
-                                key: _deleteIconKey,
-                                width: 64,
-                                height: 64,
-                                decoration: BoxDecoration(
-                                  color: _deleteHover
-                                      ? Colors.red
-                                      : Colors.white30,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.delete,
-                                    color: Colors.black),
-                              ),
-                            ),
-                          ),
-
-                        // Туториал поверх всего
-                        if (_showTutorial)
-                          Positioned.fill(
-                            child: Container(
-                              color: Colors.black.withOpacity(0.8),
-                              child: Center(
-                                child: SingleChildScrollView(
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
+                          InteractiveViewer(
+                            boundaryMargin: const EdgeInsets.all(999999),
+                            // теперь глобальный зум отключен
+                            scaleEnabled: false,
+                            panEnabled: false,
+                            clipBehavior: Clip.none,
+                            child: Transform.scale(
+                              scale: _collageScale,
+                              alignment: Alignment.topLeft,
+                              child: RepaintBoundary(
+                                key: _collageKey,
+                                child: SizedBox(
+                                  width: 5000,
+                                  height: 5000,
+                                  child: Stack(
+                                    clipBehavior: Clip.none,
                                     children: [
-                                      const Icon(Icons.touch_app,
-                                          size: 60, color: Colors.white),
-                                      const SizedBox(height: 20),
-                                      const Text(
-                                        'Move with one finger\n'
-                                        'Zoom with two fingers\n'
-                                        'Long Press to toggle Edit Mode\n'
-                                        'Rotate + Brightness + Saturation + Temperature + Hue\n'
-                                        'Crop corners when in Edit Mode\n'
-                                        'Tap to bring to front\n'
-                                        'Press check to save image',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.bold,
+                                      Positioned.fill(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            border: Border.all(
+                                              color: Colors.blue.withOpacity(
+                                                  0.6), // например, синий
+                                              width: 3,
+                                            ),
+                                            color: Colors.transparent,
+                                          ),
                                         ),
                                       ),
-                                      const SizedBox(height: 20),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          setState(() => _showTutorial = false);
-                                          _markTutorialPassed();
-                                        },
-                                        child: const Text('Got it'),
-                                      ),
+                                      for (final item in sorted)
+                                        _buildPhotoItem(item),
                                     ],
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                      ],
+
+                          // Иконка удаления (появляется, когда начинаем drag)
+                          if (!isSomePhotoInEditMode &&
+                              (showForInit || _draggingIndex != null))
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 50,
+                              child: Center(
+                                child: Container(
+                                  key: _deleteIconKey,
+                                  width: 64,
+                                  height: 64,
+                                  decoration: BoxDecoration(
+                                    color: _deleteHover
+                                        ? Colors.red
+                                        : Colors.white30,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(Icons.delete,
+                                      color: Colors.black),
+                                ),
+                              ),
+                            ),
+
+                          // Туториал поверх всего
+                          if (_showTutorial)
+                            Positioned.fill(
+                              child: Container(
+                                color: Colors.black.withOpacity(0.8),
+                                child: Center(
+                                  child: SingleChildScrollView(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(Icons.touch_app,
+                                            size: 60, color: Colors.white),
+                                        const SizedBox(height: 20),
+                                        const Text(
+                                          'Move with one finger\n'
+                                          'Zoom with two fingers\n'
+                                          'Long Press to toggle Edit Mode\n'
+                                          'Rotate + Brightness + Saturation + Temperature + Hue\n'
+                                          'Crop corners when in Edit Mode\n'
+                                          'Tap to bring to front\n'
+                                          'Press check to save image',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            setState(
+                                                () => _showTutorial = false);
+                                            _markTutorialPassed();
+                                          },
+                                          child: const Text('Got it'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
 
@@ -759,6 +767,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               decoration:
                   const InputDecoration(hintText: "Enter collage title"),
               autofocus: true,
+              onSubmitted: (value) {
+                Navigator.of(context).pop(value);
+              },
             ),
             actions: [
               TextButton(
@@ -827,6 +838,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     setState(() {
                       _collageScale = val;
                     });
+                    _saveCollageScale(val);
                   },
                 ),
               ),
@@ -837,6 +849,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           tooltip: 'Add photo',
           onPressed: _showAllPhotosSheet,
         ),
+        IconButton(
+          icon: Icon(Icons.grid_view, color: Colors.white),
+          tooltip: 'Overview mode',
+          onPressed: _toggleOverviewMode,
+        ),
+
         IconButton(
           icon: const Icon(Iconsax.colorfilter, color: Colors.white),
           tooltip: 'Change background color',
@@ -860,6 +878,64 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         ),
       ],
     );
+  }
+
+  void _toggleOverviewMode() {
+    setState(() {
+      _overviewMode = !_overviewMode;
+
+      if (_overviewMode) {
+        _enterOverviewLayout();
+      } else {
+        _exitOverviewLayout(); // если хочешь возврат из кнопки
+      }
+    });
+  }
+
+  void _enterOverviewLayout() {
+    _originalOffsets = _items.map((e) => e.offset).toList();
+    _originalScales = _items.map((e) => e.scale).toList();
+
+    final screenWidth = MediaQuery.of(context).size.width;
+    const spacing = 20.0;
+    const itemTargetWidth = 200.0;
+
+    // Автоматически подбираем количество колонок
+    final columns = (screenWidth / (itemTargetWidth + spacing))
+            .floor()
+            .clamp(1, _items.length) -
+        1;
+    final actualItemWidth = (screenWidth - (columns + 1) * spacing) / columns;
+
+    for (int i = 0; i < _items.length; i++) {
+      final row = i ~/ columns;
+      final col = i % columns;
+
+      final x = spacing + col * (actualItemWidth + spacing);
+      final y = spacing + row * (actualItemWidth + spacing);
+
+      final item = _items[i];
+      final scale = actualItemWidth / item.baseWidth;
+
+      item.offset = Offset(x, y);
+      item.scale = scale;
+    }
+  }
+
+  void _exitOverviewLayout({int? bringToFrontIndex}) {
+    for (int i = 0; i < _items.length; i++) {
+      _items[i].offset = _originalOffsets[i];
+      _items[i].scale = _originalScales[i];
+    }
+
+    if (bringToFrontIndex != null) {
+      _maxZIndex++;
+      _items[bringToFrontIndex].zIndex = _maxZIndex;
+    }
+
+    setState(() {
+      _overviewMode = false;
+    });
   }
 
   /// Панель при режиме редактирования (brightness, saturation, temp, hue, rotation)
@@ -898,7 +974,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             _buildSlider(
               label: 'Brt',
               min: 0.0,
-              max: 2.0,
+              max: 4.0,
               divisions: 20,
               value: item.brightness,
               centerValue: 1.0,
@@ -968,6 +1044,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final h = item.baseHeight * item.scale;
 
     return Positioned(
+        key: ValueKey(item.id),
         left: item.offset.dx,
         top: item.offset.dy,
         child: Listener(
@@ -982,12 +1059,19 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           },
           child: GestureDetector(
             onTap: () {
-              setState(() {
-                _maxZIndex++;
-                item.zIndex = _maxZIndex;
-                _activeItemIndex =
-                    _items.indexOf(item); // вот тут сохраняем активный
-              });
+              if (_overviewMode) {
+                final tappedIndex = _items.indexOf(item);
+                _exitOverviewLayout(bringToFrontIndex: tappedIndex);
+              } else {
+                setState(() {
+                  for (final it in _items) {
+                    it.isEditing = false;
+                  }
+                  _maxZIndex++;
+                  item.zIndex = _maxZIndex;
+                  _activeItemIndex = _items.indexOf(item);
+                });
+              }
             },
             onLongPress: () {
               // Отключаем edit mode у всех, включаем у текущего
@@ -1053,145 +1137,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         ));
   }
 
-  /// Комбинируем яркость + насыщенность + контраст + hue
-  ColorFilter _combinedColorFilter(
-    double brightness,
-    double saturation,
-    double temp,
-    double hue,
-  ) {
-    // 1) Матрица яркости (brightness)
-    final b = brightness;
-    final brightnessMatrix = [
-      b,
-      0,
-      0,
-      0,
-      0,
-      0,
-      b,
-      0,
-      0,
-      0,
-      0,
-      0,
-      b,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-    ];
-
-    // 2) Матрица насыщенности (saturation)
-    final s = saturation;
-    const lumR = 0.3086, lumG = 0.6094, lumB = 0.0820;
-    final sr = (1 - s) * lumR;
-    final sg = (1 - s) * lumG;
-    final sb = (1 - s) * lumB;
-    final saturationMatrix = [
-      sr + s,
-      sg,
-      sb,
-      0,
-      0,
-      sr,
-      sg + s,
-      sb,
-      0,
-      0,
-      sr,
-      sg,
-      sb + s,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-    ];
-
-    // 3) Матрица контраста (temperature)
-    // Если temp в диапазоне [-1..1],
-// то при temp>0 картинка теплеет, при temp<0 – холодеет.
-
-    final temperatureMatrix = [
-      // R' = R + 2*temp
-      1, 0, 0, 0, 2 * temp,
-      // G' = G
-      0, 1, 0, 0, 0,
-      // B' = B - 2*temp
-      0, 0, 1, 0, -2 * temp,
-      // A' = A
-      0, 0, 0, 1, 0,
-    ];
-
-    // 4) Матрица оттенка (hue)
-    final cosA = math.cos(hue);
-    final sinA = math.sin(hue);
-    // Пример поворота матрицы для hue
-    final hueMatrix = [
-      0.213 + cosA * 0.787 - sinA * 0.213,
-      0.715 - cosA * 0.715 - sinA * 0.715,
-      0.072 - cosA * 0.072 + sinA * 0.928,
-      0,
-      0,
-      0.213 - cosA * 0.213 + sinA * 0.143,
-      0.715 + cosA * 0.285 + sinA * 0.140,
-      0.072 - cosA * 0.072 - sinA * 0.283,
-      0,
-      0,
-      0.213 - cosA * 0.213 - sinA * 0.787,
-      0.715 - cosA * 0.715 + sinA * 0.715,
-      0.072 + cosA * 0.928 + sinA * 0.072,
-      0,
-      0,
-      0,
-      0,
-      0,
-      1,
-      0,
-    ];
-
-    // Функция умножения матриц 4x5
-    List<double> multiply(List<double> m1, List<double> m2) {
-      final out = List<double>.filled(20, 0.0);
-      for (int row = 0; row < 4; row++) {
-        for (int col = 0; col < 5; col++) {
-          double sum = 0;
-          for (int k = 0; k < 4; k++) {
-            sum += m1[row * 5 + k] * m2[k * 5 + col];
-          }
-          // offset
-          if (col == 4) {
-            sum += m1[row * 5 + 4];
-          }
-          out[row * 5 + col] = sum;
-        }
-      }
-      return out;
-    }
-
-    // Последовательно умножаем: brightness -> saturation -> temp -> hue
-    final m1 = multiply(
-      brightnessMatrix.map((e) => e.toDouble()).toList(),
-      saturationMatrix.map((e) => e.toDouble()).toList(),
-    );
-    final m2 = multiply(
-      m1.map((e) => e.toDouble()).toList(),
-      temperatureMatrix.map((e) => e.toDouble()).toList(),
-    );
-    final m3 = multiply(
-      m2.map((e) => e.toDouble()).toList(),
-      hueMatrix.map((e) => e.toDouble()).toList(),
-    );
-
-    return ColorFilter.matrix(m3);
-  }
-
   /// Собираем контент (учитываем cropRect + полный colorFilter)
   Widget _buildEditableContent(
       CollagePhotoState item, double effectiveWidth, double effectiveHeight) {
@@ -1200,17 +1145,40 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final cropWidth = item.cropRect.width * effectiveWidth;
     final cropHeight = item.cropRect.height * effectiveHeight;
 
-    final filter = _combinedColorFilter(
+    final filter = combinedColorFilter(
       item.brightness,
       item.saturation,
       item.temp,
       item.hue,
     );
 
+    final fullPath = PhotoPathHelper().getFullPath(item.photo.fileName);
+    final isVideo = item.photo.mediaType == 'video';
+
+    Widget mediaWidget;
+    if (isVideo) {
+      mediaWidget = SizedBox(
+        width: effectiveWidth,
+        height: effectiveHeight,
+        child: VideoView(
+          0, // index
+          item.photo,
+          0, // currentIndex
+          null, // внешний контроллер не нужен
+        ),
+      );
+    } else {
+      mediaWidget = Image.file(
+        File(fullPath),
+        width: effectiveWidth,
+        height: effectiveHeight,
+        fit: BoxFit.cover,
+      );
+    }
+
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Основное изображение + обрезка
         ClipRect(
           child: Align(
             alignment: Alignment.topLeft,
@@ -1220,116 +1188,28 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               offset: Offset(-cropLeft, -cropTop) + item.internalOffset,
               child: ColorFiltered(
                 colorFilter: filter,
-                child: Image.file(
-                  File(PhotoPathHelper().getFullPath(item.photo.fileName)),
-                  width: effectiveWidth,
-                  height: effectiveHeight,
-                  fit: BoxFit.cover,
-                ),
+                child: mediaWidget,
               ),
             ),
           ),
         ),
-        // Рамка и уголки при edit mode
         if (item.isEditing) ...[
           Positioned.fill(
             child: CustomPaint(painter: _CropBorderPainter()),
           ),
-          ..._buildCropHandles(item, effectiveWidth, effectiveHeight),
+          ...buildCropHandles(
+            item,
+            effectiveWidth,
+            effectiveHeight,
+            (Rect newRect) {
+              setState(() {
+                item.cropRect = newRect;
+              });
+            },
+          ),
         ],
       ],
     );
-  }
-
-  /// Уголки для обрезки
-  List<Widget> _buildCropHandles(CollagePhotoState item, double w, double h) {
-    final handles = <Widget>[];
-
-    Widget cornerWidget({
-      required Alignment alignment,
-      required Function(Offset delta) onDrag,
-    }) {
-      return Positioned.fill(
-        child: Align(
-          alignment: alignment,
-          child: GestureDetector(
-            onPanUpdate: (details) => onDrag(details.delta),
-            child: Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    void updateCropRect(Offset delta, bool isLeft, bool isTop) {
-      setState(() {
-        final dxNorm = delta.dx / w;
-        final dyNorm = delta.dy / h;
-
-        double left = item.cropRect.left;
-        double top = item.cropRect.top;
-        double right = item.cropRect.right;
-        double bottom = item.cropRect.bottom;
-
-        if (isLeft) left += dxNorm;
-        if (isTop) top += dyNorm;
-        if (!isLeft) right += dxNorm;
-        if (!isTop) bottom += dyNorm;
-
-        left = left.clamp(0.0, 1.0);
-        top = top.clamp(0.0, 1.0);
-        right = right.clamp(0.0, 1.0);
-        bottom = bottom.clamp(0.0, 1.0);
-
-        if (right < left) {
-          final tmp = right;
-          right = left;
-          left = tmp;
-        }
-        if (bottom < top) {
-          final tmp = bottom;
-          bottom = top;
-          top = tmp;
-        }
-
-        item.cropRect = Rect.fromLTRB(left, top, right, bottom);
-      });
-    }
-
-    // Четыре угла
-    handles.add(
-      cornerWidget(
-        alignment: Alignment.topLeft,
-        onDrag: (delta) => updateCropRect(delta, true, true),
-      ),
-    );
-    handles.add(
-      cornerWidget(
-        alignment: Alignment.topRight,
-        onDrag: (delta) => updateCropRect(delta, false, true),
-      ),
-    );
-    handles.add(
-      cornerWidget(
-        alignment: Alignment.bottomLeft,
-        onDrag: (delta) => updateCropRect(delta, true, false),
-      ),
-    );
-    handles.add(
-      cornerWidget(
-        alignment: Alignment.bottomRight,
-        onDrag: (delta) => updateCropRect(delta, false, false),
-      ),
-    );
-
-    return handles;
   }
 
   /// Специальный метод для Slider'а с поддержкой:
@@ -1431,15 +1311,30 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _showAllPhotosSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return PhotoPickerWidget(
-          onPhotoSelected: (photo) {
-            // Закрываем BottomSheet
-            Navigator.pop(context);
-
-            // Например, добавляем фото в ваш коллаж:
-            _addPhotoToCollage(photo);
-          },
+        return FractionallySizedBox(
+          widthFactor: 1,
+          heightFactor: 1,
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.black, // фон внутри
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: PhotoPickerWidget(
+              onPhotoSelected: (photo) {
+                Navigator.pop(context); // закрываем bottom-sheet
+                _addPhotoToCollage(photo); // одиночное добавление
+              },
+              onMultiSelectDone: (List<Photo> list) {
+                Navigator.pop(context); // закрываем bottom-sheet один раз
+                for (final photo in list) {
+                  _addPhotoToCollage(photo); // добавляем по одному
+                }
+              },
+            ),
+          ),
         );
       },
     );
