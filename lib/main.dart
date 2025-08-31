@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p; // <--- Добавьте этот импорт
+import 'package:photographers_reference_app/backup.service.dart';
 
 // Импортируем все нужные сущности, адаптеры и репозитории
 import 'package:photographers_reference_app/src/data/repositories/category_repository_impl.dart';
@@ -37,6 +38,9 @@ import 'package:photographers_reference_app/src/presentation/widgets/rating_prom
 import 'package:photographers_reference_app/src/services/export_service.dart';
 
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 
 /// Точка входа
 void main() async {
@@ -88,6 +92,12 @@ void main() async {
     photoBox: photoBox,
     collageBox: collageBox,
   ));
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    BackupService.promptAndRun(
+      navigatorKey.currentContext!, // navigatorKey — GlobalKey<NavigatorState>
+    );
+  });
 }
 
 /// Пример миграции, если надо заполнить новые поля
@@ -199,6 +209,7 @@ class MyApp extends StatelessWidget {
           ),
         ],
         child: MaterialApp(
+          navigatorKey: navigatorKey,
           title: 'Photographers Reference',
           theme: ThemeData(
             brightness: Brightness.dark,
