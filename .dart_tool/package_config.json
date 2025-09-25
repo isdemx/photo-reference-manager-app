@@ -236,6 +236,18 @@
       "languageVersion": "3.7"
     },
     {
+      "name": "ffmpeg_kit_flutter_new",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_new-3.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.1"
+    },
+    {
+      "name": "ffmpeg_kit_flutter_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/ffmpeg_kit_flutter_platform_interface-0.2.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "file",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/file-7.0.1",
       "packageUri": "lib/",
@@ -758,6 +770,72 @@
       "languageVersion": "3.6"
     },
     {
+      "name": "screen_capture",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_capture-1.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.5"
+    },
+    {
+      "name": "screen_capturer",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_capturer-0.2.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_capturer_linux",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_capturer_linux-0.2.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_capturer_macos",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_capturer_macos-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_capturer_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_capturer_platform_interface-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_capturer_windows",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_capturer_windows-0.2.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_retriever",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_retriever-0.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_retriever_linux",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_retriever_linux-0.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_retriever_macos",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_retriever_macos-0.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_retriever_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_retriever_platform_interface-0.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
+      "name": "screen_retriever_windows",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/screen_retriever_windows-0.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "share_plus",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/share_plus-10.1.4",
       "packageUri": "lib/",
@@ -822,6 +900,12 @@
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shelf_web_socket-3.0.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
+    },
+    {
+      "name": "shell_executor",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/shell_executor-0.1.6",
+      "packageUri": "lib/",
+      "languageVersion": "2.16"
     },
     {
       "name": "sky_engine",
@@ -1076,6 +1160,12 @@
       "languageVersion": "3.7"
     },
     {
+      "name": "window_manager",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/window_manager-0.5.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "wkt_parser",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/wkt_parser-2.0.0",
       "packageUri": "lib/",
@@ -1106,7 +1196,7 @@
       "languageVersion": "3.3"
     }
   ],
-  "generated": "2025-07-05T21:41:09.828360Z",
+  "generated": "2025-09-01T23:19:40.177601Z",
   "generator": "pub",
   "generatorVersion": "3.7.0",
   "flutterRoot": "file:///Users/sergeykudryashov/Development/flutter",

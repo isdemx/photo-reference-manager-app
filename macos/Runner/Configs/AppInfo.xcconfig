@@ -4,6 +4,11 @@
 // future. If not, the values below would default to using the project name when this becomes a
 // 'flutter create' template.
 
+// Имя модуля = нормализованное имя продукта
+PRODUCT_MODULE_NAME = $(PRODUCT_NAME:c99extidentifier)
+DEFINES_MODULE = YES
+SWIFT_VERSION = 5.0
+
 // The application's name. By default this is also the title of the Flutter window.
 PRODUCT_NAME = Refma
 
@@ -12,3 +17,5 @@ PRODUCT_BUNDLE_IDENTIFIER = app.greenmonster.photographersReferenceApp
 
 // The copyright displayed in application information
 PRODUCT_COPYRIGHT = Copyright © 2024-2025 app.greenmonster. All rights reserved.
+
+MACOSX_DEPLOYMENT_TARGET = 11.0

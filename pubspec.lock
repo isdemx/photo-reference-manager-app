@@ -310,6 +310,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.4"
+  ffmpeg_kit_flutter_new:
+    dependency: "direct main"
+    description:
+      name: ffmpeg_kit_flutter_new
+      sha256: a6f881b2a41c8900733afef1806e069f58ab48e395174552e98157eb10d8adc0
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.0"
+  ffmpeg_kit_flutter_platform_interface:
+    dependency: transitive
+    description:
+      name: ffmpeg_kit_flutter_platform_interface
+      sha256: addf046ae44e190ad0101b2fde2ad909a3cd08a2a109f6106d2f7048b7abedee
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.1"
   file:
     dependency: transitive
     description:
@@ -997,6 +1013,94 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.5.0"
+  screen_capture:
+    dependency: "direct main"
+    description:
+      name: screen_capture
+      sha256: "7cbeb8911673553f8f78bed53fa263d1f20a262f474db7bbaf9e9a02e2c9cc12"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.1"
+  screen_capturer:
+    dependency: "direct main"
+    description:
+      name: screen_capturer
+      sha256: "6607812bac01f2d3d98cad0808f5efbaa5824445998dc8567de5f05f24b45b95"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.3"
+  screen_capturer_linux:
+    dependency: transitive
+    description:
+      name: screen_capturer_linux
+      sha256: "3c87aeffcb6f744dd6f7d257c916e6caf23f06e85a976c2f319f9d4398151821"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.3"
+  screen_capturer_macos:
+    dependency: transitive
+    description:
+      name: screen_capturer_macos
+      sha256: "92b67dfbae3263d2228e2438b74dc9aae8cdc9ccacca152f0f8e8531ed5aff8b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
+  screen_capturer_platform_interface:
+    dependency: transitive
+    description:
+      name: screen_capturer_platform_interface
+      sha256: f53d3b955bb413cf4f9bd928c501297a3eb490a72b6a147c8384d4cd5feb872a
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
+  screen_capturer_windows:
+    dependency: transitive
+    description:
+      name: screen_capturer_windows
+      sha256: "141542ff0ce1dae0df9c6625182c480c973c20282dc85f866fbc9215dcbbe04f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.2"
+  screen_retriever:
+    dependency: "direct main"
+    description:
+      name: screen_retriever
+      sha256: "570dbc8e4f70bac451e0efc9c9bb19fa2d6799a11e6ef04f946d7886d2e23d0c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
+  screen_retriever_linux:
+    dependency: transitive
+    description:
+      name: screen_retriever_linux
+      sha256: f7f8120c92ef0784e58491ab664d01efda79a922b025ff286e29aa123ea3dd18
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
+  screen_retriever_macos:
+    dependency: transitive
+    description:
+      name: screen_retriever_macos
+      sha256: "71f956e65c97315dd661d71f828708bd97b6d358e776f1a30d5aa7d22d78a149"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
+  screen_retriever_platform_interface:
+    dependency: transitive
+    description:
+      name: screen_retriever_platform_interface
+      sha256: ee197f4581ff0d5608587819af40490748e1e39e648d7680ecf95c05197240c0
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
+  screen_retriever_windows:
+    dependency: transitive
+    description:
+      name: screen_retriever_windows
+      sha256: "449ee257f03ca98a57288ee526a301a430a344a161f9202b4fcc38576716fe13"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.2.0"
   share_plus:
     dependency: "direct main"
     description:
@@ -1085,6 +1189,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  shell_executor:
+    dependency: transitive
+    description:
+      name: shell_executor
+      sha256: "9c024546fc96470a6b96be9902f0bc05347a017a7638ed8d93c77e8d77eb3c3c"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.6"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -1418,6 +1530,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
+  window_manager:
+    dependency: "direct main"
+    description:
+      name: window_manager
+      sha256: "7eb6d6c4164ec08e1bf978d6e733f3cebe792e2a23fb07cbca25c2872bfdbdcd"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.5.1"
   wkt_parser:
     dependency: transitive
     description:

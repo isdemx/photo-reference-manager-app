@@ -68,6 +68,7 @@ class Photo extends HiveObject {
 
   bool get isImage => mediaType == 'image';
   bool get isVideo => mediaType == 'video';
+  bool get isWebMedia => mediaType == 'webMedia';
 
   Photo copyWith({
     String? id,

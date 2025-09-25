@@ -82,5 +82,7 @@
 				<string>AppFunctionality</string>
 			</dict>
 		</array>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>Recording reference videos</string>
 	</dict>
 </plist>

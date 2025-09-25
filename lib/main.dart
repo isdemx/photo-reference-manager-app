@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -38,9 +40,10 @@ import 'package:photographers_reference_app/src/presentation/widgets/rating_prom
 import 'package:photographers_reference_app/src/services/export_service.dart';
 
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:window_manager/window_manager.dart';
+
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 
 /// Точка входа
 void main() async {
@@ -82,6 +85,15 @@ void main() async {
 
   // (Опционально) Инициализируем пути для фото
   await PhotoPathHelper().initialize();
+
+  
+
+  // 4. Инициализация windowManager для screen recording
+
+  if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+    await windowManager.ensureInitialized();
+    // (Не обязательно менять настройки главного окна, оверлей создадим отдельным окном)
+  }
 
   // 5. Запуск приложения. Передаём открытые боксы в MyApp, чтобы дальше не открывать их повторно.
 

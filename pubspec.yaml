@@ -68,12 +68,19 @@ dependencies:
   video_thumbnail: ^0.5.3
   video_player: ^2.9.2
   # ffmpeg_kit_flutter_min_gpl: ^6.0.1
-  # ffmpeg_kit_flutter_new: ^1.1.0   # Fork
+  ffmpeg_kit_flutter_new: ^3.2.0
   desktop_drop: ^0.5.0
   # scribble: ^0.10.0+1
   # gif_view: ^1.0.2
   url_launcher: ^6.3.1
   flutter_archive: ^6.0.3
+  # screen recording section
+  window_manager: ^0.5.1
+  screen_retriever: ^0.2.0
+  screen_capturer: ^0.2.3
+  screen_capture: ^1.0.1  # macOS screen recording (ScreenCaptureKit)
+  # ffmpeg_kit_flutter_min_gpl: ^6.0.1
+  # end of screen recording section
 
 
 dev_dependencies:

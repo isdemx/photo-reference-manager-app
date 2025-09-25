@@ -28,6 +28,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/collage_sav
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:video_player/video_player.dart';
+import 'package:photographers_reference_app/src/feature/screencap/record_block.dart';
 
 /// Состояние одного фото (drag + zoom + zIndex + edit + brightness + saturation + rotation).
 class CollagePhotoState {
@@ -541,8 +542,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         child: Scaffold(
           appBar: !_isFullscreen
               ? AppBar(
+                  toolbarHeight: 35,
                   title: Text('Free collage (${_items.length} images)'),
                   actions: [
+                    RecordBlock(),
                     IconButton(
                       tooltip: 'Help / Info',
                       icon: const Icon(Icons.info_outline),
@@ -688,8 +691,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
                   // Нижняя панель
                   Container(
-                    height: isSomePhotoInEditMode ? 220 : 80,
-                    color: Colors.black54,
+                    height: isSomePhotoInEditMode
+                        ? (Platform.isMacOS ? 90 : 220)
+                        : (Platform.isMacOS ? 40 : 80),
+                    color: const ui.Color.fromARGB(61, 0, 0, 0),
                     child: isSomePhotoInEditMode
                         ? _buildEditPanel(editingPhoto)
                         : _isFullscreen
@@ -940,101 +945,120 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   /// Панель при режиме редактирования (brightness, saturation, temp, hue, rotation)
   Widget _buildEditPanel(CollagePhotoState item) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Первая строка — кнопки вращения
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.rotate_left),
-              label: const Text('Rotate Left'),
-              onPressed: () {
-                setState(() {
-                  item.rotation -= math.pi / 2;
-                });
-              },
-            ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.rotate_right),
-              label: const Text('Rotate Right'),
-              onPressed: () {
-                setState(() {
-                  item.rotation += math.pi / 2;
-                });
-              },
-            ),
-          ],
-        ),
-        // Вторая строка — яркость, насыщенность
-        Row(
-          children: [
-            const SizedBox(width: 16),
-            _buildSlider(
-              label: 'Brt',
-              min: 0.0,
-              max: 4.0,
-              divisions: 20,
-              value: item.brightness,
-              centerValue: 1.0,
-              onChanged: (val) {
-                setState(() => item.brightness = val);
-              },
-            ),
-            _buildSlider(
-              label: 'Sat',
-              min: 0.0,
-              max: 2.0,
-              divisions: 20,
-              value: item.saturation,
-              centerValue: 1.0,
-              onChanged: (val) {
-                setState(() => item.saturation = val);
-              },
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-        // Третья строка — контраст и hue
-        Row(
-          children: [
-            const SizedBox(width: 16),
-            _buildSlider(
-              label: 'Tmp',
-              min: -5.0,
-              max: 5.0,
-              divisions: 20,
-              value: item.temp,
-              centerValue: 0.0,
-              onChanged: (val) {
-                setState(() => item.temp = val);
-              },
-            ),
-            _buildSlider(
-              label: 'Hue',
-              min: -math.pi / 4,
-              max: math.pi / 4,
-              divisions: 20,
-              value: item.hue,
-              centerValue: 0.0,
-              onChanged: (val) {
-                setState(() => item.hue = val);
-              },
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-        // Четвертая строка — кнопка OK
-        ElevatedButton(
-          child: const Text('OK'),
-          onPressed: () {
-            setState(() {
-              item.isEditing = false;
-            });
-          },
-        ),
-      ],
+    return SizedBox(
+      height: 140,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Ротация — компактные кнопки
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.rotate_left, size: 18),
+                label: const Text('Left', style: TextStyle(fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  minimumSize: const Size(72, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () {
+                  setState(() => item.rotation -= math.pi / 2);
+                },
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.rotate_right, size: 18),
+                label: const Text('Right', style: TextStyle(fontSize: 12)),
+                style: ElevatedButton.styleFrom(
+                  visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  minimumSize: const Size(72, 32),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: () {
+                  setState(() => item.rotation += math.pi / 2);
+                },
+              ),
+              // OK — компактная
+              SizedBox(
+                height: 32,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    minimumSize: const Size(64, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  onPressed: () => setState(() => item.isEditing = false),
+                  child: const Text('OK', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+
+          // Яркость/насыщенность
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              _buildSlider(
+                label: 'Brt',
+                min: 0.0,
+                max: 4.0,
+                divisions: 20,
+                value: item.brightness,
+                centerValue: 1.0,
+                onChanged: (val) => setState(() => item.brightness = val),
+              ),
+              const SizedBox(width: 8),
+              _buildSlider(
+                label: 'Sat',
+                min: 0.0,
+                max: 2.0,
+                divisions: 20,
+                value: item.saturation,
+                centerValue: 1.0,
+                onChanged: (val) => setState(() => item.saturation = val),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+
+          // Темп/Хью
+          Row(
+            children: [
+              const SizedBox(width: 8),
+              _buildSlider(
+                label: 'Tmp',
+                min: -5.0,
+                max: 5.0,
+                divisions: 20,
+                value: item.temp,
+                centerValue: 0.0,
+                onChanged: (val) => setState(() => item.temp = val),
+              ),
+              const SizedBox(width: 8),
+              _buildSlider(
+                label: 'Hue',
+                min: -math.pi / 4,
+                max: math.pi / 4,
+                divisions: 20,
+                value: item.hue,
+                centerValue: 0.0,
+                onChanged: (val) => setState(() => item.hue = val),
+              ),
+              const SizedBox(width: 8),
+            ],
+          ),
+
+          const SizedBox(height: 6),
+        ],
+      ),
     );
   }
 
@@ -1234,25 +1258,34 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         },
         child: Row(
           children: [
-            Text(label, style: const TextStyle(color: Colors.grey)),
+            Text(label,
+                style: const TextStyle(color: Colors.grey, fontSize: 11)),
             Expanded(
-              child: Slider(
-                min: min,
-                max: max,
-                divisions: divisions,
-                value: value,
-                onChanged: (val) {
-                  // Примагничивание к centerValue
-                  final threshold = (max - min) * 0.03; // 5% от диапазона
-                  final diff = (val - centerValue).abs();
-                  if (diff < threshold) {
-                    // Считаем «достаточно близко», делаем привязку
-                    vibrate(5);
-                    onChanged(centerValue);
-                  } else {
-                    onChanged(val);
-                  }
-                },
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2.0, // тонкая линия
+                  thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6), // маленький кружок
+                  overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 10), // компактная подсветка
+                ),
+                child: Slider(
+                  min: min,
+                  max: max,
+                  divisions: divisions,
+                  value: value,
+                  onChanged: (val) {
+                    // Примагничивание к centerValue
+                    final threshold = (max - min) * 0.03; // ~3%
+                    final diff = (val - centerValue).abs();
+                    if (diff < threshold) {
+                      vibrate(5);
+                      onChanged(centerValue);
+                    } else {
+                      onChanged(val);
+                    }
+                  },
+                ),
               ),
             ),
           ],
@@ -1309,10 +1342,16 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   /// Добавить фото
   void _showAllPhotosSheet() {
+    final size = MediaQuery.of(context).size;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      constraints: BoxConstraints(
+        maxWidth: size.width/2, // во всю ширину окна
+        maxHeight: size.height, // и во всю высоту (если нужно)
+      ),
       builder: (ctx) {
         return FractionallySizedBox(
           widthFactor: 1,
