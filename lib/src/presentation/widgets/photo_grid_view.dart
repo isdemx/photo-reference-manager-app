@@ -59,6 +59,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   final Set<String> _dragToggledIds = {};
 
   bool get _isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
+  static const double _multiBarHeight =
+      96.0; // примерно Row с иконками + паддинги
 
   int _columnCount = 3;
   bool _isPinterestLayout = false;
@@ -322,6 +324,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     final hasActiveFilters =
         filterState.filters.isNotEmpty && widget.showFilter;
 
+    final sliderBottom = _isMultiSelect ? (_multiBarHeight + 16.0) : 26.0;
+
     return Stack(
       children: [
         // GestureDetector для обработки драга
@@ -408,9 +412,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                         left: 8.0,
                         right: 8.0,
                         top: 8.0,
-                        bottom: _isMultiSelect
-                            ? 80.0
-                            : 8.0, // Увеличиваем отступ, если включен мультиселект
+                        bottom: _isMultiSelect ? _multiBarHeight : 8.0,
                       ),
                       sliver: _isPinterestLayout
                           ? SliverMasonryGrid.count(
@@ -481,6 +483,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
         ColumnSlider(
           initialCount: _columnCount,
           columnCount: _columnCount,
+          bottomInset: sliderBottom,
           onChanged: (value) => _updateColumnCount(value),
         ),
 
