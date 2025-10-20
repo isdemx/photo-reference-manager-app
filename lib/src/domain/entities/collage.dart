@@ -57,6 +57,15 @@ class CollageItem extends HiveObject {
   @HiveField(17)
   int zIndex;
 
+  @HiveField(18)
+  double? videoStartFrac; // 0..1
+
+  @HiveField(19)
+  double? videoEndFrac; // 0..1
+
+  @HiveField(20)
+  double? videoSpeed; // 0.1..4.0
+
   CollageItem({
     required this.fileName,
     required this.offsetX,
@@ -76,6 +85,9 @@ class CollageItem extends HiveObject {
     required this.cropRectRight,
     required this.cropRectBottom,
     required this.zIndex,
+    this.videoStartFrac,
+    this.videoEndFrac,
+    this.videoSpeed,
   });
 
   factory CollageItem.fromJson(Map<String, dynamic> json) => CollageItem(
@@ -97,6 +109,15 @@ class CollageItem extends HiveObject {
         cropRectRight: json['cropRectRight'],
         cropRectBottom: json['cropRectBottom'],
         zIndex: json['zIndex'],
+        videoStartFrac: (json.containsKey('videoStartFrac'))
+            ? (json['videoStartFrac'] as num?)?.toDouble()
+            : null,
+        videoEndFrac: (json.containsKey('videoEndFrac'))
+            ? (json['videoEndFrac'] as num?)?.toDouble()
+            : null,
+        videoSpeed: (json.containsKey('videoSpeed'))
+            ? (json['videoSpeed'] as num?)?.toDouble()
+            : null,
       );
 
   Map<String, dynamic> toJson() => {
@@ -118,6 +139,9 @@ class CollageItem extends HiveObject {
         'cropRectRight': cropRectRight,
         'cropRectBottom': cropRectBottom,
         'zIndex': zIndex,
+        'videoStartFrac': videoStartFrac, // <-- new
+        'videoEndFrac': videoEndFrac, // <-- new
+        'videoSpeed': videoSpeed, // <-- new
       };
 }
 
@@ -141,14 +165,17 @@ class Collage extends HiveObject {
   @HiveField(5)
   DateTime? dateUpdated;
 
-  Collage({
-    required this.id,
-    required this.title,
-    required this.backgroundColorValue,
-    required this.items,
-    required this.dateCreated,
-    required this.dateUpdated,
-  });
+  @HiveField(6)
+  String? previewPath;
+
+  Collage(
+      {required this.id,
+      required this.title,
+      required this.backgroundColorValue,
+      required this.items,
+      required this.dateCreated,
+      required this.dateUpdated,
+      this.previewPath});
 
   factory Collage.fromJson(Map<String, dynamic> json) => Collage(
         id: json['id'],
@@ -163,6 +190,7 @@ class Collage extends HiveObject {
         dateUpdated: json['dateUpdated'] != null
             ? DateTime.parse(json['dateUpdated'])
             : null,
+        previewPath: json['previewPath'],
       );
 
   Map<String, dynamic> toJson() => {
@@ -172,5 +200,6 @@ class Collage extends HiveObject {
         'items': items.map((e) => e.toJson()).toList(),
         'dateCreated': dateCreated?.toIso8601String(),
         'dateUpdated': dateUpdated?.toIso8601String(),
+        'previewPath': previewPath,
       };
 }

@@ -60,26 +60,22 @@ class TagBloc extends Bloc<TagEvent, TagState> {
   }
 
   Future<void> _onUpdateTag(UpdateTag event, Emitter<TagState> emit) async {
-    if (state is TagLoaded) {
-      final currentState = state as TagLoaded;
+    final prev = state;
+    if (prev is TagLoaded) {
       try {
+        // 1) Сохраняем ВЕСЬ объект тега как есть (со всеми новыми полями)
         await tagRepository.updateTag(event.tag);
 
-        // Создаем новый объект Tag и новый список тегов
-        final updatedTag = Tag(
-          id: event.tag.id,
-          name: event.tag.name,
-          colorValue: event.tag.colorValue,
-        );
-
-        final updatedTags = currentState.tags.map((tag) {
-          return tag.id == updatedTag.id ? updatedTag : tag;
+        // 2) Обновляем state, подменяя ровно этот тег на event.tag
+        final updated = prev.tags.map((t) {
+          return t.id == event.tag.id ? event.tag : t;
         }).toList();
 
-        emit(TagLoaded(updatedTags));
+        emit(TagLoaded(updated));
       } catch (e) {
-        print('Error updating tag: $e');
+        // Лог можно добавить при желании
         emit(const TagError('Failed to update tag'));
+        emit(prev);
       }
     }
   }

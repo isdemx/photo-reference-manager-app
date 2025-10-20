@@ -20,19 +20,22 @@ class TagAdapter extends TypeAdapter<Tag> {
       id: fields[0] as String,
       name: fields[1] as String,
       colorValue: fields[2] as int,
+      tagCategoryId: fields[3] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Tag obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
       ..write(obj.name)
       ..writeByte(2)
-      ..write(obj.colorValue);
+      ..write(obj.colorValue)
+      ..writeByte(3)
+      ..write(obj.tagCategoryId);
   }
 
   @override

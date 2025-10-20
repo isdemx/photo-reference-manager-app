@@ -38,9 +38,12 @@ import 'package:photographers_reference_app/src/presentation/widgets/rating_prom
 import 'package:photographers_reference_app/src/services/export_service.dart';
 
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
+import 'package:photographers_reference_app/src/domain/repositories/tag_category_repository.dart';
+import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-
 
 /// Точка входа
 void main() async {
@@ -57,6 +60,7 @@ void main() async {
   Hive.registerAdapter(UserSettingsAdapter());
   Hive.registerAdapter(CollageAdapter()); // typeId=100
   Hive.registerAdapter(CollageItemAdapter()); // typeId=101
+  Hive.registerAdapter(TagCategoryAdapter()); // typeId = 200
 
   // await ExportService.run();
   // await ImportJsonService.run();
@@ -67,6 +71,10 @@ void main() async {
   final folderBox = await Hive.openBox<Folder>('folders');
   final photoBox = await Hive.openBox<Photo>('photos');
   final collageBox = await Hive.openBox<Collage>('collages');
+  final tagCategoryBox = await Hive.openBox<TagCategory>('tag_categories');
+
+  // Миграция тегов
+  // await migrateTagBox(tagBox, photoBox);
 
   // 4. Запуск миграции (если нужно)
   await migratePhotoBox(photoBox);
@@ -74,6 +82,10 @@ void main() async {
   // Инициализация дефолтных данных (например, начальные теги/категории)
   final tagRepository = TagRepositoryImpl(tagBox);
   await tagRepository.initializeDefaultTags();
+
+  final tagCategoryRepository =
+      TagCategoryRepositoryImpl(tagCategoryBox, tagBox);
+  await tagCategoryRepository.initializeDefaultTagCategory();
 
   final categoryRepository = CategoryRepositoryImpl(categoryBox);
   await categoryRepository.initializeDefaultCategory();
@@ -91,6 +103,7 @@ void main() async {
     folderBox: folderBox,
     photoBox: photoBox,
     collageBox: collageBox,
+    tagCategoryBox: tagCategoryBox,
   ));
 
   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -98,6 +111,158 @@ void main() async {
       navigatorKey.currentContext!, // navigatorKey — GlobalKey<NavigatorState>
     );
   });
+}
+
+/// Миграция бокса тегов:
+/// 1) rekey: все записи -> ключ == tag.id
+/// 2) merge: объединить теги с одинаковым именем (case-insensitive)
+/// 3) обновить все фото: заменить id дублей на мастер.id
+Future<void> migrateTagBox(Box<Tag> tagBox, Box<Photo> photoBox) async {
+  debugPrint('[TAG MIGRATION] Start');
+
+  // 0) Снимем снапшот
+  final entries = <dynamic, Tag>{};
+  for (final k in tagBox.keys) {
+    try {
+      final t = tagBox.get(k);
+      if (t != null) entries[k] = t;
+    } catch (e) {
+      debugPrint('[TAG MIGRATION] skip key=$k read error: $e');
+    }
+  }
+  debugPrint('[TAG MIGRATION] snapshot size=${entries.length}');
+
+  // 1) rekey: key == tag.id
+  for (final entry in entries.entries) {
+    final oldKey = entry.key;
+    final tag = entry.value;
+
+    try {
+      if (oldKey == tag.id) continue;
+
+      final existing = tagBox.get(tag.id);
+      if (existing == null) {
+        await tagBox.put(tag.id, tag);
+        debugPrint('[TAG MIGRATION] Rekey $oldKey -> ${tag.id}');
+      } else {
+        final keepExisting =
+            (existing.name.trim().length >= tag.name.trim().length);
+        if (!keepExisting) {
+          await tagBox.put(tag.id, tag);
+          debugPrint('[TAG MIGRATION] Replace content on key ${tag.id}');
+        }
+      }
+      await tagBox.delete(oldKey);
+      debugPrint('[TAG MIGRATION] Deleted old key: $oldKey');
+    } catch (e) {
+      debugPrint('[TAG MIGRATION] rekey failed for key=$oldKey err=$e');
+    }
+  }
+
+  // 1b) перечитать после rekey
+  final idToTag = <String, Tag>{};
+  for (final k in tagBox.keys) {
+    try {
+      final t = tagBox.get(k);
+      if (t != null) idToTag[t.id] = t;
+    } catch (_) {}
+  }
+  debugPrint('[TAG MIGRATION] after rekey uniqueIds=${idToTag.length}');
+
+  // 2) групповое объединение (case-insensitive by name)
+  final nameGroups = <String, List<Tag>>{};
+  for (final t in idToTag.values) {
+    final name = (t.name ?? '').trim();
+    if (name.isEmpty) continue; // пропускаем совсем битые
+    final key = name.toLowerCase();
+    nameGroups.putIfAbsent(key, () => []).add(t);
+  }
+
+  final redirectMap = <String, String>{};
+  for (final group in nameGroups.values) {
+    if (group.length <= 1) continue;
+
+    // выбор мастера
+    Tag master = group.first;
+    for (final t in group) {
+      if ((master.tagCategoryId == null || master.tagCategoryId!.isEmpty) &&
+          (t.tagCategoryId != null && t.tagCategoryId!.isNotEmpty)) {
+        master = t;
+      }
+    }
+
+    // категория: первая ненулевая
+    String? mergedCategory = master.tagCategoryId;
+    if (mergedCategory == null || mergedCategory.isEmpty) {
+      for (final t in group) {
+        if (t.tagCategoryId != null && t.tagCategoryId!.isNotEmpty) {
+          mergedCategory = t.tagCategoryId;
+          break;
+        }
+      }
+    }
+
+    // обновим мастера при необходимости
+    if (mergedCategory != master.tagCategoryId) {
+      try {
+        master = master.copyWith(tagCategoryId: mergedCategory);
+        await tagBox.put(master.id, master);
+        idToTag[master.id] = master;
+        debugPrint(
+            '[TAG MIGRATION] master "${master.name}" set category=${master.tagCategoryId}');
+      } catch (e) {
+        debugPrint('[TAG MIGRATION] master update failed: $e');
+      }
+    }
+
+    // удалим дубли
+    for (final dup in group) {
+      if (dup.id == master.id) continue;
+      try {
+        redirectMap[dup.id] = master.id;
+        await tagBox.delete(dup.id);
+        idToTag.remove(dup.id);
+        debugPrint(
+            '[TAG MIGRATION] removed dup "${dup.name}" ${dup.id} -> ${master.id}');
+      } catch (e) {
+        debugPrint('[TAG MIGRATION] remove dup failed id=${dup.id}: $e');
+      }
+    }
+  }
+
+  // 3) обновим фото
+  if (redirectMap.isNotEmpty) {
+    debugPrint(
+        '[TAG MIGRATION] updating photos, redirects=${redirectMap.length}');
+    for (final photoKey in photoBox.keys) {
+      try {
+        final p = photoBox.get(photoKey);
+        if (p == null) continue;
+
+        bool changed = false;
+        final newTagIdsSet = <String>{};
+        for (final tagId in p.tagIds) {
+          final redirected = redirectMap[tagId];
+          if (redirected != null) {
+            newTagIdsSet.add(redirected);
+            changed = true;
+          } else {
+            newTagIdsSet.add(tagId);
+          }
+        }
+
+        if (changed) {
+          final updated = p.copyWith(tagIds: newTagIdsSet.toList());
+          await photoBox.put(photoKey, updated);
+          debugPrint('[TAG MIGRATION] photo ${p.id} updated');
+        }
+      } catch (e) {
+        debugPrint('[TAG MIGRATION] photo update failed key=$photoKey: $e');
+      }
+    }
+  }
+
+  debugPrint('[TAG MIGRATION] Done');
 }
 
 /// Пример миграции, если надо заполнить новые поля
@@ -140,6 +305,7 @@ class MyApp extends StatelessWidget {
   final Box<Folder> folderBox;
   final Box<Photo> photoBox;
   final Box<Collage> collageBox;
+  final Box<TagCategory> tagCategoryBox;
 
   const MyApp({
     Key? key,
@@ -148,6 +314,7 @@ class MyApp extends StatelessWidget {
     required this.folderBox,
     required this.photoBox,
     required this.collageBox,
+    required this.tagCategoryBox,
   }) : super(key: key);
 
   @override
@@ -168,6 +335,9 @@ class MyApp extends StatelessWidget {
         ),
         RepositoryProvider<CollageRepositoryImpl>(
           create: (_) => CollageRepositoryImpl(collageBox),
+        ),
+        RepositoryProvider<TagCategoryRepositoryImpl>(
+          create: (_) => TagCategoryRepositoryImpl(tagCategoryBox, tagBox),
         ),
       ],
       child: MultiBlocProvider(
@@ -206,6 +376,12 @@ class MyApp extends StatelessWidget {
               collageRepository:
                   RepositoryProvider.of<CollageRepositoryImpl>(context),
             )..add(LoadCollages()),
+          ),
+          BlocProvider<TagCategoryBloc>(
+            create: (context) => TagCategoryBloc(
+              tagCategoryRepository:
+                  RepositoryProvider.of<TagCategoryRepositoryImpl>(context),
+            )..add(const LoadTagCategories()),
           ),
         ],
         child: MaterialApp(

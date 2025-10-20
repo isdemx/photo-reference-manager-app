@@ -26,6 +26,11 @@ class VideoView extends StatefulWidget {
 
   /// показывать название файла
   final bool showTitle;
+
+  /// скорость воспроизведения (0.1..4.0), null => 1.0
+  final double? initialSpeed;
+  /// скрыть регулятор скорости
+  final bool hideSpeed;
   // -------------------------------------------------------------------------
 
   const VideoView(
@@ -34,11 +39,13 @@ class VideoView extends StatefulWidget {
     this.currentIndex,
     this.videoController, {
     Key? key,
-    this.initialVolume,
+    this.initialVolume,            // теперь по умолчанию будет 0.0 (см. initState)
     this.hideVolume = false,
     this.hidePlayPause = false,
     this.loopSliderHide = false,
     this.showTitle = false,
+    this.initialSpeed,             // по умолчанию 1.0 (см. initState)
+    this.hideSpeed = false,
   }) : super(key: key);
 
   @override
@@ -49,7 +56,10 @@ class _VideoViewState extends State<VideoView> {
   late VideoPlayerController _internalController;
   bool _ownsController = false;
   bool _isInitializing = false;
-  late double _volume; // текущее значение громкости
+
+  // громкость и скорость
+  late double _volume; // (0..1)
+  late double _speed;  // (0.1..4.0)
 
   double _loopStart = 0;
   double _loopEnd = 1;
@@ -59,7 +69,10 @@ class _VideoViewState extends State<VideoView> {
   @override
   void initState() {
     super.initState();
-    _volume = (widget.initialVolume ?? 0.1).clamp(0.0, 1.0);
+    // ГРОМКОСТЬ: дефолт теперь 0.0 если не задана initialVolume
+    _volume = (widget.initialVolume ?? 0.0).clamp(0.0, 1.0);
+    // СКОРОСТЬ: дефолт 1.0 если не задана initialSpeed
+    _speed = (widget.initialSpeed ?? 1.0).clamp(0.1, 4.0);
     _createControllerIfNeeded();
   }
 
@@ -79,6 +92,14 @@ class _VideoViewState extends State<VideoView> {
       _volume = widget.initialVolume!.clamp(0.0, 1.0);
       final c = widget.videoController ?? _internalController;
       if (_controllerReady(c)) c.setVolume(_volume);
+    }
+
+    // изменили скорость извне
+    if (widget.initialSpeed != null &&
+        widget.initialSpeed != oldWidget.initialSpeed) {
+      _speed = widget.initialSpeed!.clamp(0.1, 4.0);
+      final c = widget.videoController ?? _internalController;
+      if (_controllerReady(c)) c.setPlaybackSpeed(_speed);
     }
 
     // авто-пауза / авто-плей
@@ -118,7 +139,8 @@ class _VideoViewState extends State<VideoView> {
     await _internalController.initialize();
     _internalController
       ..setLooping(true)
-      ..setVolume(_volume);
+      ..setVolume(_volume)
+      ..setPlaybackSpeed(_speed); // ← применяем скорость
 
     if (widget.index == widget.currentIndex) _internalController.play();
 
@@ -213,7 +235,7 @@ class _VideoViewState extends State<VideoView> {
                         // уменьшить отступ между слайдерами
                         const SizedBox(height: 4),
 
-                        if (!widget.loopSliderHide) // <— NEW
+                        if (!widget.loopSliderHide) // <— петля
                           Theme(
                             data: Theme.of(context).copyWith(
                               sliderTheme: SliderTheme.of(context).copyWith(
@@ -263,25 +285,64 @@ class _VideoViewState extends State<VideoView> {
 
                   const SizedBox(width: 8),
 
+                  /// Регулятор скорости (0.1x..4x)
+                  if (!widget.hideSpeed)
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 60,
+                          child: RotatedBox(
+                            quarterTurns: -1,
+                            child: Slider(
+                              min: 0.1,
+                              max: 4.0,
+                              divisions: 39, // шаг ~0.1x
+                              value: _speed,
+                              onChanged: (v) {
+                                setState(() {
+                                  _speed = double.parse(v.toStringAsFixed(2));
+                                  controller.setPlaybackSpeed(_speed);
+                                });
+                              },
+                            ),
+                          ),
+                        ),
+                        Text('${_speed.toStringAsFixed(2)}x',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.white70)),
+                      ],
+                    ),
+
+                  const SizedBox(width: 8),
+
                   /// Громкость
                   if (!widget.hideVolume)
-                    SizedBox(
-                      height: 60,
-                      child: RotatedBox(
-                        quarterTurns: -1,
-                        child: Slider(
-                          min: 0.0,
-                          max: 1.0,
-                          divisions: 10,
-                          value: _volume,
-                          onChanged: (v) {
-                            setState(() {
-                              _volume = v;
-                              controller.setVolume(_volume);
-                            });
-                          },
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          height: 60,
+                          child: RotatedBox(
+                            quarterTurns: -1,
+                            child: Slider(
+                              min: 0.0,
+                              max: 1.0,
+                              divisions: 10,
+                              value: _volume,
+                              onChanged: (v) {
+                                setState(() {
+                                  _volume = v;
+                                  controller.setVolume(_volume);
+                                });
+                              },
+                            ),
+                          ),
                         ),
-                      ),
+                        Text('${(_volume * 100).round()}%',
+                            style: const TextStyle(
+                                fontSize: 11, color: Colors.white70)),
+                      ],
                     ),
                   const SizedBox(width: 8),
                   // Text(_fmt(dur)),

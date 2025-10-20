@@ -14,9 +14,12 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/collage_preview_helper.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_surface_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/edit_build_crop_handlers.dart';
 import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
@@ -130,6 +133,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   late List<Offset> _originalOffsets = [];
   late List<double> _originalScales = [];
 
+  // по item.id храним состояние слайдеров/позиции/громкости/скорости
+  final Map<String, _VideoUi> _videoStates = {};
+
+  // когда курсор над панелью контролов конкретного item — отключаем жесты перетаскивания
+  final Map<String, bool> _controlsHover = {};
+
+  // когда мышь над самим видео (не над контролами)
+  final Map<String, bool> _videoHover = {};
+
   /// Туториал
   bool _showTutorial = false; // Проверим SharedPreferences
 
@@ -160,6 +172,16 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Future<void> _markTutorialPassed() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('collage_tutor_passed', true);
+  }
+
+  void _bringToFront(CollagePhotoState item) {
+    if (_overviewMode) return;
+    setState(() {
+      // НЕ трогаем isEditing здесь
+      _maxZIndex++;
+      item.zIndex = _maxZIndex;
+      _activeItemIndex = _items.indexOf(item);
+    });
   }
 
   @override
@@ -245,6 +267,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           collageItem.internalOffsetY,
         );
     }).toList();
+
+    for (int i = 0; i < _items.length; i++) {
+      final item = _items[i];
+      final src = collage.items[i];
+
+      if (item.photo.mediaType == 'video') {
+        _videoStates[item.id] = _VideoUi(
+          startFrac: (src.videoStartFrac ?? 0.0).clamp(0.0, 1.0),
+          endFrac: (src.videoEndFrac ?? 1.0).clamp(0.0, 1.0),
+          speed: (src.videoSpeed ?? 1.0).clamp(0.1, 4.0),
+          // остальное будет заполнено позже колбэками VideoSurface:
+          posFrac: 0.0,
+          volume: 0.0,
+          duration: Duration.zero,
+        );
+      }
+    }
 
     // Опционально, сортируем по zIndex или инициализируем _maxZIndex
     _maxZIndex =
@@ -541,7 +580,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         child: Scaffold(
           appBar: !_isFullscreen
               ? AppBar(
-                  title: Text('Free collage (${_items.length} images)'),
+                  title: Text('${widget.initialCollage?.title} (${_items.length} images)'),
                   actions: [
                     IconButton(
                       tooltip: 'Help / Info',
@@ -687,15 +726,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   ),
 
                   // Нижняя панель
+
                   Container(
-                    height: isSomePhotoInEditMode ? 220 : 80,
-                    color: Colors.black54,
-                    child: isSomePhotoInEditMode
-                        ? _buildEditPanel(editingPhoto)
-                        : _isFullscreen
-                            ? null
-                            : _buildDefaultPanel(),
-                  ),
+                      height: isSomePhotoInEditMode ? 120 : 40,
+                      color: _isFullscreen
+                          ? const ui.Color.fromARGB(0, 0, 0, 0)
+                          : const ui.Color.fromARGB(60, 0, 0, 0),
+                      child: isSomePhotoInEditMode
+                          ? _buildEditPanel(editingPhoto)
+                          : _buildDefaultPanel()),
                 ],
               ),
 
@@ -724,100 +763,125 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   void _onSaveCollageToDb() async {
-    // Генерируем дефолтное название в формате My_collage_20250101_20:45
-    final now = DateTime.now();
-    final formattedDate =
+  final now = DateTime.now();
+  final formattedDate =
         "My_collage_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
 
-    // Контроллер для TextField
-    final TextEditingController titleController =
-        TextEditingController(text: formattedDate);
+  final TextEditingController titleController =
+      TextEditingController(text: formattedDate);
 
-    final itemsList = _items.map((it) {
-      return CollageItem(
-        fileName: it.photo.fileName,
-        offsetX: it.offset.dx,
-        offsetY: it.offset.dy,
-        scale: it.scale,
-        rotation: it.rotation,
-        baseWidth: it.baseWidth,
-        baseHeight: it.baseHeight,
-        internalOffsetX: it.internalOffset.dx,
-        internalOffsetY: it.internalOffset.dy,
-        brightness: it.brightness,
-        saturation: it.saturation,
-        temp: it.temp,
-        hue: it.hue,
-        cropRectLeft: it.cropRect.left,
-        cropRectTop: it.cropRect.top,
-        cropRectRight: it.cropRect.right,
-        cropRectBottom: it.cropRect.bottom,
-        zIndex: it.zIndex,
-      );
-    }).toList();
+  final itemsList = _items.map((it) {
+    final ui = _videoStates[it.id];
+    final isVideo = it.photo.mediaType == 'video';
+    return CollageItem(
+      fileName: it.photo.fileName,
+      offsetX: it.offset.dx,
+      offsetY: it.offset.dy,
+      scale: it.scale,
+      rotation: it.rotation,
+      baseWidth: it.baseWidth,
+      baseHeight: it.baseHeight,
+      internalOffsetX: it.internalOffset.dx,
+      internalOffsetY: it.internalOffset.dy,
+      brightness: it.brightness,
+      saturation: it.saturation,
+      temp: it.temp,
+      hue: it.hue,
+      cropRectLeft: it.cropRect.left,
+      cropRectTop: it.cropRect.top,
+      cropRectRight: it.cropRect.right,
+      cropRectBottom: it.cropRect.bottom,
+      zIndex: it.zIndex,
+      videoStartFrac: isVideo ? (ui?.startFrac ?? 0.0) : null,
+      videoEndFrac: isVideo ? (ui?.endFrac ?? 1.0) : null,
+      videoSpeed: isVideo ? (ui?.speed ?? 1.0) : null,
+    );
+  }).toList();
 
-    if (widget.initialCollage == null) {
-      final result = await showDialog<String>(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Enter collage title'),
-            content: TextField(
-              controller: titleController,
-              decoration:
-                  const InputDecoration(hintText: "Enter collage title"),
-              autofocus: true,
-              onSubmitted: (value) {
-                Navigator.of(context).pop(value);
-              },
-            ),
-            actions: [
-              TextButton(
-                child: const Text('Cancel'),
-                onPressed: () => Navigator.of(context).pop(null),
-              ),
-              TextButton(
-                child: const Text('Save'),
-                onPressed: () =>
-                    Navigator.of(context).pop(titleController.text),
-              ),
-            ],
-          );
-        },
-      );
+  if (widget.initialCollage == null) {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save Collage'),
+        content: TextField(
+          controller: titleController,
+          autofocus: true,
+          decoration: const InputDecoration(hintText: 'Collage Title'),
+        ),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () {
+              Navigator.of(ctx).pop(); // Returns null
+            },
+          ),
+          TextButton(
+            child: const Text('Save'),
+            onPressed: () {
+              Navigator.of(ctx).pop(titleController.text); // Returns the text
+            },
+          ),
+        ],
+      ),
+    );
+    if (result == null || result.trim().isEmpty) return;
 
-      // Если пользователь нажал "Cancel" или не ввел название — не сохраняем
-      if (result == null || result.trim().isEmpty) return;
-      // Новый коллаж
-      final collageId = const Uuid().v4();
-      final newCollage = Collage(
-        id: collageId,
-        title: result.trim(),
-        backgroundColorValue: _backgroundColor.value,
-        items: itemsList,
-        dateCreated: now,
-        dateUpdated: now,
+    final collageId = const Uuid().v4();
+
+    // 1) Сначала рендерим превью (перезаписывать нечего — создаём)
+    String previewPath = '';
+    try {
+      previewPath = await CollagePreviewHelper.renderPreviewPng(
+        boundaryKey: _collageKey,
+        collageId: collageId,
+        pixelRatio: 1.25,
       );
-      context.read<CollageBloc>().add(AddCollage(newCollage));
-    } else {
-      // Уже существующий - обновляем
-      final existing = widget.initialCollage!;
-      final updatedCollage = Collage(
-        id: existing.id,
-        title: existing.title,
-        backgroundColorValue: _backgroundColor.value,
-        items: itemsList,
-        dateCreated: existing.dateCreated, // не меняем дату создания
-        dateUpdated: now, // обновляем дату
-      );
-      context.read<CollageBloc>().add(UpdateCollage(updatedCollage));
+    } catch (_) {
+      // превью — не критично, можно проглотить и оставить пустым
     }
 
-    // Показываем подтверждение
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Collage saved to DB!')),
+    // 2) Собираем и сохраняем в БД
+    final newCollage = Collage(
+      id: collageId,
+      title: result.trim(),
+      backgroundColorValue: _backgroundColor.value,
+      items: itemsList,
+      dateCreated: now,
+      dateUpdated: now,
+      previewPath: previewPath.isEmpty ? null : previewPath,
     );
+    context.read<CollageBloc>().add(AddCollage(newCollage));
+  } else {
+    final existing = widget.initialCollage!;
+    // 1) Перерисовываем превью для того же id — файл перезапишется
+    String previewPath = existing.previewPath ?? '';
+    try {
+      previewPath = await CollagePreviewHelper.renderPreviewPng(
+        boundaryKey: _collageKey,
+        collageId: existing.id,
+        pixelRatio: 1.25,
+      );
+    } catch (_) {
+      // не фейлим сохранение коллажа из-за проблем превью
+    }
+
+    // 2) Обновляем запись
+    final updatedCollage = Collage(
+      id: existing.id,
+      title: existing.title,
+      backgroundColorValue: _backgroundColor.value,
+      items: itemsList,
+      dateCreated: existing.dateCreated,
+      dateUpdated: now,
+      previewPath: previewPath.isEmpty ? existing.previewPath : previewPath,
+    );
+    context.read<CollageBloc>().add(UpdateCollage(updatedCollage));
   }
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(content: Text('Collage saved to DB!')),
+  );
+}
 
   /// Панель, когда не редактируется конкретное фото
   Widget _buildDefaultPanel() {
@@ -1048,6 +1112,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         left: item.offset.dx,
         top: item.offset.dy,
         child: Listener(
+          behavior: HitTestBehavior.translucent, // важно!
+          onPointerDown: (_) {
+            _bringToFront(item); // сработает и по видео, и по контролам
+          },
           onPointerSignal: (event) {
             if (event is PointerScrollEvent) {
               setState(() {
@@ -1139,11 +1207,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   /// Собираем контент (учитываем cropRect + полный colorFilter)
   Widget _buildEditableContent(
-      CollagePhotoState item, double effectiveWidth, double effectiveHeight) {
+    CollagePhotoState item,
+    double effectiveWidth,
+    double effectiveHeight,
+  ) {
     final cropLeft = item.cropRect.left * effectiveWidth;
     final cropTop = item.cropRect.top * effectiveHeight;
-    final cropWidth = item.cropRect.width * effectiveWidth;
-    final cropHeight = item.cropRect.height * effectiveHeight;
 
     final filter = combinedColorFilter(
       item.brightness,
@@ -1155,30 +1224,25 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final fullPath = PhotoPathHelper().getFullPath(item.photo.fileName);
     final isVideo = item.photo.mediaType == 'video';
 
-    Widget mediaWidget;
-    if (isVideo) {
-      mediaWidget = SizedBox(
-        width: effectiveWidth,
-        height: effectiveHeight,
-        child: VideoView(
-          0, // index
-          item.photo,
-          0, // currentIndex
-          null, // внешний контроллер не нужен
-        ),
-      );
-    } else {
-      mediaWidget = Image.file(
-        File(fullPath),
-        width: effectiveWidth,
-        height: effectiveHeight,
-        fit: BoxFit.cover,
-      );
+    // доступ к состоянию этого элемента
+    final uiState = _videoStates[item.id] ??= _VideoUi();
+
+    // helpers
+    Duration _fracToTime(Duration total, double f) {
+      if (total == Duration.zero) return Duration.zero;
+      final ms = (total.inMilliseconds * f.clamp(0.0, 1.0)).round();
+      return Duration(milliseconds: ms);
+    }
+
+    double _timeToFrac(Duration total, Duration t) {
+      if (total == Duration.zero) return 0.0;
+      return (t.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
     }
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
+        // КРОПИМ ТОЛЬКО КОНТЕНТ
         ClipRect(
           child: Align(
             alignment: Alignment.topLeft,
@@ -1188,24 +1252,127 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               offset: Offset(-cropLeft, -cropTop) + item.internalOffset,
               child: ColorFiltered(
                 colorFilter: filter,
-                child: mediaWidget,
+                child: SizedBox(
+                  width: effectiveWidth,
+                  height: effectiveHeight,
+                  child: isVideo
+                      ? MouseRegion(
+                          onEnter: (_) =>
+                              setState(() => _videoHover[item.id] = true),
+                          onExit: (_) =>
+                              setState(() => _videoHover[item.id] = false),
+                          child: VideoSurface(
+                            key: ValueKey(
+                              'vs-${item.id}-'
+                              '${uiState.duration.inMilliseconds}-'
+                              '${uiState.startFrac.toStringAsFixed(3)}-'
+                              '${uiState.endFrac.toStringAsFixed(3)}-'
+                              '${uiState.speed.toStringAsFixed(2)}',
+                            ),
+                            filePath: fullPath,
+                            startTime: _fracToTime(
+                                uiState.duration, uiState.startFrac),
+                            endTime: uiState.duration == Duration.zero
+                                ? null
+                                : _fracToTime(
+                                    uiState.duration, uiState.endFrac),
+                            volume: uiState.volume,
+                            speed: uiState.speed,
+
+                            // ВАЖНО: не стартуем, пока не знаем duration
+                            autoplay: uiState.duration != Duration.zero,
+
+                            onDuration: (d) => setState(() {
+                              uiState.duration = d;
+                              // setState приведёт к ребилду, key поменяется из-за duration,
+                              // и VideoSurface пересоздастся с корректным startTime и autoplay=true
+                            }),
+                            onPosition: (p) => setState(() {
+                              uiState.posFrac =
+                                  _timeToFrac(uiState.duration, p);
+                            }),
+                          ),
+                        )
+                      : Image.file(
+                          File(fullPath),
+                          width: effectiveWidth,
+                          height: effectiveHeight,
+                          fit: BoxFit.cover,
+                        ),
+                ),
               ),
             ),
           ),
         ),
-        if (item.isEditing) ...[
-          Positioned.fill(
-            child: CustomPaint(painter: _CropBorderPainter()),
+
+        // КОНТРОЛЫ — поверх, НЕ кропятся
+        if (isVideo)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: MouseRegion(
+              onEnter: (_) => setState(() => _controlsHover[item.id] = true),
+              onExit: (_) => setState(() => _controlsHover[item.id] = false),
+              child: Builder(builder: (context) {
+                final visible = (_videoHover[item.id] == true) ||
+                    (_controlsHover[item.id] == true) ||
+                    item.isEditing;
+
+                return AnimatedOpacity(
+                  duration: const Duration(milliseconds: 150),
+                  opacity: visible ? 1.0 : 0.0,
+                  child: IgnorePointer(
+                    ignoring: !visible, // когда скрыто — не ловим события
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [Colors.black45, Colors.transparent],
+                          ),
+                        ),
+                        child: VideoControls(
+                          startFrac: uiState.startFrac,
+                          endFrac: uiState.endFrac,
+                          positionFrac: uiState.posFrac,
+                          volume: uiState.volume,
+                          speed: uiState.speed,
+                          onSeekFrac: (f) => setState(() {
+                            uiState.startFrac =
+                                f.clamp(0.0, uiState.endFrac - 0.001);
+                          }),
+                          onChangeRange: (rv) => setState(() {
+                            uiState.startFrac = rv.start;
+                            uiState.endFrac = rv.end;
+                          }),
+                          onChangeVolume: (v) => setState(() {
+                            uiState.volume = v;
+                          }),
+                          onChangeSpeed: (s) => setState(() {
+                            uiState.speed = s;
+                          }),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
           ),
+
+        // Рамка и хэндлы кропа (как было)
+        if (item.isEditing) ...[
+          Positioned.fill(child: CustomPaint(painter: _CropBorderPainter())),
           ...buildCropHandles(
             item,
             effectiveWidth,
             effectiveHeight,
-            (Rect newRect) {
-              setState(() {
-                item.cropRect = newRect;
-              });
-            },
+            (Rect newRect) => setState(() => item.cropRect = newRect),
           ),
         ],
       ],
@@ -1379,4 +1546,53 @@ class _CropBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _VideoUiStateCache extends InheritedWidget {
+  double? startFrac, endFrac, posFrac, volume, speed;
+  Duration? duration;
+
+  _VideoUiStateCache({
+    super.key,
+    required super.child,
+    this.startFrac,
+    this.endFrac,
+    this.posFrac,
+    this.volume,
+    this.speed,
+    this.duration,
+  }) : super();
+
+  static _VideoUiStateCache? of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_VideoUiStateCache>();
+
+  static _VideoUiStateCache init(BuildContext context) {
+    final widget = _VideoUiStateCache(
+      child: const SizedBox.shrink(),
+      startFrac: 0.0,
+      endFrac: 1.0,
+      posFrac: 0.0,
+      volume: 0.0,
+      speed: 1.0,
+      duration: Duration.zero,
+    );
+    // В реальном коде лучше держать состояние у родителя этого блока.
+    return widget;
+  }
+
+  @override
+  bool updateShouldNotify(covariant _VideoUiStateCache oldWidget) => true;
+}
+
+class _VideoUi {
+  double startFrac, endFrac, posFrac, volume, speed;
+  Duration duration;
+  _VideoUi({
+    this.startFrac = 0.0,
+    this.endFrac = 1.0,
+    this.posFrac = 0.0,
+    this.volume = 0.0,
+    this.speed = 1.0,
+    this.duration = Duration.zero,
+  });
 }

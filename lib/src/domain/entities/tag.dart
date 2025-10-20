@@ -15,21 +15,25 @@ class Tag extends HiveObject with EquatableMixin {
   @HiveField(2)
   int colorValue;
 
+  @HiveField(3)
+  String? tagCategoryId;
+
   Tag({
     required this.id,
     required this.name,
     required this.colorValue,
+    this.tagCategoryId,
   });
 
   Color get color => Color(colorValue);
   set color(Color newColor) => colorValue = newColor.value;
 
   @override
-  List<Object?> get props => [id, name, colorValue];
+  List<Object?> get props => [id, name, colorValue, tagCategoryId];
 
   @override
   String toString() {
-    return 'Tag{id: $id, name: $name, colorValue: $colorValue}';
+    return 'Tag{id: $id, name: $name, colorValue: $colorValue, tagCategoryId: $tagCategoryId}';
   }
 
   factory Tag.fromJson(Map<String, dynamic> json) {
@@ -37,6 +41,7 @@ class Tag extends HiveObject with EquatableMixin {
       id: json['id'] as String,
       name: json['name'] as String,
       colorValue: json['colorValue'] as int,
+      tagCategoryId: json['tagCategoryId'] as String?,
     );
   }
 
@@ -45,6 +50,21 @@ class Tag extends HiveObject with EquatableMixin {
       'id': id,
       'name': name,
       'colorValue': colorValue,
+      'tagCategoryId': tagCategoryId,
     };
+  }
+
+  Tag copyWith({
+    String? id,
+    String? name,
+    int? colorValue,
+    String? tagCategoryId,
+  }) {
+    return Tag(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      colorValue: colorValue ?? this.colorValue,
+      tagCategoryId: tagCategoryId ?? this.tagCategoryId,
+    );
   }
 }

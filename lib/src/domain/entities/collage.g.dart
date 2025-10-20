@@ -35,13 +35,16 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       cropRectRight: fields[15] as double,
       cropRectBottom: fields[16] as double,
       zIndex: fields[17] as int,
+      videoStartFrac: fields[18] as double?,
+      videoEndFrac: fields[19] as double?,
+      videoSpeed: fields[20] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, CollageItem obj) {
     writer
-      ..writeByte(18)
+      ..writeByte(21)
       ..writeByte(0)
       ..write(obj.fileName)
       ..writeByte(1)
@@ -77,7 +80,13 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       ..writeByte(16)
       ..write(obj.cropRectBottom)
       ..writeByte(17)
-      ..write(obj.zIndex);
+      ..write(obj.zIndex)
+      ..writeByte(18)
+      ..write(obj.videoStartFrac)
+      ..writeByte(19)
+      ..write(obj.videoEndFrac)
+      ..writeByte(20)
+      ..write(obj.videoSpeed);
   }
 
   @override
@@ -108,13 +117,14 @@ class CollageAdapter extends TypeAdapter<Collage> {
       items: (fields[3] as List).cast<CollageItem>(),
       dateCreated: fields[4] as DateTime?,
       dateUpdated: fields[5] as DateTime?,
+      previewPath: fields[6] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Collage obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -126,7 +136,9 @@ class CollageAdapter extends TypeAdapter<Collage> {
       ..writeByte(4)
       ..write(obj.dateCreated)
       ..writeByte(5)
-      ..write(obj.dateUpdated);
+      ..write(obj.dateUpdated)
+      ..writeByte(6)
+      ..write(obj.previewPath);
   }
 
   @override

@@ -1,6 +1,7 @@
+// lib/src/presentation/screens/tag_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:get/get_connect/http/src/utils/utils.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
@@ -36,9 +37,10 @@ class _TagScreenState extends State<TagScreen> {
 
                 return PhotoGridView(
                   showFilter: false,
-                  tags: tagState.tags, // Передаём список тегов
+                  tags: tagState.tags,
                   photos: photos,
-                  title: '${widget.tag.name[0].toUpperCase()}${widget.tag.name.substring(1)}',
+                  title:
+                      '${widget.tag.name.isNotEmpty ? widget.tag.name[0].toUpperCase() : ''}${widget.tag.name.length > 1 ? widget.tag.name.substring(1) : ''}',
                   showShareBtn: true,
                 );
               } else {

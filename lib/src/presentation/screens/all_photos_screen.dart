@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:path/path.dart' as p;
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
@@ -40,11 +41,26 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                 );
               }
 
+              // Создаём индекс тегов для быстрого и безопасного доступа
+              final Map<String, Tag> tagIndex = {
+                for (final t in tags ?? <Tag>[]) t.id: t,
+              };
+
               final List<Photo> photosFiltered = _filterNotRef
                   ? photoState.photos.where((photo) {
+                      // Если у фото нет тегов — считаем его проходным (true)
+                      if (photo.tagIds.isEmpty) return true;
+
+                      // Проверяем: все ли теги не называются "Not Ref"
                       return photo.tagIds.every((tagId) {
-                        final tag = tags!.firstWhere((tag) => tag.id == tagId);
-                        return tag.name != "Not Ref";
+                        final tag = tagIndex[tagId];
+                        if (tag == null) {
+                          // тег был удалён — безопасно пропускаем
+                          debugPrint(
+                              '⚠️ Missing tagId $tagId for photo ${photo.id}');
+                          return true;
+                        }
+                        return tag.name != 'Not Ref';
                       });
                     }).toList()
                   : photoState.photos;

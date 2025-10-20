@@ -24,7 +24,9 @@ class TagRepositoryImpl implements TagRepository {
 
   @override
   Future<void> deleteTag(String id) async {
+    print('deleteTag ${id}');
     await tagBox.delete(id);
+    print('deleted Tag ${id}');
   }
 
   @override

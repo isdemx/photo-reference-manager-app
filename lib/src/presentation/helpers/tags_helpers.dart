@@ -7,6 +7,8 @@ import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:uuid/uuid.dart';
+import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
 
 class TagsHelpers {
   static void _addTagToBloc(
@@ -215,13 +217,10 @@ class TagsHelpers {
           actions: [
             TextButton(
               onPressed: () {
-                final updatedTag = Tag(
-                  id: tag.id,
-                  name: tag.name,
+                final updatedTag = tag.copyWith(
                   colorValue: pickerColor.value,
                 );
                 context.read<TagBloc>().add(UpdateTag(updatedTag));
-                Navigator.of(context).pop();
               },
               child: const Text('Ok'),
             ),
@@ -253,10 +252,8 @@ class TagsHelpers {
               onPressed: () {
                 final String tagName = controller.text.trim();
                 if (tagName.isNotEmpty) {
-                  final updatedTag = Tag(
-                    id: tag.id,
+                  final updatedTag = tag.copyWith(
                     name: tagName,
-                    colorValue: tag.colorValue,
                   );
                   context.read<TagBloc>().add(UpdateTag(updatedTag));
                   Navigator.of(context).pop();
@@ -294,84 +291,196 @@ class TagsHelpers {
   /// Возвращает true, если были изменения.
   /// Показывает тот же диалог, но для массива фото.
   /// Возвращает true, если пользователь нажал "OK"
+  /// Диалог массового назначения тега нескольким фотографиям.
+  /// Возвращает true, если были изменения.
   static Future<bool> showAddTagToImagesDialog(
     BuildContext context,
     List<Photo> photos,
   ) async {
     bool anyChanged = false;
 
-    // прогоняем диалог для всех тегов сразу
+    // Обеспечим наличие данных
     final tagBloc = context.read<TagBloc>();
     if (tagBloc.state is! TagLoaded) tagBloc.add(LoadTags());
+
+    final catBloc = context.read<TagCategoryBloc>();
+    if (catBloc.state is! TagCategoryLoaded) {
+      catBloc.add(const LoadTagCategories());
+    }
 
     return await showDialog<bool>(
       context: context,
       builder: (_) {
-        return BlocBuilder<TagBloc, TagState>(
-          builder: (context, tagState) {
-            if (tagState is! TagLoaded) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        return BlocBuilder<TagCategoryBloc, TagCategoryState>(
+          builder: (context, catState) {
+            return BlocBuilder<TagBloc, TagState>(
+              builder: (context, tagState) {
+                final bool loading = tagState is! TagLoaded ||
+                    !(catState is TagCategoryLoaded ||
+                        catState is TagCategoryInitial);
 
-            final tags = tagState.tags;
-            return AlertDialog(
-              title: const Text('Add tags to selected images'),
-              content: SingleChildScrollView(
-                child: Wrap(
-                  spacing: 8,
-                  children: tags.map((tag) {
-                    final allHave =
-                        photos.every((p) => p.tagIds.contains(tag.id));
-                    final someHave =
-                        photos.any((p) => p.tagIds.contains(tag.id));
+                if (loading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-                    IconData? icon;
-                    if (allHave)
-                      icon = Icons.check;
-                    else if (someHave)
-                      icon = Icons.remove;
-                    else
-                      icon = null;
+                final tags = (tagState as TagLoaded).tags;
+                print('tags length: ${tags.length}');
+                final tagDebugList = tags
+                    .map(
+                        (t) => {'tagCategory': t.tagCategoryId, 'name': t.name})
+                    .toList();
+                print('tags (name+id): $tagDebugList');
 
-                    return ChoiceChip(
-                      avatar: Icon(icon, size: 16, color: Colors.white),
-                      label: Text(tag.name),
-                      selected: allHave,
-                      selectedColor: Color(tag.colorValue).withOpacity(0.5),
-                      backgroundColor: Color(tag.colorValue),
-                      labelStyle: const TextStyle(color: Colors.white),
-                      onSelected: (_) {
-                        for (final photo in photos) {
-                          if (allHave || someHave) {
-                            photo.tagIds.remove(tag.id);
-                          } else {
-                            if (!photo.tagIds.contains(tag.id)) {
-                              photo.tagIds.add(tag.id);
-                            }
-                          }
-                          context.read<PhotoBloc>().add(UpdatePhoto(photo));
-                        }
-                        anyChanged = true;
-                        (context as Element).markNeedsBuild();
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, anyChanged),
-                  child: const Text('OK'),
-                ),
-              ],
+                final categories = catState is TagCategoryLoaded
+                    ? List<TagCategory>.from(catState.categories)
+                    : <TagCategory>[];
+
+                // Сортируем категории: sortOrder ↑, затем name ↑
+                categories.sort((a, b) {
+                  final byOrder = a.sortOrder.compareTo(b.sortOrder);
+                  return byOrder != 0
+                      ? byOrder
+                      : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                });
+
+                // Группируем теги по категориям
+                final Map<String?, List<Tag>> grouped = {};
+                for (final t in tags) {
+                  grouped.putIfAbsent(t.tagCategoryId, () => []).add(t);
+                }
+
+                // Внутри каждой группы — сортировка по имени
+                for (final entry in grouped.entries) {
+                  entry.value.sort(
+                    (a, b) =>
+                        a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                  );
+                }
+
+                // Секции: все категории по порядку + «Без категории» в конце
+                final sections = <_TagSection>[
+                  for (final c in categories)
+                    _TagSection(
+                      title: c.name,
+                      categoryId: c.id,
+                      tags: grouped[c.id] ?? const [],
+                    ),
+                  _TagSection(
+                    title: 'No category',
+                    categoryId: null,
+                    tags: grouped[null] ?? const [],
+                  ),
+                ]
+                    .where((s) => s.tags.isNotEmpty)
+                    .toList(); // пустые секции скрываем
+
+                return AlertDialog(
+                  title: const Text('Add tags to selected images'),
+                  content: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 600),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: sections.map((s) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Заголовок секции
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 6),
+                                  child: Text(
+                                    s.title,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                // Список чипов тегов этой секции
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: s.tags.map((tag) {
+                                    final allHave = photos.every(
+                                        (p) => p.tagIds.contains(tag.id));
+                                    final someHave = photos
+                                        .any((p) => p.tagIds.contains(tag.id));
+
+                                    IconData? icon;
+                                    if (allHave) {
+                                      icon = Icons.check;
+                                    } else if (someHave) {
+                                      icon = Icons.remove;
+                                    } else {
+                                      icon = null;
+                                    }
+
+                                    return ChoiceChip(
+                                      avatar: icon != null
+                                          ? Icon(icon,
+                                              size: 16, color: Colors.white)
+                                          : null,
+                                      label: Text(tag.name),
+                                      selected: allHave,
+                                      selectedColor: Color(tag.colorValue)
+                                          .withOpacity(0.5),
+                                      backgroundColor: Color(tag.colorValue),
+                                      labelStyle:
+                                          const TextStyle(color: Colors.white),
+                                      onSelected: (_) {
+                                        for (final photo in photos) {
+                                          if (allHave || someHave) {
+                                            photo.tagIds.remove(tag.id);
+                                          } else {
+                                            if (!photo.tagIds
+                                                .contains(tag.id)) {
+                                              photo.tagIds.add(tag.id);
+                                            }
+                                          }
+                                          context
+                                              .read<PhotoBloc>()
+                                              .add(UpdatePhoto(photo));
+                                        }
+                                        anyChanged = true;
+                                        (context as Element).markNeedsBuild();
+                                      },
+                                    );
+                                  }).toList(),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, anyChanged),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
       },
     ).then((v) => v ?? false);
   }
+}
+
+/// Внутренняя модель секции для диалога
+class _TagSection {
+  final String title;
+  final String? categoryId;
+  final List<Tag> tags;
+  _TagSection(
+      {required this.title, required this.categoryId, required this.tags});
 }
