@@ -151,6 +151,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   /// Индикатор, что мы уже делали один раз auto-fit
   bool _hasAutoFitted = false;
 
+  final Map<String, Offset> _downPos = {};
+  final Map<String, bool> _movedSinceDown = {};
+  static const double _tapSlop = 8.0; // порог в пикселях
+
   @override
   void initState() {
     super.initState();
@@ -580,7 +584,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         child: Scaffold(
           appBar: !_isFullscreen
               ? AppBar(
-                  title: Text('${widget.initialCollage?.title} (${_items.length} images)'),
+                  title: Text(
+                      '${widget.initialCollage?.title} (${_items.length} images)'),
                   actions: [
                     IconButton(
                       tooltip: 'Help / Info',
@@ -728,7 +733,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   // Нижняя панель
 
                   Container(
-                      height: isSomePhotoInEditMode ? 120 : 40,
+                      height: isSomePhotoInEditMode ? 160 : 40,
                       color: _isFullscreen
                           ? const ui.Color.fromARGB(0, 0, 0, 0)
                           : const ui.Color.fromARGB(60, 0, 0, 0),
@@ -763,125 +768,125 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   void _onSaveCollageToDb() async {
-  final now = DateTime.now();
-  final formattedDate =
+    final now = DateTime.now();
+    final formattedDate =
         "My_collage_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
 
-  final TextEditingController titleController =
-      TextEditingController(text: formattedDate);
+    final TextEditingController titleController =
+        TextEditingController(text: formattedDate);
 
-  final itemsList = _items.map((it) {
-    final ui = _videoStates[it.id];
-    final isVideo = it.photo.mediaType == 'video';
-    return CollageItem(
-      fileName: it.photo.fileName,
-      offsetX: it.offset.dx,
-      offsetY: it.offset.dy,
-      scale: it.scale,
-      rotation: it.rotation,
-      baseWidth: it.baseWidth,
-      baseHeight: it.baseHeight,
-      internalOffsetX: it.internalOffset.dx,
-      internalOffsetY: it.internalOffset.dy,
-      brightness: it.brightness,
-      saturation: it.saturation,
-      temp: it.temp,
-      hue: it.hue,
-      cropRectLeft: it.cropRect.left,
-      cropRectTop: it.cropRect.top,
-      cropRectRight: it.cropRect.right,
-      cropRectBottom: it.cropRect.bottom,
-      zIndex: it.zIndex,
-      videoStartFrac: isVideo ? (ui?.startFrac ?? 0.0) : null,
-      videoEndFrac: isVideo ? (ui?.endFrac ?? 1.0) : null,
-      videoSpeed: isVideo ? (ui?.speed ?? 1.0) : null,
-    );
-  }).toList();
+    final itemsList = _items.map((it) {
+      final ui = _videoStates[it.id];
+      final isVideo = it.photo.mediaType == 'video';
+      return CollageItem(
+        fileName: it.photo.fileName,
+        offsetX: it.offset.dx,
+        offsetY: it.offset.dy,
+        scale: it.scale,
+        rotation: it.rotation,
+        baseWidth: it.baseWidth,
+        baseHeight: it.baseHeight,
+        internalOffsetX: it.internalOffset.dx,
+        internalOffsetY: it.internalOffset.dy,
+        brightness: it.brightness,
+        saturation: it.saturation,
+        temp: it.temp,
+        hue: it.hue,
+        cropRectLeft: it.cropRect.left,
+        cropRectTop: it.cropRect.top,
+        cropRectRight: it.cropRect.right,
+        cropRectBottom: it.cropRect.bottom,
+        zIndex: it.zIndex,
+        videoStartFrac: isVideo ? (ui?.startFrac ?? 0.0) : null,
+        videoEndFrac: isVideo ? (ui?.endFrac ?? 1.0) : null,
+        videoSpeed: isVideo ? (ui?.speed ?? 1.0) : null,
+      );
+    }).toList();
 
-  if (widget.initialCollage == null) {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Save Collage'),
-        content: TextField(
-          controller: titleController,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: 'Collage Title'),
+    if (widget.initialCollage == null) {
+      final result = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Save Collage'),
+          content: TextField(
+            controller: titleController,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Collage Title'),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(ctx).pop(); // Returns null
+              },
+            ),
+            TextButton(
+              child: const Text('Save'),
+              onPressed: () {
+                Navigator.of(ctx).pop(titleController.text); // Returns the text
+              },
+            ),
+          ],
         ),
-        actions: <Widget>[
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () {
-              Navigator.of(ctx).pop(); // Returns null
-            },
-          ),
-          TextButton(
-            child: const Text('Save'),
-            onPressed: () {
-              Navigator.of(ctx).pop(titleController.text); // Returns the text
-            },
-          ),
-        ],
-      ),
-    );
-    if (result == null || result.trim().isEmpty) return;
-
-    final collageId = const Uuid().v4();
-
-    // 1) Сначала рендерим превью (перезаписывать нечего — создаём)
-    String previewPath = '';
-    try {
-      previewPath = await CollagePreviewHelper.renderPreviewPng(
-        boundaryKey: _collageKey,
-        collageId: collageId,
-        pixelRatio: 1.25,
       );
-    } catch (_) {
-      // превью — не критично, можно проглотить и оставить пустым
+      if (result == null || result.trim().isEmpty) return;
+
+      final collageId = const Uuid().v4();
+
+      // 1) Сначала рендерим превью (перезаписывать нечего — создаём)
+      String previewPath = '';
+      try {
+        previewPath = await CollagePreviewHelper.renderPreviewPng(
+          boundaryKey: _collageKey,
+          collageId: collageId,
+          pixelRatio: 1.25,
+        );
+      } catch (_) {
+        // превью — не критично, можно проглотить и оставить пустым
+      }
+
+      // 2) Собираем и сохраняем в БД
+      final newCollage = Collage(
+        id: collageId,
+        title: result.trim(),
+        backgroundColorValue: _backgroundColor.value,
+        items: itemsList,
+        dateCreated: now,
+        dateUpdated: now,
+        previewPath: previewPath.isEmpty ? null : previewPath,
+      );
+      context.read<CollageBloc>().add(AddCollage(newCollage));
+    } else {
+      final existing = widget.initialCollage!;
+      // 1) Перерисовываем превью для того же id — файл перезапишется
+      String previewPath = existing.previewPath ?? '';
+      try {
+        previewPath = await CollagePreviewHelper.renderPreviewPng(
+          boundaryKey: _collageKey,
+          collageId: existing.id,
+          pixelRatio: 1.25,
+        );
+      } catch (_) {
+        // не фейлим сохранение коллажа из-за проблем превью
+      }
+
+      // 2) Обновляем запись
+      final updatedCollage = Collage(
+        id: existing.id,
+        title: existing.title,
+        backgroundColorValue: _backgroundColor.value,
+        items: itemsList,
+        dateCreated: existing.dateCreated,
+        dateUpdated: now,
+        previewPath: previewPath.isEmpty ? existing.previewPath : previewPath,
+      );
+      context.read<CollageBloc>().add(UpdateCollage(updatedCollage));
     }
 
-    // 2) Собираем и сохраняем в БД
-    final newCollage = Collage(
-      id: collageId,
-      title: result.trim(),
-      backgroundColorValue: _backgroundColor.value,
-      items: itemsList,
-      dateCreated: now,
-      dateUpdated: now,
-      previewPath: previewPath.isEmpty ? null : previewPath,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Collage saved to DB!')),
     );
-    context.read<CollageBloc>().add(AddCollage(newCollage));
-  } else {
-    final existing = widget.initialCollage!;
-    // 1) Перерисовываем превью для того же id — файл перезапишется
-    String previewPath = existing.previewPath ?? '';
-    try {
-      previewPath = await CollagePreviewHelper.renderPreviewPng(
-        boundaryKey: _collageKey,
-        collageId: existing.id,
-        pixelRatio: 1.25,
-      );
-    } catch (_) {
-      // не фейлим сохранение коллажа из-за проблем превью
-    }
-
-    // 2) Обновляем запись
-    final updatedCollage = Collage(
-      id: existing.id,
-      title: existing.title,
-      backgroundColorValue: _backgroundColor.value,
-      items: itemsList,
-      dateCreated: existing.dateCreated,
-      dateUpdated: now,
-      previewPath: previewPath.isEmpty ? existing.previewPath : previewPath,
-    );
-    context.read<CollageBloc>().add(UpdateCollage(updatedCollage));
   }
-
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Collage saved to DB!')),
-  );
-}
 
   /// Панель, когда не редактируется конкретное фото
   Widget _buildDefaultPanel() {
@@ -1002,103 +1007,150 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
-  /// Панель при режиме редактирования (brightness, saturation, temp, hue, rotation)
+  /// Панель при режиме редактирования — компактный UI
   Widget _buildEditPanel(CollagePhotoState item) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // Первая строка — кнопки вращения
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Material(
+      color: Colors.black.withOpacity(0.6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        child: Row(
           children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.rotate_left),
-              label: const Text('Rotate Left'),
-              onPressed: () {
-                setState(() {
-                  item.rotation -= math.pi / 2;
-                });
-              },
+            // Блок поворота
+            _ActionIcon(
+              icon: Icons.rotate_left,
+              tooltip: 'Rotate -90°',
+              onPressed: () => setState(() => item.rotation -= math.pi / 2),
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.rotate_right),
-              label: const Text('Rotate Right'),
-              onPressed: () {
-                setState(() {
-                  item.rotation += math.pi / 2;
-                });
-              },
+            const SizedBox(width: 6),
+            _ActionIcon(
+              icon: Icons.rotate_right,
+              tooltip: 'Rotate +90°',
+              onPressed: () => setState(() => item.rotation += math.pi / 2),
+            ),
+
+            const VerticalDivider(
+              color: Colors.white24,
+              thickness: 1,
+              width: 16,
+              indent: 6,
+              endIndent: 6,
+            ),
+
+            // Слайдеры — упакуем в две колонки, если места мало, они перейдут на две строки
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final twoCols = c.maxWidth > 640; // адаптивно
+                  final sliders = [
+                    _MiniSlider(
+                      label: 'Brt',
+                      value: item.brightness,
+                      min: 0.0,
+                      max: 4.0,
+                      divisions: 20,
+                      centerValue: 1.0,
+                      onChanged: (v) => setState(() => item.brightness = v),
+                    ),
+                    _MiniSlider(
+                      label: 'Sat',
+                      value: item.saturation,
+                      min: 0.0,
+                      max: 2.0,
+                      divisions: 20,
+                      centerValue: 1.0,
+                      onChanged: (v) => setState(() => item.saturation = v),
+                    ),
+                    _MiniSlider(
+                      label: 'Tmp',
+                      value: item.temp,
+                      min: -5.0,
+                      max: 5.0,
+                      divisions: 20,
+                      centerValue: 0.0,
+                      onChanged: (v) => setState(() => item.temp = v),
+                    ),
+                    _MiniSlider(
+                      label: 'Hue',
+                      value: item.hue,
+                      min: -math.pi / 4,
+                      max: math.pi / 4,
+                      divisions: 20,
+                      centerValue: 0.0,
+                      format: (v) =>
+                          (v * 180 / math.pi).toStringAsFixed(0) + '°',
+                      onChanged: (v) => setState(() => item.hue = v),
+                    ),
+                  ];
+
+                  if (!twoCols) {
+                    // одна «полка» — просто заворачиваем в Wrap
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 6,
+                      children: sliders
+                          .map((w) =>
+                              SizedBox(width: c.maxWidth / 2 - 12, child: w))
+                          .toList(),
+                    );
+                  } else {
+                    // две колонки фикс ширины
+                    final colW = (c.maxWidth - 12) / 2;
+                    return Row(
+                      children: [
+                        SizedBox(
+                            width: colW,
+                            child: Column(
+                              children: [
+                                sliders[0],
+                                const SizedBox(height: 6),
+                                sliders[1]
+                              ],
+                            )),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                            width: colW,
+                            child: Column(
+                              children: [
+                                sliders[2],
+                                const SizedBox(height: 6),
+                                sliders[3]
+                              ],
+                            )),
+                      ],
+                    );
+                  }
+                },
+              ),
+            ),
+
+            const VerticalDivider(
+              color: Colors.white24,
+              thickness: 1,
+              width: 16,
+              indent: 6,
+              endIndent: 6,
+            ),
+
+            // OK — компактная кнопка
+            SizedBox(
+              height: 32,
+              child: ElevatedButton(
+                onPressed: () => setState(() => item.isEditing = false),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  backgroundColor: Colors.white10,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('OK',
+                    style: TextStyle(fontSize: 13, letterSpacing: 0.2)),
+              ),
             ),
           ],
         ),
-        // Вторая строка — яркость, насыщенность
-        Row(
-          children: [
-            const SizedBox(width: 16),
-            _buildSlider(
-              label: 'Brt',
-              min: 0.0,
-              max: 4.0,
-              divisions: 20,
-              value: item.brightness,
-              centerValue: 1.0,
-              onChanged: (val) {
-                setState(() => item.brightness = val);
-              },
-            ),
-            _buildSlider(
-              label: 'Sat',
-              min: 0.0,
-              max: 2.0,
-              divisions: 20,
-              value: item.saturation,
-              centerValue: 1.0,
-              onChanged: (val) {
-                setState(() => item.saturation = val);
-              },
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-        // Третья строка — контраст и hue
-        Row(
-          children: [
-            const SizedBox(width: 16),
-            _buildSlider(
-              label: 'Tmp',
-              min: -5.0,
-              max: 5.0,
-              divisions: 20,
-              value: item.temp,
-              centerValue: 0.0,
-              onChanged: (val) {
-                setState(() => item.temp = val);
-              },
-            ),
-            _buildSlider(
-              label: 'Hue',
-              min: -math.pi / 4,
-              max: math.pi / 4,
-              divisions: 20,
-              value: item.hue,
-              centerValue: 0.0,
-              onChanged: (val) {
-                setState(() => item.hue = val);
-              },
-            ),
-            const SizedBox(width: 16),
-          ],
-        ),
-        // Четвертая строка — кнопка OK
-        ElevatedButton(
-          child: const Text('OK'),
-          onPressed: () {
-            setState(() {
-              item.isEditing = false;
-            });
-          },
-        ),
-      ],
+      ),
     );
   }
 
@@ -1113,8 +1165,25 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         top: item.offset.dy,
         child: Listener(
           behavior: HitTestBehavior.translucent, // важно!
-          onPointerDown: (_) {
-            _bringToFront(item); // сработает и по видео, и по контролам
+          onPointerDown: (e) {
+            _downPos[item.id] = e.position;
+            _movedSinceDown[item.id] = false;
+          },
+          onPointerMove: (e) {
+            final start = _downPos[item.id];
+            if (start != null && (_movedSinceDown[item.id] != true)) {
+              final moved = (e.position - start).distance > _tapSlop;
+              if (moved) _movedSinceDown[item.id] = true;
+            }
+          },
+          onPointerUp: (_) {
+            final moved = _movedSinceDown[item.id] == true;
+            if (!moved) {
+              // «Тап без движения» — поднимаем наверх (и для видео тоже сработает)
+              _bringToFront(item);
+            }
+            _downPos.remove(item.id);
+            _movedSinceDown.remove(item.id);
           },
           onPointerSignal: (event) {
             if (event is PointerScrollEvent) {
@@ -1356,6 +1425,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                           onChangeSpeed: (s) => setState(() {
                             uiState.speed = s;
                           }),
+                          totalDuration: uiState.duration, // <— ВАЖНО
                         ),
                       ),
                     ),
@@ -1595,4 +1665,119 @@ class _VideoUi {
     this.speed = 1.0,
     this.duration = Duration.zero,
   });
+}
+
+/// Маленькая иконка-кнопка с тултипом
+class _ActionIcon extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  const _ActionIcon({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 400),
+      child: InkResponse(
+        onTap: onPressed,
+        radius: 18,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: Colors.white10,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 16, color: Colors.white),
+        ),
+      ),
+    );
+  }
+}
+
+/// Компактный слайдер: тонкий трек, подпись + значение, двойной тап — сброс к центру
+class _MiniSlider extends StatelessWidget {
+  final String label;
+  final double value;
+  final double min;
+  final double max;
+  final int divisions;
+  final double centerValue;
+  final ValueChanged<double> onChanged;
+  final String Function(double v)? format;
+
+  const _MiniSlider({
+    required this.label,
+    required this.value,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.centerValue,
+    required this.onChanged,
+    this.format,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final txt = (format ?? ((v) => v.toStringAsFixed(2)))(value);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Заголовок + значение
+        Row(
+          children: [
+            Text(label,
+                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            const Spacer(),
+            Text(txt,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFeatures: [ui.FontFeature.tabularFigures()])),
+          ],
+        ),
+        const SizedBox(height: 2),
+        // Сам слайдер + «магнит» к центру
+        GestureDetector(
+          onDoubleTap: () => onChanged(centerValue),
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              activeTrackColor: Colors.white,
+              inactiveTrackColor: Colors.white24,
+              thumbColor: Colors.white,
+              overlayColor: Colors.white12,
+              tickMarkShape:
+                  const RoundSliderTickMarkShape(tickMarkRadius: 0.0),
+            ),
+            child: Slider(
+              min: min,
+              max: max,
+              divisions: divisions,
+              value: value.clamp(min, max),
+              onChanged: (v) {
+                // «магнит» к центру (3% диапазона)
+                final threshold = (max - min) * 0.03;
+                if ((v - centerValue).abs() < threshold) {
+                  onChanged(centerValue);
+                } else {
+                  onChanged(v);
+                }
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
