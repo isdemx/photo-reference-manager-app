@@ -7,10 +7,12 @@ import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
+import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
 
 import 'package:photographers_reference_app/src/presentation/bloc/folder_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
 
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
@@ -71,6 +73,12 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                 final tags =
                     {for (var t in tagState.tags) t.id: t}.values.toList();
 
+                final tagCatState = context.watch<TagCategoryBloc>().state;
+                final List<TagCategory> categories =
+                    tagCatState is TagCategoryLoaded
+                        ? tagCatState.categories
+                        : <TagCategory>[];
+
                 // фильтруем фотографии
                 final photos = _applyFilters(photoState.photos);
 
@@ -119,6 +127,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                   folders: folders,
                                   allTags: tags,
                                   folderId: _folderId,
+                                  categories: categories,
                                   onFolderChanged: (v) =>
                                       setState(() => _folderId = v),
                                   selectedTagIds: _selectedTagIds,
@@ -495,6 +504,7 @@ class _GridSizeSlider extends StatelessWidget {
 class _FilterPanel extends StatelessWidget {
   final List<Folder> folders;
   final List<Tag> allTags;
+  final List<TagCategory> categories;
 
   final String? folderId;
   final ValueChanged<String?> onFolderChanged;
@@ -509,6 +519,7 @@ class _FilterPanel extends StatelessWidget {
     Key? key,
     required this.folders,
     required this.allTags,
+    required this.categories,
     required this.folderId,
     required this.onFolderChanged,
     required this.selectedTagIds,
@@ -521,6 +532,20 @@ class _FilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grouped = _groupTagsByCategoryId(allTags);
+
+    String _catName(String? id) {
+      if (id == null) return 'No category';
+      final cat = categories.firstWhere(
+        (c) => c.id == id,
+        orElse: () => TagCategory(
+          id: '',
+          name: 'Unknown',
+          sortOrder: 0,
+          dateCreated: DateTime.now(),
+        ),
+      );
+      return cat.name;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -542,10 +567,12 @@ class _FilterPanel extends StatelessWidget {
                     value: null,
                     child: Text('All Folders'),
                   ),
-                  ...folders.map((f) => DropdownMenuItem(
-                        value: f.id,
-                        child: Text(f.name),
-                      )),
+                  ...folders.map(
+                    (f) => DropdownMenuItem(
+                      value: f.id,
+                      child: Text(f.name),
+                    ),
+                  ),
                 ],
                 onChanged: onFolderChanged,
               ),
@@ -586,19 +613,21 @@ class _FilterPanel extends StatelessWidget {
             TextButton.icon(
               onPressed: onClearAllTags,
               icon: const Icon(Icons.clear, size: 16, color: Colors.white70),
-              label:
-                  const Text('Clear', style: TextStyle(color: Colors.white70)),
+              label: const Text(
+                'Clear',
+                style: TextStyle(color: Colors.white70),
+              ),
             ),
           ],
         ),
         const SizedBox(height: 6),
 
-        // --- Render categories first
+        // --- Сначала категории
         for (final entry in grouped.byCat.entries) ...[
           Padding(
             padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: Text(
-              _catTitle(entry.key),
+              _catName(entry.key), // <-- здесь теперь имя категории
               style: const TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ),
@@ -606,7 +635,7 @@ class _FilterPanel extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: entry.value.map((t) {
-              final id = t.id ?? '';
+              final id = t.id; // id тут точно String
               final selected = selectedTagIds.contains(id);
               return _TagBadge(
                 label: t.name,
@@ -618,12 +647,12 @@ class _FilterPanel extends StatelessWidget {
           ),
         ],
 
-        // --- Then uncategorized
+        // --- Потом некатегоризированные
         if (grouped.uncategorized.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.only(top: 12, bottom: 4),
             child: Text(
-              'Без категории',
+              'No category',
               style: TextStyle(color: Colors.white70, fontSize: 12),
             ),
           ),
@@ -631,7 +660,7 @@ class _FilterPanel extends StatelessWidget {
             spacing: 6,
             runSpacing: 6,
             children: grouped.uncategorized.map((t) {
-              final id = t.id ?? '';
+              final id = t.id;
               final selected = selectedTagIds.contains(id);
               return _TagBadge(
                 label: t.name,
@@ -645,9 +674,6 @@ class _FilterPanel extends StatelessWidget {
       ],
     );
   }
-
-  // Если есть справочник имён категорий — используйте его тут.
-  String _catTitle(String catId) => 'Категория $catId';
 }
 
 /// Группировка тегов по tagCategoryId

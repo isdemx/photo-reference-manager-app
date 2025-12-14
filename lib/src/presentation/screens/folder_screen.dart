@@ -138,7 +138,7 @@ class _FolderScreenState extends State<FolderScreen> {
                         : PhotoGridView(
                             showFilter: false,
                             tags: tagState.tags,
-                            title: '${widget.folder.name} (${photos.length})',
+                            title: widget.folder.name,
                             showShareBtn: true,
                             photos: photos,
                             actionFromParent: null,

@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:video_player/video_player.dart';
+
 import '../../domain/entities/photo.dart';
+import 'video_loop_timeline.dart';
 
 class VideoView extends StatefulWidget {
   /// индекс этого виджета и «текущей» страницы (нужны,
@@ -29,6 +31,7 @@ class VideoView extends StatefulWidget {
 
   /// скорость воспроизведения (0.1..4.0), null => 1.0
   final double? initialSpeed;
+
   /// скрыть регулятор скорости
   final bool hideSpeed;
   // -------------------------------------------------------------------------
@@ -39,12 +42,12 @@ class VideoView extends StatefulWidget {
     this.currentIndex,
     this.videoController, {
     Key? key,
-    this.initialVolume,            // теперь по умолчанию будет 0.0 (см. initState)
+    this.initialVolume, // теперь по умолчанию будет 0.0 (см. initState)
     this.hideVolume = false,
     this.hidePlayPause = false,
     this.loopSliderHide = false,
     this.showTitle = false,
-    this.initialSpeed,             // по умолчанию 1.0 (см. initState)
+    this.initialSpeed, // по умолчанию 1.0 (см. initState)
     this.hideSpeed = false,
   }) : super(key: key);
 
@@ -59,7 +62,7 @@ class _VideoViewState extends State<VideoView> {
 
   // громкость и скорость
   late double _volume; // (0..1)
-  late double _speed;  // (0.1..4.0)
+  late double _speed; // (0.1..4.0)
 
   double _loopStart = 0;
   double _loopEnd = 1;
@@ -179,6 +182,11 @@ class _VideoViewState extends State<VideoView> {
     final pos = controller.value.position;
     final dur = controller.value.duration;
 
+    // фракция текущей позиции (0..1)
+    final double positionFrac = dur.inMilliseconds == 0
+        ? 0.0
+        : (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -217,67 +225,48 @@ class _VideoViewState extends State<VideoView> {
                   // Text(_fmt(pos)),
                   const SizedBox(width: 8),
 
-                  /// Видео-прогресс и loop-range идут в колонке
+                  /// Видео-прогресс + loop в одном виджете
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        VideoProgressIndicator(
-                          controller,
-                          allowScrubbing: true,
-                          padding: EdgeInsets.zero, // убрать лишние отступы
-                          colors: const VideoProgressColors(
-                            playedColor: Colors.blue,
-                            bufferedColor: Colors.white54,
-                            backgroundColor: Colors.black26,
-                          ),
-                        ),
-                        // уменьшить отступ между слайдерами
-                        const SizedBox(height: 4),
+                        if (!widget.loopSliderHide)
+                          VideoLoopTimeline(
+                            position: positionFrac,
+                            loopStart: _loopStart,
+                            loopEnd: _loopEnd,
+                            onPositionChanged: (frac) {
+                              final c =
+                                  widget.videoController ?? _internalController;
+                              if (!_controllerReady(c)) return;
+                              final d = c.value.duration;
+                              if (d.inMilliseconds == 0) return;
+                              final targetMs =
+                                  (d.inMilliseconds * frac).round();
+                              c.seekTo(Duration(milliseconds: targetMs));
+                            },
+                            onLoopChanged: (range) {
+                              final c =
+                                  widget.videoController ?? _internalController;
+                              setState(() {
+                                final prevStart = _loopStart;
+                                _loopStart = range.start;
+                                _loopEnd = range.end;
 
-                        if (!widget.loopSliderHide) // <— петля
-                          Theme(
-                            data: Theme.of(context).copyWith(
-                              sliderTheme: SliderTheme.of(context).copyWith(
-                                activeTrackColor: Colors.white,
-                                inactiveTrackColor: Colors.white30,
-                                thumbColor: Colors.white,
-                                overlayColor: Colors.white.withOpacity(0.2),
-                                trackHeight: 2.0,
-                                thumbShape: const RoundSliderThumbShape(
-                                    enabledThumbRadius: 6.0),
-                                overlayShape: const RoundSliderOverlayShape(
-                                    overlayRadius: 12.0),
-                              ),
-                            ),
-                            child: RangeSlider(
-                              values: RangeValues(_loopStart, _loopEnd),
-                              min: 0,
-                              max: 1,
-                              divisions: null,
-                              onChanged: (RangeValues values) {
-                                final wasStartChanged =
-                                    values.start != _loopStart;
-                                setState(() {
-                                  _loopStart = values.start;
-                                  _loopEnd = values.end;
-                                });
-
-                                if (wasStartChanged) {
-                                  final c = widget.videoController ??
-                                      _internalController;
-                                  if (_controllerReady(c)) {
-                                    final dur = c.value.duration;
-                                    final start = Duration(
-                                      milliseconds:
-                                          (dur.inMilliseconds * _loopStart)
-                                              .toInt(),
-                                    );
-                                    c.seekTo(start);
+                                // если поменяли начало петли — сразу прыгаем туда
+                                if (_loopStart != prevStart &&
+                                    _controllerReady(c)) {
+                                  final d = c.value.duration;
+                                  if (d.inMilliseconds > 0) {
+                                    final startMs =
+                                        (d.inMilliseconds * _loopStart)
+                                            .round();
+                                    c.seekTo(
+                                        Duration(milliseconds: startMs));
                                   }
                                 }
-                              },
-                            ),
+                              });
+                            },
                           ),
                       ],
                     ),
@@ -308,9 +297,13 @@ class _VideoViewState extends State<VideoView> {
                             ),
                           ),
                         ),
-                        Text('${_speed.toStringAsFixed(2)}x',
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.white70)),
+                        Text(
+                          '${_speed.toStringAsFixed(2)}x',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ],
                     ),
 
@@ -339,9 +332,13 @@ class _VideoViewState extends State<VideoView> {
                             ),
                           ),
                         ),
-                        Text('${(_volume * 100).round()}%',
-                            style: const TextStyle(
-                                fontSize: 11, color: Colors.white70)),
+                        Text(
+                          '${(_volume * 100).round()}%',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
                       ],
                     ),
                   const SizedBox(width: 8),

@@ -97,27 +97,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                           _filterNotRef = !_filterNotRef;
                         });
                       },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6.0, vertical: 3.0),
-                        decoration: BoxDecoration(
-                          color: _filterNotRef
-                              ? Colors.blueAccent
-                              : Colors.transparent,
-                          border: Border.all(color: Colors.blueAccent),
-                          borderRadius: BorderRadius.circular(20.0),
-                        ),
-                        child: Text(
-                          'Ref Only',
-                          style: TextStyle(
-                            fontSize: 12.0,
-                            color: _filterNotRef
-                                ? Colors.white
-                                : Colors.blueAccent,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                      child: Container(),
                     ),
                   ),
                 ),

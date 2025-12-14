@@ -7,7 +7,11 @@ import 'package:hive/hive.dart';
 import 'package:share_plus/share_plus.dart';
 
 class BackupService {
-  static Future<String> _buildZip() async {
+  /// Собираем ZIP-файл.
+  /// [onProgress] получает значение 0..100 (double).
+  static Future<String> _buildZip({
+    void Function(double progress)? onProgress,
+  }) async {
     print('[Backup] Начало создания ZIP...');
     final docs = await getApplicationDocumentsDirectory();
     final tmp = await getTemporaryDirectory();
@@ -61,6 +65,12 @@ class BackupService {
       onZipping: (filePath, isDir, progress) {
         final name = p.basename(filePath);
         print('[Backup] ${progress.toStringAsFixed(1)}% → $name');
+
+        // Пробрасываем прогресс наружу
+        if (onProgress != null) {
+          onProgress(progress); // progress: 0..100
+        }
+
         return ZipFileOperation.includeItem;
       },
     );
@@ -69,7 +79,10 @@ class BackupService {
     print('[Backup] Временная рабочая папка удалена.');
 
     final zipSize = await File(zipPath).length();
-    print('[Backup] ZIP-файл создан: $zipPath (${(zipSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+    print(
+      '[Backup] ZIP-файл создан: $zipPath '
+      '(${(zipSize / 1024 / 1024).toStringAsFixed(2)} MB)',
+    );
 
     return zipPath;
   }
@@ -89,39 +102,109 @@ class BackupService {
     }
   }
 
+  /// Публичный метод: спросить пользователя, затем показать прогресс и сделать бэкап.
   static Future<void> promptAndRun(BuildContext context) async {
     print('[Backup] Показываем диалог пользователю...');
     final agreed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Сделать резервную копию?'),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Create a backup?'),
         content: const Text(
-          'Мы упакуем базу Hive и все медиа в ZIP и предложим сохранить '
-          'файл в «Файлы», iCloud или отправить AirDrop.'),
+          'We’ll package your Hive database and all media files into a ZIP archive. '
+          'Then you’ll be able to store them or import the backup into the app on another device.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(_, false), child: const Text('Отмена')),
-          ElevatedButton(onPressed: () => Navigator.pop(_, true), child: const Text('Создать')),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Create'),
+          ),
         ],
       ),
     );
 
-    if (agreed == true) {
-      try {
-        print('[Backup] Пользователь подтвердил. Закрываем Hive...');
-        await Hive.close();
-
-        final zip = await _buildZip();
-
-        print('[Backup] Открываем системное окно share...');
-        await Share.shareXFiles([XFile(zip)], text: 'Photographers Reference backup');
-
-        print('[Backup] Backup завершён успешно!');
-      } catch (e, st) {
-        print('[Backup] Ошибка при создании backup: $e');
-        print('[Backup] Stacktrace:\n$st');
-      }
-    } else {
+    if (agreed != true) {
       print('[Backup] Пользователь отказался от backup.');
+      return;
     }
+
+    print('[Backup] Пользователь подтвердил. Показываем прогресс-диалог...');
+
+    // Диалог с прогрессом
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        double progress = 0.0; // 0..100
+
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            // Стартуем бэкап только один раз — при первой сборке виджета,
+            // когда progress == 0.0
+            if (progress == 0.0) {
+              Future.microtask(() async {
+                try {
+                  print('[Backup] Закрываем Hive...');
+                  await Hive.close();
+
+                  print('[Backup] Стартуем _buildZip...');
+                  final zipPath = await _buildZip(
+                    onProgress: (p) {
+                      // Обновление прогресса
+                      setState(() {
+                        progress = p;
+                      });
+                    },
+                  );
+
+                  print('[Backup] Открываем системное окно share...');
+                  await Share.shareXFiles(
+                    [XFile(zipPath)],
+                    text: 'Photographers Reference backup',
+                  );
+
+                  print('[Backup] Backup завершён успешно!');
+
+                  if (Navigator.of(dialogCtx).canPop()) {
+                    Navigator.of(dialogCtx).pop(); // закрываем прогресс-диалог
+                  }
+                } catch (e, st) {
+                  print('[Backup] Ошибка при создании backup: $e');
+                  print('[Backup] Stacktrace:\n$st');
+
+                  if (Navigator.of(dialogCtx).canPop()) {
+                    Navigator.of(dialogCtx).pop();
+                  }
+
+                  // По желанию здесь можно показать SnackBar/AlertDialog об ошибке
+                  // ScaffoldMessenger.of(context).showSnackBar(...)
+                }
+              });
+            }
+
+            final normalized = (progress / 100).clamp(0.0, 1.0);
+
+            return AlertDialog(
+              title: const Text('Creating backup...'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: normalized == 0 ? null : normalized),
+                  const SizedBox(height: 12),
+                  Text(
+                    progress > 0
+                        ? '${progress.toStringAsFixed(0)} %'
+                        : 'Preparing files...',
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }

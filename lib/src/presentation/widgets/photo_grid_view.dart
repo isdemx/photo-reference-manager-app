@@ -19,10 +19,8 @@ import 'package:photographers_reference_app/src/presentation/helpers/images_help
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
-// import 'package:photographers_reference_app/src/presentation/screens/video_generator.dart';
 
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
-// import 'package:photographers_reference_app/src/presentation/widgets/collage_grid_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/filter_panel.dart';
@@ -30,11 +28,12 @@ import 'package:photographers_reference_app/src/presentation/widgets/photo_thumb
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_overlay.dart';
 
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
+import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 
 // Быстрое чтение размеров из заголовков (без полного декода пикселей)
-// Добавь в pubspec.yaml: image_size_getter: ^2.1.2
 import 'package:image_size_getter/image_size_getter.dart';
 
 class PhotoGridView extends StatefulWidget {
@@ -89,10 +88,105 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   final Map<String, double> _ratioById = {};
   final Set<String> _ratioLoading = {}; // чтобы не дублировать задачи
 
+  /// Режим логики фильтра по тегам: false = OR, true = AND
+  bool _filterAndMode = false;
+
+  // ---------------- Sort by file size ----------------
+  bool _sortByFileSize = false;
+  bool _fileSizesLoading = false;
+  final Map<String, int> _fileSizeById = {};
+
   @override
   void initState() {
     super.initState();
     _loadPreferences();
+  }
+
+  // ---------------- Helpers: размер файла ----------------
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    final mb = kb / 1024;
+    if (mb < 1024) return '${mb.toStringAsFixed(1)} MB';
+    final gb = mb / 1024;
+    return '${gb.toStringAsFixed(2)} GB';
+  }
+
+  static Future<Map<String, int>> _computeFileSizesInIsolate(
+      List<Map<String, String>> items) async {
+    return await Isolate.run<Map<String, int>>(() {
+      final result = <String, int>{};
+
+      for (final item in items) {
+        final String id = item['id']!;
+        final String path = item['path']!;
+        try {
+          final file = File(path);
+          if (file.existsSync()) {
+            final size = file.lengthSync();
+            result[id] = size;
+          }
+        } catch (_) {
+          // игнорируем ошибки доступа к конкретным файлам
+        }
+      }
+
+      return result;
+    });
+  }
+
+  Future<void> _toggleSortByFileSize() async {
+    // если уже включено — выключаем и возвращаемся к обычному порядку
+    if (_sortByFileSize) {
+      setState(() {
+        _sortByFileSize = false;
+        _visibleCount = 0; // сброс пагинации
+      });
+      return;
+    }
+
+    // Включаем сортировку: надо посчитать размеры для тех фото, которых нет в кэше
+    final helper = PhotoPathHelper();
+
+    final missing =
+        widget.photos.where((p) => !_fileSizeById.containsKey(p.id)).map((p) {
+      final effectivePath =
+          p.isStoredInApp ? helper.getFullPath(p.fileName) : p.path;
+      return {
+        'id': p.id,
+        'path': effectivePath,
+      };
+    }).toList();
+
+    if (missing.isEmpty) {
+      // все размеры уже есть, просто включаем сортировку
+      setState(() {
+        _sortByFileSize = true;
+        _visibleCount = 0;
+      });
+      return;
+    }
+
+    setState(() {
+      _fileSizesLoading = true;
+    });
+
+    try {
+      final newSizes = await _computeFileSizesInIsolate(missing);
+      if (!mounted) return;
+      setState(() {
+        _fileSizeById.addAll(newSizes);
+        _sortByFileSize = true;
+        _fileSizesLoading = false;
+        _visibleCount = 0; // сброс пагинации
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _fileSizesLoading = false;
+      });
+    }
   }
 
   // ---------------- Фильтрация ----------------
@@ -104,19 +198,30 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     return photos.where((photo) {
       final filters = filterState.filters;
 
-      // включённые теги (true)
-      if (filters.values.contains(TagFilterState.trueState)) {
-        final hasRequired = photo.tagIds.any((tagId) {
-          return filters[tagId] == TagFilterState.trueState;
-        });
-        if (!hasRequired) return false;
+      // --- включённые теги (true) ---
+      final includeIds = filters.entries
+          .where((e) => e.value == TagFilterState.trueState)
+          .map((e) => e.key)
+          .toSet();
+
+      if (includeIds.isNotEmpty) {
+        final photoTagIds = photo.tagIds.toSet();
+
+        final matches = _filterAndMode
+            ? includeIds.every(photoTagIds.contains) // AND
+            : includeIds.any(photoTagIds.contains); // OR
+
+        if (!matches) return false;
       }
 
-      // исключённые теги (false)
+      // --- исключённые теги (false) ---
       if (filters.values.contains(TagFilterState.falseState)) {
-        final hasExcluded = photo.tagIds.any((tagId) {
-          return filters[tagId] == TagFilterState.falseState;
-        });
+        final excludeIds = filters.entries
+            .where((e) => e.value == TagFilterState.falseState)
+            .map((e) => e.key)
+            .toSet();
+
+        final hasExcluded = photo.tagIds.any(excludeIds.contains);
         if (hasExcluded) return false;
       }
 
@@ -190,9 +295,11 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     }
   }
 
-  Future<void> _onDeletePressed(BuildContext context, List<Photo> photos) async {
+  Future<void> _onDeletePressed(
+      BuildContext context, List<Photo> photos) async {
     if (photos.isEmpty) return;
-    final ok = await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
+    final ok =
+        await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
     if (ok) _turnMultiSelectModeOff();
   }
 
@@ -311,7 +418,10 @@ class _PhotoGridViewState extends State<PhotoGridView> {
       return;
     }
 
-    final path = photo.path;
+    final helper = PhotoPathHelper();
+    final String path =
+        photo.isStoredInApp ? helper.getFullPath(photo.fileName) : photo.path;
+
     if (path.isEmpty || !File(path).existsSync()) {
       _ratioById[photo.id] = 1.0;
       return;
@@ -341,7 +451,15 @@ class _PhotoGridViewState extends State<PhotoGridView> {
 
         // Поддерживаемые форматы
         final ext = p.extension(path).toLowerCase();
-        const exts = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif'];
+        const exts = [
+          '.jpg',
+          '.jpeg',
+          '.png',
+          '.webp',
+          '.gif',
+          '.heic',
+          '.heif'
+        ];
         if (!exts.contains(ext)) return 1.0;
 
         final sz = ImageSizeGetter.getSize(FileInput(file));
@@ -356,8 +474,54 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   double _ratioFor(Photo photo) {
-    // если ещё не считали — вернём 1.0, но заранее стараемся префетчить
     return _ratioById[photo.id] ?? 1.0;
+  }
+
+  void _showFullTitleBottomSheet(String title) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.black87,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Text(
+                'Full title',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -372,14 +536,52 @@ class _PhotoGridViewState extends State<PhotoGridView> {
           )
         : widget.photos;
 
+    // --- Сортировка по размеру файла (если включена) ---
+    if (_sortByFileSize) {
+      photosFiltered.sort((a, b) {
+        final sa = _fileSizeById[a.id] ?? 0;
+        final sb = _fileSizeById[b.id] ?? 0;
+        final bySize = sb.compareTo(sa); // большие сначала
+        if (bySize != 0) return bySize;
+        return b.dateAdded.compareTo(a.dateAdded);
+      });
+    }
+
+    // 🔧 КЛАМПИМ visibleCount, если список сузился
+    if (_visibleCount > photosFiltered.length) {
+      _visibleCount = photosFiltered.length;
+    }
+
     // первая порция и предзагрузка ratio для видимой области
     _ensureMoreVisible(photosFiltered.length);
     _prefetchRatios(photosFiltered, _visibleCount);
 
-    final titleText = '${widget.title} (${photosFiltered.length})';
+    // --- Заголовок: в режиме сортировки по размеру показываем общий вес ---
+    String titleText;
+    if (_sortByFileSize) {
+      int totalBytes = 0;
+      for (final p in photosFiltered) {
+        totalBytes += _fileSizeById[p.id] ?? 0;
+      }
+      final sizeText = _formatBytes(totalBytes);
+      titleText = '${widget.title} (${photosFiltered.length}) • $sizeText';
+    } else {
+      titleText = '${widget.title} (${photosFiltered.length})';
+    }
+
     final hasActiveFilters =
         filterState.filters.isNotEmpty && widget.showFilter;
     final sliderBottom = _isMultiSelect ? (_multiBarHeight + 16.0) : 26.0;
+
+    // Внутри build(), перед return Stack(...)
+// можно вычислить один раз текущий title:
+    final String currentTitle = _isMultiSelect
+        ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
+        : titleText;
+
+    final Color currentTitleColor = _isMultiSelect
+        ? Colors.yellow
+        : (hasActiveFilters ? Colors.yellow : Colors.white);
 
     return Stack(
       children: [
@@ -399,7 +601,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                       if (m.pixels >= m.maxScrollExtent - 200) {
                         setState(
                             () => _ensureMoreVisible(photosFiltered.length));
-                        // префетчим ratio для новой зоны
                         _prefetchRatios(
                             photosFiltered, _visibleCount + _pageSize);
                       }
@@ -417,16 +618,20 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                               child: Padding(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 8.0),
-                                child: Text(
-                                  _isMultiSelect
-                                      ? 'Selected: ${_selectedPhotos.length}/${widget.photos.length}'
-                                      : titleText,
-                                  style: TextStyle(
-                                    color: _isMultiSelect
-                                        ? Colors.yellow
-                                        : (hasActiveFilters
-                                            ? Colors.yellow
-                                            : Colors.white),
+                                child: GestureDetector(
+                                  onLongPress: () =>
+                                      _showFullTitleBottomSheet(currentTitle),
+                                  child: SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    physics: const BouncingScrollPhysics(),
+                                    child: Text(
+                                      currentTitle,
+                                      softWrap: false,
+                                      overflow: TextOverflow.visible,
+                                      style: TextStyle(
+                                        color: currentTitleColor,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -438,13 +643,25 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                                 if (widget.actionFromParent != null)
                                   widget.actionFromParent!,
                                 IconButton(
-                                  icon: Icon(_isPinterestLayout
-                                      ? Icons.grid_on
-                                      : Icons.dashboard),
+                                  icon: Icon(
+                                    _isPinterestLayout
+                                        ? Icons.grid_on
+                                        : Icons.dashboard,
+                                  ),
                                   onPressed: _togglePinterestLayout,
                                   tooltip: _isPinterestLayout
                                       ? 'Switch to Grid View'
                                       : 'Switch to Masonry View',
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.swap_vert,
+                                    color: _sortByFileSize
+                                        ? Colors.yellow
+                                        : Colors.white,
+                                  ),
+                                  tooltip: 'Sort by file size',
+                                  onPressed: _toggleSortByFileSize,
                                 ),
                                 if (widget.showFilter)
                                   IconButton(
@@ -454,9 +671,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                                           ? Colors.yellow
                                           : Colors.white,
                                     ),
-                                    onPressed: () => setState(
-                                        () => _showFilterPanel =
-                                            !_showFilterPanel),
+                                    onPressed: () => setState(() =>
+                                        _showFilterPanel = !_showFilterPanel),
                                     tooltip: 'Filters',
                                   ),
                                 if (widget.showShareBtn == true)
@@ -475,7 +691,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                                 ),
                               ],
                       ),
-
                       SliverPadding(
                         padding: EdgeInsets.only(
                           left: 8.0,
@@ -527,35 +742,45 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                 ),
               ),
             ),
-
             if (_isMacOS)
               AnimatedContainer(
                 width: _showFilterPanel ? 300 : 0,
                 duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.only(bottom: 50),
                 decoration: const BoxDecoration(
                   boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black54)],
                 ),
                 curve: Curves.easeInOut,
                 child: _showFilterPanel
-                    ? FilterPanel(tags: widget.tags)
+                    ? FilterPanel(
+                        tags: widget.tags,
+                        useAndMode: _filterAndMode,
+                        onToggleLogic: () {
+                          setState(() => _filterAndMode = !_filterAndMode);
+                        },
+                      )
                     : const SizedBox.shrink(),
               ),
           ],
         ),
-
         if (_isSharing)
           Container(
             color: Colors.black.withOpacity(0.5),
             child: const Center(child: CircularProgressIndicator()),
           ),
-
+        if (_fileSizesLoading)
+          Container(
+            color: Colors.black.withOpacity(0.4),
+            child: const Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
         ColumnSlider(
           initialCount: _columnCount,
           columnCount: _columnCount,
           bottomInset: sliderBottom,
           onChanged: (value) => _updateColumnCount(value),
         ),
-
         if (_isMultiSelect)
           Align(
             alignment: Alignment.bottomCenter,
@@ -612,23 +837,28 @@ class _PhotoGridViewState extends State<PhotoGridView> {
               ),
             ),
           ),
-
         if (!_isMacOS && _showFilterPanel && widget.showFilter)
           Align(
             alignment: Alignment.topCenter,
             child: Container(
-              constraints: const BoxConstraints(maxHeight: 300),
+              constraints: const BoxConstraints(maxHeight: 400),
               margin: const EdgeInsets.only(top: kToolbarHeight + 40),
               width: double.infinity,
               color: Colors.black54,
-              child: FilterPanel(tags: widget.tags),
+              child: FilterPanel(
+                tags: widget.tags,
+                useAndMode: _filterAndMode,
+                onToggleLogic: () {
+                  setState(() => _filterAndMode = !_filterAndMode);
+                },
+              ),
             ),
           ),
       ],
     );
   }
 
-  /// Элемент сетки: СТАБИЛЬНЫЙ layout через AspectRatio на базе кэша ratio.
+  /// Элемент сетки.
   Widget _buildGridItem(
     BuildContext context,
     int index,
@@ -639,9 +869,19 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     final GlobalKey itemKey =
         _itemKeys.putIfAbsent(photo.id, () => GlobalKey());
 
-    // если ещё нет — запрашиваем вычисление ratio
     _ensureRatio(photo);
-    final ratio = _ratioFor(photo);
+
+    // 🟡 ВАЖНО: для Masonry — настоящий ratio, для квадратиков — строго 1:1
+    final double ratio = isPinterest ? _ratioFor(photo) : 1.0;
+
+    final bool isSelected = _isMultiSelect && _selectedPhotos.contains(photo);
+    String? sizeLabel;
+    if (_sortByFileSize) {
+      final sizeBytes = _fileSizeById[photo.id];
+      if (sizeBytes != null && sizeBytes > 0) {
+        sizeLabel = _formatBytes(sizeBytes);
+      }
+    }
 
     return Container(
       key: itemKey,
@@ -655,7 +895,8 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                 key: ValueKey('thumb_${photo.id}'),
                 photo: photo,
                 isPinterestLayout: isPinterest,
-                isSelected: _isMultiSelect && _selectedPhotos.contains(photo),
+                isSelected: isSelected,
+                fileSizeLabel: sizeLabel,
                 onPhotoTap: () => _onPhotoTap(context, index, currentList),
                 onLongPress: () {
                   vibrate();
@@ -664,7 +905,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
               ),
             ),
           ),
-          if (_isMultiSelect && _selectedPhotos.contains(photo))
+          if (isSelected)
             const Positioned(
               bottom: 8,
               right: 8,

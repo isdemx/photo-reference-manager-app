@@ -12,29 +12,37 @@ import 'package:photographers_reference_app/src/presentation/bloc/tag_category_b
 
 class TagsHelpers {
   static void _addTagToBloc(
-      BuildContext context, String tagName, Photo? photo) {
+    BuildContext context,
+    String tagName,
+    Photo? photo, {
+    String? tagCategoryId,
+  }) {
     final tagBloc = context.read<TagBloc>();
     final existingTags = (tagBloc.state as TagLoaded).tags;
 
+    // Пытаемся найти существующий тег по имени (case-insensitive)
     final existingTag = existingTags.firstWhere(
       (tag) => tag.name.toLowerCase() == tagName.toLowerCase(),
       orElse: () => Tag(id: '', name: '', colorValue: Colors.blue.value),
     );
 
     if (existingTag.id.isNotEmpty) {
-      // Если тег уже существует, добавляем его к фотографии, если указана
+      // Если тег уже существует — просто вешаем его на фото (категорию не трогаем)
       if (photo != null && !photo.tagIds.contains(existingTag.id)) {
         photo.tagIds.add(existingTag.id);
         context.read<PhotoBloc>().add(UpdatePhoto(photo));
       }
     } else {
-      // Если тег не существует, создаем новый и добавляем в TagBloc и PhotoBloc
+      // Создаём новый тег С УЧЁТОМ выбранной категории
       final newTag = Tag(
         id: const Uuid().v4(),
         name: tagName,
         colorValue: Colors.blue.value,
+        tagCategoryId: tagCategoryId, // ← вот это и не хватало
       );
+
       tagBloc.add(AddTag(newTag));
+
       if (photo != null) {
         photo.tagIds.add(newTag.id);
         context.read<PhotoBloc>().add(UpdatePhoto(photo));
@@ -44,25 +52,66 @@ class TagsHelpers {
 
   static void showAddTagDialog(BuildContext context) {
     final TextEditingController controller = TextEditingController();
+    String? selectedCategoryId;
+
+    // Достаём категории из TagCategoryBloc
+    final tagCategoryState = context.read<TagCategoryBloc>().state;
+    final categories = tagCategoryState is TagCategoryLoaded
+        ? tagCategoryState.categories
+        : <TagCategory>[];
 
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: const Text('Add tag'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(hintText: 'Tag name'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  hintText: 'Tag name',
+                ),
+              ),
+              const SizedBox(height: 16),
+              if (categories.isNotEmpty)
+                DropdownButtonFormField<String>(
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                  ),
+                  value: selectedCategoryId,
+                  items: categories
+                      .map(
+                        (c) => DropdownMenuItem<String>(
+                          value: c.id,
+                          child: Text(c.name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    selectedCategoryId = value;
+                  },
+                ),
+            ],
           ),
           actions: [
             TextButton(
               onPressed: () {
-                final String tagName = controller.text.trim();
-                if (tagName.isNotEmpty) {
-                  _addTagToBloc(
-                      context, tagName, null); // Передаем null для фото
-                  Navigator.of(context).pop();
-                }
+                final tagName = controller.text.trim();
+                if (tagName.isEmpty) return;
+
+                final newTag = Tag(
+                  id: const Uuid().v4(),
+                  name: tagName,
+                  colorValue: Colors.grey.value,
+                  tagCategoryId: selectedCategoryId, // выбранная категория
+                );
+
+                context.read<TagBloc>().add(AddTag(newTag));
+
+                Navigator.of(context).pop();
               },
               child: const Text('Add'),
             ),
@@ -74,100 +123,6 @@ class TagsHelpers {
         );
       },
     );
-  }
-
-  static Future<bool> showAddTagToImageDialog(
-      BuildContext context, Photo photo) async {
-    final TextEditingController controller = TextEditingController();
-    final tagBloc = context.read<TagBloc>();
-
-    if (tagBloc.state is! TagLoaded) {
-      tagBloc.add(LoadTags());
-    }
-
-    return await showDialog<bool>(
-      context: context,
-      builder: (context) {
-        return BlocBuilder<TagBloc, TagState>(
-          builder: (context, tagState) {
-            if (tagState is TagLoaded) {
-              final existingTags = tagState.tags;
-
-              return AlertDialog(
-                title: const Text('Add Tag'),
-                content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        controller: controller,
-                        decoration: const InputDecoration(hintText: 'Tag Name'),
-                      ),
-                      const SizedBox(height: 16.0),
-                      Wrap(
-                        spacing: 8.0,
-                        runSpacing: 8.0,
-                        children: existingTags.map((tag) {
-                          final isSelected = photo.tagIds.contains(tag.id);
-
-                          return ChoiceChip(
-                            label: Text(tag.name),
-                            selected: isSelected,
-                            selectedColor:
-                                Color(tag.colorValue).withOpacity(0.5),
-                            backgroundColor: Color(tag.colorValue),
-                            onSelected: (selected) {
-                              if (selected) {
-                                if (!photo.tagIds.contains(tag.id)) {
-                                  photo.tagIds.add(tag.id);
-                                  context
-                                      .read<PhotoBloc>()
-                                      .add(UpdatePhoto(photo));
-                                }
-                              } else {
-                                if (photo.tagIds.contains(tag.id)) {
-                                  photo.tagIds.remove(tag.id);
-                                  context
-                                      .read<PhotoBloc>()
-                                      .add(UpdatePhoto(photo));
-                                }
-                              }
-                              (context as Element).markNeedsBuild();
-                            },
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context)
-                        .pop(false), // Возвращаем false при отмене
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      final String tagName = controller.text.trim();
-                      if (tagName.isNotEmpty) {
-                        _addTagToBloc(context, tagName, photo); // Передаем фото
-                      }
-                      Navigator.of(context)
-                          .pop(true); // Возвращаем true при добавлении тега
-                    },
-                    child: const Text('Add'),
-                  ),
-                ],
-              );
-            } else if (tagState is TagLoading) {
-              return const Center(child: CircularProgressIndicator());
-            } else {
-              return const Center(child: Text('Failed to load tags.'));
-            }
-          },
-        );
-      },
-    ).then((value) => value ?? false); // Если результат null, возвращаем false
   }
 
   static void showDeleteConfirmationDialog(BuildContext context, Tag tag) {
@@ -271,50 +226,42 @@ class TagsHelpers {
     );
   }
 
-  static Map<String, int> computeTagPhotoCounts(
-      List<Tag> tags, List<Photo> photos) {
-    final Map<String, int> counts = {};
-    for (var tag in tags) {
-      counts[tag.id] = 0;
-    }
-    for (var photo in photos) {
-      for (var tagId in photo.tagIds) {
-        if (counts.containsKey(tagId)) {
-          counts[tagId] = counts[tagId]! + 1;
-        }
-      }
-    }
-    return counts;
-  }
-
-  /// Диалог массового назначения тега нескольким фотографиям.
-  /// Возвращает true, если были изменения.
-  /// Показывает тот же диалог, но для массива фото.
-  /// Возвращает true, если пользователь нажал "OK"
-  /// Диалог массового назначения тега нескольким фотографиям.
-  /// Возвращает true, если были изменения.
-  static Future<bool> showAddTagToImagesDialog(
-    BuildContext context,
-    List<Photo> photos,
-  ) async {
+  /// Общий full-screen диалог для работы с тегами.
+  /// Используется и для одного изображения, и для мультивыбора.
+  static Future<bool> _showFullScreenTagDialog({
+    required BuildContext context,
+    required List<Photo> photos,
+    required String title,
+    required String subtitle,
+    required bool allowNewTagCreation,
+    required bool multiAssign,
+  }) async {
     bool anyChanged = false;
 
     // Обеспечим наличие данных
     final tagBloc = context.read<TagBloc>();
-    if (tagBloc.state is! TagLoaded) tagBloc.add(LoadTags());
+    if (tagBloc.state is! TagLoaded) {
+      tagBloc.add(LoadTags());
+    }
 
     final catBloc = context.read<TagCategoryBloc>();
     if (catBloc.state is! TagCategoryLoaded) {
       catBloc.add(const LoadTagCategories());
     }
 
+    final singlePhoto = photos.length == 1 ? photos.first : null;
+    final TextEditingController controller = TextEditingController();
+    String? selectedCategoryId; // пока не используем в _addTagToBloc
+
     return await showDialog<bool>(
       context: context,
-      builder: (_) {
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (dialogCtx) {
         return BlocBuilder<TagCategoryBloc, TagCategoryState>(
-          builder: (context, catState) {
+          builder: (catCtx, catState) {
             return BlocBuilder<TagBloc, TagState>(
-              builder: (context, tagState) {
+              builder: (tagCtx, tagState) {
                 final bool loading = tagState is! TagLoaded ||
                     !(catState is TagCategoryLoaded ||
                         catState is TagCategoryInitial);
@@ -324,12 +271,6 @@ class TagsHelpers {
                 }
 
                 final tags = (tagState as TagLoaded).tags;
-                print('tags length: ${tags.length}');
-                final tagDebugList = tags
-                    .map(
-                        (t) => {'tagCategory': t.tagCategoryId, 'name': t.name})
-                    .toList();
-                print('tags (name+id): $tagDebugList');
 
                 final categories = catState is TagCategoryLoaded
                     ? List<TagCategory>.from(catState.categories)
@@ -343,7 +284,7 @@ class TagsHelpers {
                       : a.name.toLowerCase().compareTo(b.name.toLowerCase());
                 });
 
-                // Группируем теги по категориям
+                // Группируем теги по categoryId
                 final Map<String?, List<Tag>> grouped = {};
                 for (final t in tags) {
                   grouped.putIfAbsent(t.tagCategoryId, () => []).add(t);
@@ -370,102 +311,253 @@ class TagsHelpers {
                     categoryId: null,
                     tags: grouped[null] ?? const [],
                   ),
-                ]
-                    .where((s) => s.tags.isNotEmpty)
-                    .toList(); // пустые секции скрываем
+                ].where((s) => s.tags.isNotEmpty).toList();
 
-                return AlertDialog(
-                  title: const Text('Add tags to selected images'),
-                  content: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: SingleChildScrollView(
+                return Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: EdgeInsets.zero,
+                  child: SafeArea(
+                    child: Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      padding: const EdgeInsets.all(16),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: sections.map((s) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Заголовок секции
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 6),
-                                  child: Text(
-                                    s.title,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Верхняя панель: заголовок + крестик
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
                                   ),
                                 ),
-                                // Список чипов тегов этой секции
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: s.tags.map((tag) {
-                                    final allHave = photos.every(
-                                        (p) => p.tagIds.contains(tag.id));
-                                    final someHave = photos
-                                        .any((p) => p.tagIds.contains(tag.id));
-
-                                    IconData? icon;
-                                    if (allHave) {
-                                      icon = Icons.check;
-                                    } else if (someHave) {
-                                      icon = Icons.remove;
-                                    } else {
-                                      icon = null;
-                                    }
-
-                                    return ChoiceChip(
-                                      avatar: icon != null
-                                          ? Icon(icon,
-                                              size: 16, color: Colors.white)
-                                          : null,
-                                      label: Text(tag.name),
-                                      selected: allHave,
-                                      selectedColor: Color(tag.colorValue)
-                                          .withOpacity(0.5),
-                                      backgroundColor: Color(tag.colorValue),
-                                      labelStyle:
-                                          const TextStyle(color: Colors.white),
-                                      onSelected: (_) {
-                                        for (final photo in photos) {
-                                          if (allHave || someHave) {
-                                            photo.tagIds.remove(tag.id);
-                                          } else {
-                                            if (!photo.tagIds
-                                                .contains(tag.id)) {
-                                              photo.tagIds.add(tag.id);
-                                            }
-                                          }
-                                          context
-                                              .read<PhotoBloc>()
-                                              .add(UpdatePhoto(photo));
-                                        }
-                                        anyChanged = true;
-                                        (context as Element).markNeedsBuild();
-                                      },
-                                    );
-                                  }).toList(),
-                                ),
-                              ],
+                              ),
+                              IconButton(
+                                tooltip: 'Close',
+                                icon: const Icon(Icons.close,
+                                    color: Colors.white),
+                                onPressed: () =>
+                                    Navigator.of(dialogCtx).pop(false),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            subtitle,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.white70,
                             ),
-                          );
-                        }).toList(),
+                          ),
+                          const SizedBox(height: 16),
+
+                          if (allowNewTagCreation)
+                            _NewTagInlineEditor(
+                              controller: controller,
+                              categories: categories,
+                              onCategoryChanged: (val) {
+                                selectedCategoryId = val;
+                              },
+                              onSubmitAdd: () {
+                                final String tagName = controller.text.trim();
+                                if (tagName.isNotEmpty && singlePhoto != null) {
+                                  _addTagToBloc(
+                                    dialogCtx,
+                                    tagName,
+                                    singlePhoto,
+                                    tagCategoryId:
+                                        selectedCategoryId, // ← передаём выбранную категорию
+                                  );
+                                  anyChanged = true;
+                                  controller.clear();
+                                }
+                              },
+                            ),
+
+                          // Список секций с тегами
+                          Expanded(
+                            child: sections.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      'No tags yet',
+                                      style: TextStyle(
+                                        color: Colors.white54,
+                                      ),
+                                    ),
+                                  )
+                                : Scrollbar(
+                                    thumbVisibility: true,
+                                    child: ListView.builder(
+                                      itemCount: sections.length,
+                                      itemBuilder: (_, index) {
+                                        final s = sections[index];
+                                        return Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 16),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                s.title,
+                                                style: const TextStyle(
+                                                  fontWeight: FontWeight.w600,
+                                                  fontSize: 15,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Wrap(
+                                                spacing: 8,
+                                                runSpacing: 8,
+                                                children: s.tags.map((tag) {
+                                                  final allHave = photos.every(
+                                                    (p) => p.tagIds
+                                                        .contains(tag.id),
+                                                  );
+                                                  final someHave = photos.any(
+                                                    (p) => p.tagIds
+                                                        .contains(tag.id),
+                                                  );
+
+                                                  // selected для single/multi
+                                                  final isSelected = multiAssign
+                                                      ? allHave
+                                                      : photos.first.tagIds
+                                                          .contains(tag.id);
+
+                                                  IconData? icon;
+                                                  if (multiAssign) {
+                                                    if (allHave) {
+                                                      icon = Icons.check;
+                                                    } else if (someHave) {
+                                                      icon = Icons.remove;
+                                                    }
+                                                  }
+
+                                                  return ChoiceChip(
+                                                    avatar: icon != null
+                                                        ? Icon(
+                                                            icon,
+                                                            size: 16,
+                                                            color: Colors.white,
+                                                          )
+                                                        : null,
+                                                    label: Text(
+                                                      tag.name,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    selected: isSelected,
+                                                    selectedColor:
+                                                        Color(tag.colorValue)
+                                                            .withOpacity(0.7),
+                                                    backgroundColor:
+                                                        Color(tag.colorValue),
+                                                    labelStyle: const TextStyle(
+                                                      color: Colors.white,
+                                                    ),
+                                                    onSelected: (selected) {
+                                                      final photoBloc =
+                                                          dialogCtx.read<
+                                                              PhotoBloc>();
+
+                                                      if (!multiAssign) {
+                                                        // Один кадр: просто тумблер
+                                                        final p = photos.first;
+                                                        if (selected) {
+                                                          if (!p.tagIds
+                                                              .contains(
+                                                                  tag.id)) {
+                                                            p.tagIds
+                                                                .add(tag.id);
+                                                            photoBloc.add(
+                                                                UpdatePhoto(p));
+                                                          }
+                                                        } else {
+                                                          if (p.tagIds.contains(
+                                                              tag.id)) {
+                                                            p.tagIds
+                                                                .remove(tag.id);
+                                                            photoBloc.add(
+                                                                UpdatePhoto(p));
+                                                          }
+                                                        }
+                                                        anyChanged = true;
+                                                      } else {
+                                                        // Мультивыбор: логика all/some
+                                                        for (final p
+                                                            in photos) {
+                                                          if (allHave ||
+                                                              someHave) {
+                                                            p.tagIds
+                                                                .remove(tag.id);
+                                                          } else {
+                                                            if (!p.tagIds
+                                                                .contains(
+                                                                    tag.id)) {
+                                                              p.tagIds
+                                                                  .add(tag.id);
+                                                            }
+                                                          }
+                                                          photoBloc.add(
+                                                              UpdatePhoto(p));
+                                                        }
+                                                        anyChanged = true;
+                                                      }
+
+                                                      (tagCtx as Element)
+                                                          .markNeedsBuild();
+                                                    },
+                                                  );
+                                                }).toList(),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                          ),
+
+                          // Нижняя панель с кнопками
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              TextButton(
+                                onPressed: () =>
+                                    Navigator.of(dialogCtx).pop(false),
+                                child: const Text('Cancel'),
+                              ),
+                              const SizedBox(width: 8),
+                              if (allowNewTagCreation)
+                                ElevatedButton(
+                                  onPressed: () {
+                                    // Просто закрываем диалог.
+                                    // Само добавление тега делается через onSubmitAdd
+                                    // внутри _NewTagInlineEditor, когда юзер жмёт
+                                    // на кнопку [+] рядом с инпутом.
+                                    Navigator.of(dialogCtx).pop(anyChanged);
+                                  },
+                                  child: const Text('Done'),
+                                )
+                              else
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      Navigator.of(dialogCtx).pop(anyChanged),
+                                  child: const Text('OK'),
+                                ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, anyChanged),
-                      child: const Text('OK'),
-                    ),
-                  ],
                 );
               },
             );
@@ -473,6 +565,52 @@ class TagsHelpers {
         );
       },
     ).then((v) => v ?? false);
+  }
+
+  static Map<String, int> computeTagPhotoCounts(
+      List<Tag> tags, List<Photo> photos) {
+    final Map<String, int> counts = {};
+    for (var tag in tags) {
+      counts[tag.id] = 0;
+    }
+    for (var photo in photos) {
+      for (var tagId in photo.tagIds) {
+        if (counts.containsKey(tagId)) {
+          counts[tagId] = counts[tagId]! + 1;
+        }
+      }
+    }
+    return counts;
+  }
+
+  /// Диалог добавления тегов к ОДНОМУ изображению (full-screen).
+  static Future<bool> showAddTagToImageDialog(
+    BuildContext context,
+    Photo photo,
+  ) {
+    return _showFullScreenTagDialog(
+      context: context,
+      photos: [photo],
+      title: 'Add Tag',
+      subtitle: '1 image selected',
+      allowNewTagCreation: true,
+      multiAssign: false,
+    );
+  }
+
+  /// Диалог массового назначения тегов нескольким фотографиям (full-screen).
+  static Future<bool> showAddTagToImagesDialog(
+    BuildContext context,
+    List<Photo> photos,
+  ) {
+    return _showFullScreenTagDialog(
+      context: context,
+      photos: photos,
+      title: 'Add tags to selected images',
+      subtitle: '${photos.length} images selected',
+      allowNewTagCreation: true,
+      multiAssign: true,
+    );
   }
 }
 
@@ -483,4 +621,185 @@ class _TagSection {
   final List<Tag> tags;
   _TagSection(
       {required this.title, required this.categoryId, required this.tags});
+}
+
+class _NewTagInlineEditor extends StatefulWidget {
+  final TextEditingController controller;
+  final List<TagCategory> categories;
+  final ValueChanged<String?> onCategoryChanged;
+  final VoidCallback onSubmitAdd;
+
+  const _NewTagInlineEditor({
+    Key? key,
+    required this.controller,
+    required this.categories,
+    required this.onCategoryChanged,
+    required this.onSubmitAdd,
+  }) : super(key: key);
+
+  @override
+  State<_NewTagInlineEditor> createState() => _NewTagInlineEditorState();
+}
+
+class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
+    with SingleTickerProviderStateMixin {
+  bool _showCategory = false;
+  String? _selectedCategoryId;
+
+  void _toggleCategoryVisibility(bool value) {
+    if (widget.categories.isEmpty) return;
+    setState(() {
+      _showCategory = value;
+    });
+  }
+
+  void _handleAddPressed() {
+    final name = widget.controller.text.trim();
+    if (name.isEmpty) return;
+
+    // передаём выбранную категорию наружу
+    widget.onCategoryChanged(_selectedCategoryId);
+    widget.onSubmitAdd();
+
+    // после добавления чистим поле и сворачиваем категорию
+    setState(() {
+      widget.controller.clear();
+      _showCategory = false;
+      _selectedCategoryId = null;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasCategories = widget.categories.isNotEmpty;
+
+    // при отсутствии категорий вторая строка всегда видна (иначе некуда нажать Add)
+    final rowVisible = !hasCategories ? true : _showCategory;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // Первая строка — только инпут имени
+        Focus(
+          onFocusChange: (hasFocus) {
+            if (hasFocus && hasCategories) {
+              _toggleCategoryVisibility(true);
+            }
+          },
+          child: TextField(
+            controller: widget.controller,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Tag name',
+              hintStyle: const TextStyle(color: Colors.white54),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white),
+              ),
+              suffixIcon: hasCategories
+                  ? IconButton(
+                      tooltip:
+                          _showCategory ? 'Hide category' : 'Show category',
+                      icon: Icon(
+                        _showCategory
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        color: Colors.white70,
+                      ),
+                      onPressed: () =>
+                          _toggleCategoryVisibility(!_showCategory),
+                    )
+                  : null,
+            ),
+            onSubmitted: (_) => _handleAddPressed(),
+          ),
+        ),
+
+        // Вторая строка — категория + кнопка Add (всё вместе анимированно выезжает)
+        AnimatedSize(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          child: !rowVisible
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(top: 8.0, bottom: 8.0),
+                  child: Row(
+                    children: [
+                      if (hasCategories)
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: _selectedCategoryId,
+                            isExpanded: true,
+                            dropdownColor: Colors.grey[900],
+                            decoration: const InputDecoration(
+                              labelText: 'Category (optional)',
+                              labelStyle: TextStyle(color: Colors.white70),
+                              enabledBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.white24),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderSide: BorderSide(color: Colors.white),
+                              ),
+                            ),
+                            items: widget.categories
+                                .map(
+                                  (c) => DropdownMenuItem<String>(
+                                    value: c.id,
+                                    child: Text(
+                                      c.name,
+                                      style:
+                                          const TextStyle(color: Colors.white),
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (val) {
+                              setState(() {
+                                _selectedCategoryId = val;
+                              });
+                              widget.onCategoryChanged(val);
+                            },
+                          ),
+                        ),
+
+                      if (hasCategories) const SizedBox(width: 8),
+
+                      // Кнопка добавления тега (на второй строке, стилизована под dark UI)
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          backgroundColor: Colors.white10,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: const BorderSide(
+                              color: Colors.white24,
+                            ),
+                          ),
+                        ),
+                        onPressed: _handleAddPressed,
+                        icon: const Icon(
+                          Iconsax.add,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          'Add',
+                          style: TextStyle(fontSize: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ),
+
+        const SizedBox(height: 8),
+      ],
+    );
+  }
 }

@@ -12,6 +12,7 @@ class PhotoThumbnail extends StatefulWidget {
   final VoidCallback onLongPress;
   final bool isPinterestLayout;
   final bool isSelected;
+  final String? fileSizeLabel;
 
   const PhotoThumbnail({
     Key? key,
@@ -19,7 +20,8 @@ class PhotoThumbnail extends StatefulWidget {
     required this.onPhotoTap,
     required this.onLongPress,
     required this.isPinterestLayout,
-    required this.isSelected, // <-- добавили
+    required this.isSelected,
+    this.fileSizeLabel,
   }) : super(key: key);
 
   @override
@@ -47,29 +49,31 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
       print('Файл миниатюры НЕ существует: $imagePath');
     }
 
-    // Для режима Pinterest не задаём width/height, чтобы ExtendedImage занял размеры, определённые родителем.
-    // ── чем рендерим превью? ────────────────────────────────────────────────
     Widget imageWidget;
     if (widget.photo.mediaType == 'video') {
-      // для видео — маленький VideoView (звук 0, без UI)
+      // Видео: показываем имя файла (+ размер, если есть) текстом
+      final title = widget.fileSizeLabel != null
+          ? '${widget.photo.fileName} • ${widget.fileSizeLabel}'
+          : widget.photo.fileName;
+
       imageWidget = Container(
         height: 100,
         alignment: Alignment.center,
         padding: const EdgeInsets.symmetric(horizontal: 8),
         child: Text(
-          widget.photo.fileName,
+          title,
           style: const TextStyle(fontSize: 14, color: Colors.white70),
           textAlign: TextAlign.center,
           softWrap: true,
-          maxLines:
-              3, // или любое другое число, сколько строк максимум разрешено
+          maxLines: 3,
         ),
       );
     } else {
-      // для фото — ExtendedImage, как было
+      // Фото: ExtendedImage + оверлей размера, если есть
       final imgFile =
           File(PhotoPathHelper().getFullPath(widget.photo.fileName));
-      imageWidget = widget.isPinterestLayout
+
+      final baseImage = widget.isPinterestLayout
           ? ExtendedImage.file(
               imgFile,
               fit: BoxFit.cover,
@@ -86,9 +90,35 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
               clearMemoryCacheIfFailed: true,
               cacheRawData: true,
             );
+
+      imageWidget = Stack(
+        fit: StackFit.expand,
+        children: [
+          baseImage,
+          if (widget.fileSizeLabel != null && widget.fileSizeLabel!.isNotEmpty)
+            Positioned(
+              left: 6,
+              bottom: 6,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  widget.fileSizeLabel!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
     }
 
-    // Если это видео и задана длительность, накладываем её поверх изображения.
+    // Если это видео и задана длительность, накладываем её поверх.
     if (widget.photo.mediaType == 'video' &&
         widget.photo.videoDuration != null &&
         widget.photo.videoDuration!.isNotEmpty) {
@@ -141,7 +171,6 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
           if (widget.isSelected)
             Positioned.fill(
               child: IgnorePointer(
-                // не блокируем тапы
                 child: Container(
                   decoration: BoxDecoration(
                     border: Border.all(color: Colors.white, width: 3),

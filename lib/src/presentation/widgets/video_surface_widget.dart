@@ -7,14 +7,20 @@ class VideoSurface extends StatefulWidget {
   final String filePath;
   final VideoPlayerController? controller;
 
-  final Duration startTime;   // default = Duration.zero
-  final Duration? endTime;    // null => конец
-  final double volume;        // 0..1
-  final double speed;         // 0.1..4.0
-  final bool autoplay;        // default = true
+  final Duration startTime; // default = Duration.zero
+  final Duration? endTime; // null => конец
+  final double volume; // 0..1
+  final double speed; // 0.1..4.0
+  final bool autoplay; // default = true
 
   final ValueChanged<Duration>? onPosition;
   final ValueChanged<Duration>? onDuration;
+
+  /// Доля длительности (0..1), куда нужно перемотаться по запросу UI.
+  final double? externalPositionFrac;
+
+  /// Идентификатор запроса seek — меняем при каждом новом пользовательском действии.
+  final int? externalSeekId;
 
   const VideoSurface({
     Key? key,
@@ -27,6 +33,8 @@ class VideoSurface extends StatefulWidget {
     this.autoplay = true,
     this.onPosition,
     this.onDuration,
+    this.externalPositionFrac,
+    this.externalSeekId,
   }) : super(key: key);
 
   @override
@@ -74,6 +82,19 @@ class _VideoSurfaceState extends State<VideoSurface> {
         final startClamped = _clampStart(widget.startTime, end);
         _c.seekTo(startClamped);
         _c.play(); // по ТЗ — перезапускается
+      }
+
+      if (widget.externalSeekId != null &&
+          widget.externalSeekId != old.externalSeekId &&
+          widget.externalPositionFrac != null) {
+        final frac = widget.externalPositionFrac!.clamp(0.0, 1.0);
+        final duration = _c.value.duration;
+        if (duration > Duration.zero) {
+          final targetMs = (duration.inMilliseconds * frac)
+              .clamp(0, duration.inMilliseconds);
+          final target = Duration(milliseconds: targetMs.toInt());
+          _c.seekTo(target);
+        }
       }
     }
   }
@@ -123,9 +144,8 @@ class _VideoSurfaceState extends State<VideoSurface> {
     _tick = Timer.periodic(const Duration(milliseconds: 120), (_) async {
       if (!_ready) return;
       final d = _c.value.duration;
-      final end = (widget.endTime == null || widget.endTime! > d)
-          ? d
-          : widget.endTime!;
+      final end =
+          (widget.endTime == null || widget.endTime! > d) ? d : widget.endTime!;
       final pos = _c.value.position;
 
       widget.onPosition?.call(pos);

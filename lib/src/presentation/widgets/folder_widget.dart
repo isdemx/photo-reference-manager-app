@@ -1,8 +1,8 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
@@ -16,43 +16,36 @@ class FolderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Отображение виджета папки с изображением и названием
     return GestureDetector(
       onTap: () {
-        // Переход на экран папки
-        Navigator.pushNamed(
-          context,
-          '/folder',
-          arguments: folder,
-        );
+        Navigator.pushNamed(context, '/folder', arguments: folder);
       },
       onLongPress: () {
         vibrate();
         FoldersHelpers.showEditFolderDialog(context, folder);
       },
       child: Container(
-        margin: const EdgeInsets.all(0.0),
         decoration: BoxDecoration(
-          color: const Color.fromARGB(255, 0, 0, 0),
-          borderRadius: BorderRadius.circular(4.0),
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(4),
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
-          alignment: Alignment.center,
           children: [
+            // ------------ PREVIEW IMAGE ------------
             BlocBuilder<PhotoBloc, PhotoState>(
               builder: (context, photoState) {
                 if (photoState is PhotoLoaded) {
-                  // Получаем фотографии, которые находятся в этой папке
                   final photos = photoState.photos
-                      .where((photo) => photo.folderIds.contains(folder.id))
+                      .where((p) => p.folderIds.contains(folder.id))
                       .toList();
 
                   if (photos.isNotEmpty) {
-                    // Получаем последнюю фотографию
-                    final lastPhoto = photos.first;
-                    final fullPath =
-                        PhotoPathHelper().getFullPath(lastPhoto.fileName);
+                    final last = photos.last;
+                    final helper = PhotoPathHelper();
+                    final fullPath = last.isStoredInApp
+                        ? helper.getFullPath(last.fileName)
+                        : last.path;
 
                     return Image.file(
                       File(fullPath),
@@ -61,42 +54,48 @@ class FolderWidget extends StatelessWidget {
                       height: double.infinity,
                     );
                   } else {
-                    // Нет фотографий в папке, показываем иконку папки
-                    return Container(
-                      child: const Icon(
-                        Iconsax.folder,
-                        size: 50,
-                        color: Colors.white,
-                      ),
+                    return const Center(
+                      child:
+                          Icon(Icons.folder, size: 48, color: Colors.white70),
                     );
                   }
-                } else if (photoState is PhotoLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                } else {
-                  // Ошибка загрузки фотографий, показываем иконку папки
-                  return Container(
-                    child: const Icon(
-                      Iconsax.folder,
-                      size: 50,
-                      color: Colors.white,
-                    ),
-                  );
                 }
+                return const Center(child: CircularProgressIndicator());
               },
             ),
-            // Отображаем название папки внизу
+
+            // ------------ NAME WITH GRADIENT FADE + SCROLL ------------
             Positioned(
-              bottom: 0,
-              left: 10,
+              left: 0,
               right: 0,
+              bottom: 0,
               child: Container(
-                color: const Color.fromARGB(0, 177, 177, 177),
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Text(
-                  folder.name,
-                  textAlign: TextAlign.left,
-                  style:
-                      const TextStyle(color: Color.fromRGBO(210, 209, 209, 1)),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.transparent,
+                      Colors.black54,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+                child: SizedBox(
+                  height: 20,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    child: Text(
+                      folder.name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                    ),
+                  ),
                 ),
               ),
             ),

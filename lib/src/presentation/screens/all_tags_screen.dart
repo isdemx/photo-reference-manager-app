@@ -78,8 +78,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
               builder: (context, tagState) {
                 return BlocBuilder<PhotoBloc, PhotoState>(
                   builder: (context, photoState) {
-                    final bool loading =
-                        tagState is TagLoading ||
+                    final bool loading = tagState is TagLoading ||
                         photoState is PhotoLoading ||
                         catState is TagCategoryLoading;
 
@@ -117,7 +116,9 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                         final byCount = cb.compareTo(ca);
                         return byCount != 0
                             ? byCount
-                            : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+                            : a.name
+                                .toLowerCase()
+                                .compareTo(b.name.toLowerCase());
                       });
                     }
 
@@ -165,20 +166,6 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  if (s.categoryId != null)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white10,
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Text(
-                                        'Order: ${_categoryOrder(categories, s.categoryId!)}',
-                                        style: const TextStyle(fontSize: 11),
-                                      ),
-                                    ),
                                 ],
                               ),
                             ),
@@ -253,6 +240,7 @@ class _Section {
 }
 
 /// Элемент списка тега с назначением категории
+/// Элемент списка тега с назначением категории
 class _TagListTile extends StatelessWidget {
   final Tag tag;
   final int photoCount;
@@ -268,10 +256,127 @@ class _TagListTile extends StatelessWidget {
     final tagBloc = context.read<TagBloc>();
     final catState = context.watch<TagCategoryBloc>().state;
 
-    final categories = catState is TagCategoryLoaded
-        ? catState.categories
-        : <TagCategory>[];
+    final categories =
+        catState is TagCategoryLoaded ? catState.categories : <TagCategory>[];
 
+    final isCompact = MediaQuery.of(context).size.width < 600;
+
+    // Общий dropdown категорий, чтобы не дублировать логику
+    final categoryDropdown = _CategoryDropdown(
+      value: tag.tagCategoryId,
+      categories: categories,
+      onChanged: (newCatId) {
+        final updated = tag.copyWith(tagCategoryId: newCatId);
+        tagBloc.add(UpdateTag(updated));
+      },
+    );
+
+    // Кнопки управления тегом
+    final canEdit = tag.name != 'Not Ref';
+    final actionButtons = <Widget>[
+      if (canEdit)
+        IconButton(
+          tooltip: 'Edit tag',
+          icon: const Icon(
+            Iconsax.edit,
+            color: Color.fromARGB(255, 216, 216, 216),
+          ),
+          onPressed: () => TagsHelpers.showEditTagDialog(context, tag),
+        ),
+      if (canEdit)
+        IconButton(
+          tooltip: 'Change color',
+          icon: Icon(
+            Iconsax.colors_square,
+            color: Color(tag.colorValue),
+          ),
+          onPressed: () => TagsHelpers.showColorPickerDialog(context, tag),
+        ),
+      if (canEdit)
+        IconButton(
+          tooltip: 'Delete tag',
+          icon: const Icon(Iconsax.trash, color: Colors.red),
+          onPressed: () =>
+              TagsHelpers.showDeleteConfirmationDialog(context, tag),
+        ),
+    ];
+
+    // --- КОМПАКТНЫЙ ВАРИАНТ (телефон / узкий экран) ---
+    if (isCompact) {
+      return InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => TagScreen(tag: tag)),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Верхняя строка: аватар + название + счётчик
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Color(tag.colorValue),
+                    child: Text(
+                      tag.name.isNotEmpty ? tag.name[0].toUpperCase() : '',
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tag.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$photoCount images',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 6),
+
+              // Нижняя строка: dropdown + кнопки, могут переноситься
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    categoryDropdown,
+                    ...actionButtons,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // --- ШИРОКИЙ ВАРИАНТ (macOS / планшет / широкий экран) ---
     return ListTile(
       key: ValueKey(tag.id),
       onTap: () {
@@ -287,43 +392,30 @@ class _TagListTile extends StatelessWidget {
           style: const TextStyle(color: Colors.white),
         ),
       ),
-      title: Text(tag.name),
-      subtitle: Text('$photoCount images'),
-      trailing: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: 6,
-        children: [
-          // Dropdown назначения категории
-          _CategoryDropdown(
-            value: tag.tagCategoryId,
-            categories: categories,
-            onChanged: (newCatId) {
-              final updated = tag.copyWith(tagCategoryId: newCatId);
-              tagBloc.add(UpdateTag(updated));
-            },
-          ),
-          if (tag.name != 'Not Ref')
-            IconButton(
-              tooltip: 'Edit tag',
-              icon: const Icon(Iconsax.edit,
-                  color: Color.fromARGB(255, 216, 216, 216)),
-              onPressed: () => TagsHelpers.showEditTagDialog(context, tag),
-            ),
-          if (tag.name != 'Not Ref')
-            IconButton(
-              tooltip: 'Change color',
-              icon:
-                  Icon(Iconsax.colors_square, color: Color(tag.colorValue)),
-              onPressed: () => TagsHelpers.showColorPickerDialog(context, tag),
-            ),
-          if (tag.name != 'Not Ref')
-            IconButton(
-              tooltip: 'Delete tag',
-              icon: const Icon(Iconsax.trash, color: Colors.red),
-              onPressed: () =>
-                  TagsHelpers.showDeleteConfirmationDialog(context, tag),
-            ),
-        ],
+      title: Text(
+        tag.name,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      subtitle: Text(
+        '$photoCount images',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      // Важно: оборачиваем trailing в ConstrainedBox,
+      // чтобы он не съедал всю ширину на широких экранах.
+      trailing: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 380, // можно подправить, если захочется
+        ),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 6,
+          children: [
+            categoryDropdown,
+            ...actionButtons,
+          ],
+        ),
       ),
     );
   }
@@ -408,6 +500,7 @@ class _ManageCategoriesSection extends StatelessWidget {
             ReorderableListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false, // <-- ВАЖНО
               onReorder: (oldIndex, newIndex) {
                 final ids = List<String>.from(categories.map((e) => e.id));
                 if (newIndex > oldIndex) newIndex -= 1;
@@ -418,28 +511,31 @@ class _ManageCategoriesSection extends StatelessWidget {
               itemCount: categories.length,
               itemBuilder: (context, index) {
                 final c = categories[index];
-                return ListTile(
+                return ReorderableDragStartListener(
                   key: ValueKey('cat_${c.id}'),
-                  leading: const Icon(Icons.drag_handle),
-                  title: Text(c.name),
-                  subtitle: Text(
-                    'Order: ${c.sortOrder} • Created: ${c.dateCreated.toLocal()}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  trailing: Wrap(
-                    spacing: 8,
-                    children: [
-                      IconButton(
-                        tooltip: 'Rename',
-                        icon: const Icon(Iconsax.edit),
-                        onPressed: () => _showRenameDialog(context, c),
-                      ),
-                      IconButton(
-                        tooltip: 'Delete',
-                        icon: const Icon(Iconsax.trash, color: Colors.red),
-                        onPressed: () => _showDeleteDialog(context, c),
-                      ),
-                    ],
+                  index: index,
+                  child: ListTile(
+                    leading: const Icon(Icons.drag_handle),
+                    title: Text(c.name),
+                    // subtitle: Text(
+                    //   'Order: ${c.sortOrder} • Created: ${c.dateCreated.toLocal()}',
+                    //   style: const TextStyle(fontSize: 12),
+                    // ),
+                    trailing: Wrap(
+                      spacing: 8,
+                      children: [
+                        IconButton(
+                          tooltip: 'Rename',
+                          icon: const Icon(Iconsax.edit),
+                          onPressed: () => _showRenameDialog(context, c),
+                        ),
+                        IconButton(
+                          tooltip: 'Delete',
+                          icon: const Icon(Iconsax.trash, color: Colors.red),
+                          onPressed: () => _showDeleteDialog(context, c),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

@@ -19,7 +19,7 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
   final _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
   // Ширина превью (вся карточка тянется по высоте за счёт пропорции картинки).
-  double _tileWidth = 220;
+  double _tileWidth = 160;
   static const double _minTileWidth = 120;
   static const double _maxTileWidth = 360;
 

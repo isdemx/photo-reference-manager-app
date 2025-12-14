@@ -17,10 +17,12 @@ import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.d
 import 'package:photographers_reference_app/src/presentation/helpers/collage_preview_helper.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/open_in_new_window_button.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_surface_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
+import 'package:photographers_reference_app/src/services/window_service.dart';
 import 'package:photographers_reference_app/src/utils/edit_build_crop_handlers.dart';
 import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,7 +52,10 @@ class CollagePhotoState {
   /// Слои наложения (чем больше, тем выше)
   int zIndex;
 
-  /// Новое поле для сдвига фото внутри контейнера
+  /// Флип по горизонтали
+  bool flipX;
+
+  /// Поле для сдвига фото внутри контейнера
   Offset internalOffset = Offset.zero;
 
   /// Начальный масштаб при onScaleStart (плавный зум)
@@ -95,6 +100,7 @@ class CollagePhotoState {
     this.saturation = 1.0,
     this.temp = 0.0,
     this.hue = 0.0,
+    this.flipX = false,
   }) : cropRect = cropRect ?? const Rect.fromLTWH(0, 0, 1, 1);
 }
 
@@ -357,17 +363,29 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   CollagePhotoState _createCollagePhotoState(Photo photo) {
-    const double initialWidth = 150;
-    double baseW = initialWidth;
-    double baseH = initialWidth;
+    const double targetShortSide = 150;
+
+    double baseW = targetShortSide;
+    double baseH = targetShortSide;
+
     final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
     final file = File(fullPath);
-    if (file.existsSync()) {
-      final decoded = img.decodeImage(file.readAsBytesSync());
-      if (decoded != null && decoded.width > 0) {
-        baseH = decoded.height * (baseW / decoded.width);
+
+    if (photo.mediaType == 'image') {
+      // Картинки — как было
+      if (file.existsSync()) {
+        final decoded = img.decodeImage(file.readAsBytesSync());
+        if (decoded != null && decoded.width > 0) {
+          baseH = decoded.height * (baseW / decoded.width);
+        }
       }
+    } else if (photo.mediaType == 'video') {
+      // Видео — задаём нормальное соотношение сторон (16:9)
+      // Если хочешь, можешь поменять на 9/16 для вертикальных видео
+      baseH = targetShortSide;
+      baseW = targetShortSide * 16 / 9;
     }
+
     return CollagePhotoState(
       id: const Uuid().v4(),
       photo: photo,
@@ -383,6 +401,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       saturation: 1.0,
       temp: 0.0,
       hue: 0.0,
+      flipX: false,
     );
   }
 
@@ -513,9 +532,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         saturation: 1.0,
         temp: 1.0,
         hue: 0.0,
+        flipX: false,
       ),
     );
     final isSomePhotoInEditMode = sorted.any((it) => it.isEditing);
+
+    final bool isIOS = Platform.isIOS;
+    final double bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Focus(
       focusNode: _focusNode,
@@ -598,6 +621,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                           color: Colors.white),
                       onPressed: _toggleFullscreen,
                     ),
+                    IconButton(
+                      tooltip: 'Open New Window',
+                      icon: const Icon(Icons.window, color: Colors.white),
+                      onPressed: () => {
+                        WindowService.openWindow(
+                          route: '/my_collages',
+                          args: {}, // при необходимости
+                          title: 'Refma — Collage',
+                        )
+                      },
+                    ),
                   ],
                 )
               : null,
@@ -617,8 +651,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       },
                       child: Stack(
                         children: [
-                          // Цвет фона холста
-                          Container(color: _backgroundColor),
+                          // Цвет общего фона
+                          Container(color: Colors.grey[900]),
 
                           InteractiveViewer(
                             boundaryMargin: const EdgeInsets.all(999999),
@@ -639,14 +673,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                     children: [
                                       Positioned.fill(
                                         child: Container(
-                                          decoration: BoxDecoration(
-                                            border: Border.all(
-                                              color: Colors.blue.withOpacity(
-                                                  0.6), // например, синий
-                                              width: 3,
-                                            ),
-                                            color: Colors.transparent,
-                                          ),
+                                          color: _backgroundColor,
                                         ),
                                       ),
                                       for (final item in sorted)
@@ -732,14 +759,21 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
                   // Нижняя панель
 
-                  Container(
-                      height: isSomePhotoInEditMode ? 160 : 40,
-                      color: _isFullscreen
-                          ? const ui.Color.fromARGB(0, 0, 0, 0)
-                          : const ui.Color.fromARGB(60, 0, 0, 0),
+                  SafeArea(
+                    top: false, // нам важна только нижняя безопасная зона
+                    child: Container(
+                      // базовая высота панели
+                      height: (isSomePhotoInEditMode ? 100.0 : 40.0) +
+                          (isIOS ? bottomInset : 0.0),
+                      padding: EdgeInsets.only(
+                        bottom: isIOS ? bottomInset : 0.0,
+                      ),
+                      color: const ui.Color.fromARGB(0, 0, 0, 0),
                       child: isSomePhotoInEditMode
                           ? _buildEditPanel(editingPhoto)
-                          : _buildDefaultPanel()),
+                          : _buildDefaultPanel(),
+                    ),
+                  ),
                 ],
               ),
 
@@ -1012,7 +1046,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return Material(
       color: Colors.black.withOpacity(0.6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         child: Row(
           children: [
             // Блок поворота
@@ -1026,6 +1060,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               icon: Icons.rotate_right,
               tooltip: 'Rotate +90°',
               onPressed: () => setState(() => item.rotation += math.pi / 2),
+            ),
+
+            // 🔥 NEW — Flip horizontal
+            _ActionIcon(
+              icon: Icons.flip, // можно заменить на Icons.flip_camera_android
+              tooltip: 'Flip horizontal',
+              onPressed: () => setState(() {
+                item.flipX = !item.flipX;
+              }),
             ),
 
             const VerticalDivider(
@@ -1264,10 +1307,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               });
             },
             child: Transform(
-              transform: Matrix4.identity()
-                ..translate(w / 2, h / 2)
-                ..rotateZ(item.rotation)
-                ..translate(-w / 2, -h / 2),
+              transform: () {
+                final m = Matrix4.identity()
+                  ..translate(w / 2, h / 2)
+                  ..rotateZ(item.rotation)
+                  ..scale(item.flipX ? -1.0 : 1.0, 1.0) // <--- флип по X
+                  ..translate(-w / 2, -h / 2);
+                return m;
+              }(),
               child: _buildEditableContent(item, w, h),
             ),
           ),
@@ -1332,11 +1379,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                               setState(() => _videoHover[item.id] = false),
                           child: VideoSurface(
                             key: ValueKey(
-                              'vs-${item.id}-'
-                              '${uiState.duration.inMilliseconds}-'
-                              '${uiState.startFrac.toStringAsFixed(3)}-'
-                              '${uiState.endFrac.toStringAsFixed(3)}-'
-                              '${uiState.speed.toStringAsFixed(2)}',
+                              'vs-${item.id}-${uiState.duration.inMilliseconds}',
                             ),
                             filePath: fullPath,
                             startTime: _fracToTime(
@@ -1347,19 +1390,16 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                     uiState.duration, uiState.endFrac),
                             volume: uiState.volume,
                             speed: uiState.speed,
-
-                            // ВАЖНО: не стартуем, пока не знаем duration
                             autoplay: uiState.duration != Duration.zero,
-
                             onDuration: (d) => setState(() {
                               uiState.duration = d;
-                              // setState приведёт к ребилду, key поменяется из-за duration,
-                              // и VideoSurface пересоздастся с корректным startTime и autoplay=true
                             }),
                             onPosition: (p) => setState(() {
                               uiState.posFrac =
                                   _timeToFrac(uiState.duration, p);
                             }),
+                            externalPositionFrac: uiState.posFrac,
+                            externalSeekId: uiState.seekRequestId,
                           ),
                         )
                       : Image.file(
@@ -1412,8 +1452,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                           volume: uiState.volume,
                           speed: uiState.speed,
                           onSeekFrac: (f) => setState(() {
-                            uiState.startFrac =
-                                f.clamp(0.0, uiState.endFrac - 0.001);
+                            uiState.posFrac = f.clamp(0.0, 1.0);
+                            uiState
+                                .seekRequestId++; // 🔹 сигнал для VideoSurface: нужен seek
                           }),
                           onChangeRange: (rv) => setState(() {
                             uiState.startFrac = rv.start;
@@ -1657,6 +1698,8 @@ class _VideoUiStateCache extends InheritedWidget {
 class _VideoUi {
   double startFrac, endFrac, posFrac, volume, speed;
   Duration duration;
+  int seekRequestId = 0;
+
   _VideoUi({
     this.startFrac = 0.0,
     this.endFrac = 1.0,
@@ -1664,6 +1707,7 @@ class _VideoUi {
     this.volume = 0.0,
     this.speed = 1.0,
     this.duration = Duration.zero,
+    this.seekRequestId = 0,
   });
 }
 
@@ -1727,6 +1771,9 @@ class _MiniSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final txt = (format ?? ((v) => v.toStringAsFixed(2)))(value);
+
+    final bool isIOS = Platform.isIOS;
+    final double bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
