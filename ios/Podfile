@@ -1,4 +1,4 @@
-platform :ios, '13.0'
+platform :ios, '14.0'
 
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
@@ -37,11 +37,6 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    if target.name == 'ffmpeg-kit-ios-min-gpl'
-      target.build_configurations.each do |config|
-        config.build_settings['PODS_ROOT'] = '${SRCROOT}/Pods'
-      end
-    end
 
     flutter_additional_ios_build_settings(target)
 

@@ -112,14 +112,21 @@ class FoldersHelpers {
   }
 
   static Future<bool> showAddToFolderDialog(
-      BuildContext context, List<Photo> photos) async {
+    BuildContext outerContext,
+    List<Photo> photos,
+  ) async {
+    // Сохраняем исходные folderIds для всех фото
+    final Map<Photo, Set<String>> originalFolderIds = {
+      for (final p in photos) p: Set<String>.from(p.folderIds),
+    };
+
     final prefs = await SharedPreferences.getInstance();
     bool groupedView = prefs.getBool('groupedView') ?? false;
     String? expandedCategory = prefs.getString('expandedCategory');
 
     return await showDialog<bool>(
-      context: context,
-      builder: (context) {
+      context: outerContext,
+      builder: (dialogContext) {
         return BlocBuilder<FolderBloc, FolderState>(
           builder: (context, folderState) {
             return BlocBuilder<CategoryBloc, CategoryState>(
@@ -166,24 +173,32 @@ class FoldersHelpers {
                                       title: Text(
                                         categoryName,
                                         style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.bold,
+                                        ),
                                       ),
                                       initiallyExpanded:
                                           expandedCategory == categoryId,
                                       onExpansionChanged: (expanded) {
                                         expandedCategory =
                                             expanded ? categoryId : null;
-                                        prefs.setString('expandedCategory',
-                                            expandedCategory ?? '');
+                                        prefs.setString(
+                                          'expandedCategory',
+                                          expandedCategory ?? '',
+                                        );
                                         setState(() {
                                           expandedCategory =
                                               expanded ? categoryId : null;
                                         });
                                       },
                                       children: categoryFolders
-                                          .map((folder) => _buildFolderTile(
-                                              folder, photos, setState))
+                                          .map(
+                                            (folder) => _buildFolderTile(
+                                              folder,
+                                              photos,
+                                              setState,
+                                            ),
+                                          )
                                           .toList(),
                                     );
                                   }).toList(),
@@ -193,14 +208,19 @@ class FoldersHelpers {
                                   itemCount: folders.length,
                                   itemBuilder: (context, index) {
                                     return _buildFolderTile(
-                                        folders[index], photos, setState);
+                                      folders[index],
+                                      photos,
+                                      setState,
+                                    );
                                   },
                                 ),
                         ),
                         actions: [
                           IconButton(
-                            icon: const Icon(Iconsax.add_circle,
-                                color: Colors.blue),
+                            icon: const Icon(
+                              Iconsax.add_circle,
+                              color: Colors.blue,
+                            ),
                             tooltip: 'Create New Folder',
                             onPressed: () async {
                               await showDialog(
@@ -211,8 +231,9 @@ class FoldersHelpers {
                             },
                           ),
                           IconButton(
-                            icon:
-                                Icon(groupedView ? Iconsax.menu : Iconsax.category),
+                            icon: Icon(
+                              groupedView ? Iconsax.menu : Iconsax.category,
+                            ),
                             tooltip: 'Switch Mode',
                             onPressed: () async {
                               groupedView = !groupedView;
@@ -226,13 +247,55 @@ class FoldersHelpers {
                           ),
                           TextButton(
                             onPressed: () {
+                              // 1. Почистим несуществующие папки + обновим фото
                               for (var photo in photos) {
                                 photo.folderIds.removeWhere(
-                                    (id) => !existingFolderIds.contains(id));
+                                  (id) => !existingFolderIds.contains(id),
+                                );
                                 context
                                     .read<PhotoBloc>()
                                     .add(UpdatePhoto(photo));
                               }
+
+                              // 2. Посчитаем, какие папки были ДОБАВЛЕНЫ
+                              final Set<String> allNewlyAddedFolderIds = {};
+
+                              for (final photo in photos) {
+                                final before =
+                                    originalFolderIds[photo] ?? <String>{};
+                                final now = Set<String>.from(photo.folderIds);
+                                final added = now.difference(before);
+                                allNewlyAddedFolderIds.addAll(added);
+                              }
+
+                              // 3. Найдём названия добавленных папок
+                              final addedFolders = folders
+                                  .where(
+                                    (f) =>
+                                        allNewlyAddedFolderIds.contains(f.id),
+                                  )
+                                  .toList();
+
+                              if (addedFolders.isNotEmpty) {
+                                String message;
+
+                                if (addedFolders.length == 1) {
+                                  message =
+                                      'Photos added to "${addedFolders.first.name}"';
+                                } else {
+                                  message = 'Photos added to selected folders';
+                                }
+
+                                ScaffoldMessenger.of(outerContext).showSnackBar(
+                                  SnackBar(
+                                    content: Text(message),
+                                    behavior: SnackBarBehavior.floating,
+                                    duration:
+                                        const Duration(milliseconds: 2200),
+                                  ),
+                                );
+                              }
+
                               Navigator.of(context).pop(true);
                             },
                             child: const Text('OK'),
@@ -246,7 +309,8 @@ class FoldersHelpers {
                   return const Center(child: CircularProgressIndicator());
                 } else {
                   return const Center(
-                      child: Text('Failed to load folders or categories.'));
+                    child: Text('Failed to load folders or categories.'),
+                  );
                 }
               },
             );

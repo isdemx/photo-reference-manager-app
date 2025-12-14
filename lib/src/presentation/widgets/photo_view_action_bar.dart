@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_tag_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/add_to_edit_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/map_with_photos.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
 
 class ActionBar extends StatelessWidget {
@@ -18,6 +18,9 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onAddToFolderMulti;
   final VoidCallback onAddToTag;
 
+  // ✅ NEW
+  final VoidCallback onEdit;
+
   const ActionBar({
     super.key,
     required this.photo,
@@ -30,6 +33,7 @@ class ActionBar extends StatelessWidget {
     required this.onAddToFolder,
     required this.onAddToFolderMulti,
     required this.onAddToTag,
+    required this.onEdit, // ✅ NEW
   });
 
   @override
@@ -102,73 +106,34 @@ class ActionBar extends StatelessWidget {
               )
             else
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  Expanded(
-                    child: AddTagWidget(
-                      photo: photo,
-                    ),
+                  AddTagWidget(photo: photo),
+                  AddToFolderWidget(
+                    photos: [photo],
+                    onFolderAdded: () {},
                   ),
-                  const SizedBox(width: 8.0),
-                  Expanded(
-                    child: AddToFolderWidget(
-                      photos: [photo],
-                      onFolderAdded: () {},
-                    ),
+                  AddToEditWidget(
+                    onEdit: onEdit,
                   ),
-                  const SizedBox(width: 8.0),
-                  // Expanded(
-                  //   child: IconButton(
-                  //     icon: const Icon(Icons.share, color: Colors.white),
-                  //     onPressed: enableSelectPhotoMode,
-                  //     tooltip: 'Share Images',
-                  //   ),
-                  // ),
-                  // Expanded(
-                  //   child: IconButton(
-                  //     icon: Icon(
-                  //       Iconsax.location,
-                  //       color: photo.geoLocation != null
-                  //           ? Colors.blue
-                  //           : Colors.grey, // серый, если нет геолокации
-                  //     ),
-                  //     onPressed: () {
-                  //       if (photos.any((photo) => photo.geoLocation != null)) {
-                  //         Navigator.push(
-                  //           context,
-                  //           MaterialPageRoute(
-                  //             builder: (context) => PhotoMapWidget(
-                  //               photos: photos,
-                  //               activePhoto: photo,
-                  //             ),
-                  //           ),
-                  //         );
-                  //       } else {
-                  //         ScaffoldMessenger.of(context).showSnackBar(
-                  //           const SnackBar(
-                  //             content: Text(
-                  //                 'No location data available for photos.'),
-                  //           ),
-                  //         );
-                  //       }
-                  //     },
-                  //     tooltip: 'View Photos on Map',
-                  //   ),
-                  // ),
-                  Expanded(
-                    child: IconButton(
-                      icon: const Icon(Iconsax.trash,
-                          color: Color.fromARGB(255, 120, 13, 13)),
-                      onPressed: deletePhoto,
-                      tooltip: 'Delete Image',
+                  IconButton(
+                    icon: const Icon(
+                      Iconsax.trash,
+                      color: Color.fromARGB(255, 120, 13, 13),
                     ),
+                    onPressed: deletePhoto,
+                    tooltip: 'Delete Image',
                   ),
                 ],
               ),
-            const SizedBox(height: 8.0),
           ],
         ),
       ),
     );
   }
 }
+
+
+
+
+

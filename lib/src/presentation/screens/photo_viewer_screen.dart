@@ -2,19 +2,23 @@ import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_editor_overlay.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:video_player/video_player.dart';
 
@@ -329,6 +333,82 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     }
   }
 
+  Future<void> _openEditor(Photo photo) async {
+    if (!photo.isImage) return;
+
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withOpacity(0.85),
+        pageBuilder: (_, __, ___) {
+          return PhotoEditorOverlay(
+            photo: photo,
+            onSave: (Uint8List bytes, bool overwrite) async {
+              if (overwrite) {
+                await _overwriteCurrentPhoto(photo, bytes);
+              } else {
+                await _saveAsNewPhoto(photo, bytes);
+              }
+
+              if (mounted) {
+                // 🔥 Чтобы кроп точно отрисовался сразу в viewer
+                setState(() {});
+              }
+            },
+          );
+        },
+        transitionsBuilder: (_, animation, __, child) =>
+            FadeTransition(opacity: animation, child: child),
+      ),
+    );
+  }
+
+  Future<void> _overwriteCurrentPhoto(Photo photo, Uint8List bytes) async {
+    final String fullPath = photo.isStoredInApp
+        ? PhotoPathHelper().getFullPath(photo.fileName)
+        : photo.path;
+
+    await File(fullPath).writeAsBytes(bytes, flush: true);
+
+    // ✅ Сброс кеша, иначе FileImage может показать старое
+    final provider = FileImage(File(fullPath));
+    imageCache.evict(provider);
+
+    // ✅ Ты просил "перезаписать в базу"
+    if (mounted) {
+      context.read<PhotoBloc>().add(UpdatePhoto(photo));
+    }
+  }
+
+  Future<void> _saveAsNewPhoto(Photo source, Uint8List bytes) async {
+    final id = const Uuid().v4();
+    final newFileName = 'crop_$id.jpg';
+
+    // Пишем в app storage (как и остальные локальные фотки)
+    final newFullPath = PhotoPathHelper().getFullPath(newFileName);
+    await File(newFullPath).writeAsBytes(bytes, flush: true);
+
+    final now = DateTime.now();
+
+    final newPhoto = source.copyWith(
+      id: id,
+      fileName: newFileName,
+      path: newFullPath,
+      dateAdded: now,
+      mediaType: 'image',
+      videoPreview: null,
+      videoDuration: null,
+      isStoredInApp: true,
+    );
+
+    if (mounted) {
+      context.read<PhotoBloc>().add(AddPhoto(newPhoto));
+    }
+
+    // Если хочешь, чтобы сразу в этом viewer появился новый файл — добавим в список:
+    widget.photos.insert(_currentIndex + 1, newPhoto);
+  }
+
   // ------------------------------------------------------------------
   // ----------------------------- BUILD -------------------------------
   // ------------------------------------------------------------------
@@ -494,6 +574,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                           );
                           if (ok) _clearSelection();
                         },
+                        onEdit: () => _openEditor(currentPhoto),
                       ),
                     ),
                 ],
@@ -590,7 +671,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       },
     );
   }
-
 
   /// Миниатюры внизу
   Widget _buildThumbnails() {

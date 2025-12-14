@@ -19,6 +19,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/images_help
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/presentation/screens/video_generator.dart';
 
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
@@ -304,7 +305,10 @@ class _PhotoGridViewState extends State<PhotoGridView> {
   }
 
   void _onVideoGeneratorPressed(BuildContext context) {
-    // если нужно — вернуть ваш генератор
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
+    );
   }
 
   void _onCollageGeneratorPressed(BuildContext context) {
