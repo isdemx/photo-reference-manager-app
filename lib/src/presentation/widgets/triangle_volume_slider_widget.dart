@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-class TriangleVolumeSlider extends StatelessWidget {
+class TriangleVolumeSlider extends StatefulWidget {
   /// 0..1
   final double value;
 
@@ -18,6 +18,9 @@ class TriangleVolumeSlider extends StatelessWidget {
   final Color trackColor;
   final Color fillColor;
 
+  /// Optional label override for value display.
+  final String Function(double value01)? labelBuilder;
+
   /// Если true — добавит тонкий “бордер” треугольника.
   final bool showOutline;
   final Color outlineColor;
@@ -32,44 +35,86 @@ class TriangleVolumeSlider extends StatelessWidget {
     this.hitHeight = 30, // удобная зона для тача
     this.trackColor = const Color.fromRGBO(200, 200, 200, 0.5),
     this.fillColor = const Color.fromRGBO(255, 0, 0, 0.7),
+    this.labelBuilder,
     this.showOutline = false,
     this.outlineColor = const Color.fromRGBO(255, 255, 255, 0.25),
     this.outlineWidth = 1.0,
   });
 
+  @override
+  State<TriangleVolumeSlider> createState() => _TriangleVolumeSliderState();
+}
+
+class _TriangleVolumeSliderState extends State<TriangleVolumeSlider> {
+  bool _showValue = false;
+
   double _clamp01(double v) => v.clamp(0.0, 1.0);
 
   double _valueFromLocal(Offset local) {
     // local.dx: 0..width => 0..1
-    final dx = local.dx.clamp(0.0, width);
-    return _clamp01(dx / math.max(width, 0.0001));
+    final dx = local.dx.clamp(0.0, widget.width);
+    return _clamp01(dx / math.max(widget.width, 0.0001));
   }
 
   @override
   Widget build(BuildContext context) {
-    final v = _clamp01(value);
+    final v = _clamp01(widget.value);
+    final pct = (v * 100).round();
+    final label = widget.labelBuilder?.call(v) ?? '$pct';
 
     return SizedBox(
-      width: width,
-      height: hitHeight,
+      width: widget.width,
+      height: widget.hitHeight,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (d) => onChanged(_valueFromLocal(d.localPosition)),
-        onHorizontalDragStart: (d) => onChanged(_valueFromLocal(d.localPosition)),
-        onHorizontalDragUpdate: (d) => onChanged(_valueFromLocal(d.localPosition)),
-        child: Align(
+        onTapDown: (d) {
+          setState(() => _showValue = true);
+          widget.onChanged(_valueFromLocal(d.localPosition));
+        },
+        onTapUp: (_) => setState(() => _showValue = false),
+        onTapCancel: () => setState(() => _showValue = false),
+        onHorizontalDragStart: (d) {
+          setState(() => _showValue = true);
+          widget.onChanged(_valueFromLocal(d.localPosition));
+        },
+        onHorizontalDragUpdate: (d) =>
+            widget.onChanged(_valueFromLocal(d.localPosition)),
+        onHorizontalDragEnd: (_) => setState(() => _showValue = false),
+        onHorizontalDragCancel: () => setState(() => _showValue = false),
+        child: Stack(
+          clipBehavior: Clip.none,
           alignment: Alignment.bottomCenter,
-          child: CustomPaint(
-            size: Size(width, height),
-            painter: _TriangleVolumePainter(
-              value: v,
-              trackColor: trackColor,
-              fillColor: fillColor,
-              showOutline: showOutline,
-              outlineColor: outlineColor,
-              outlineWidth: outlineWidth,
+          children: [
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: CustomPaint(
+                size: Size(widget.width, widget.height),
+                painter: _TriangleVolumePainter(
+                  value: v,
+                  trackColor: widget.trackColor,
+                  fillColor: widget.fillColor,
+                  showOutline: widget.showOutline,
+                  outlineColor: widget.outlineColor,
+                  outlineWidth: widget.outlineWidth,
+                ),
+              ),
             ),
-          ),
+            if (_showValue)
+              Positioned(
+                top: -14,
+                left: 0,
+                right: 0,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

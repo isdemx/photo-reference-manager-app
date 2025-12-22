@@ -95,6 +95,10 @@ class CollagePhotoState {
   /// Температура (условно -5..5)
   double temp;
 
+  /// Контекст выбора из PhotoPickerWidget
+  String? pickContextId;
+  int? pickContextIndex;
+
   CollagePhotoState({
     required this.id,
     required this.photo,
@@ -111,6 +115,8 @@ class CollagePhotoState {
     this.temp = 0.0,
     this.hue = 0.0,
     this.flipX = false,
+    this.pickContextId,
+    this.pickContextIndex,
     Offset? internalOffset,
   })  : cropRect = cropRect ?? const Rect.fromLTWH(0, 0, 1, 1),
         internalOffset = internalOffset ?? Offset.zero;
@@ -467,7 +473,7 @@ class CollageController {
     item.isEditing = editing;
   }
 
-  void addPhoto({
+  CollagePhotoState addPhoto({
     required Photo photo,
     required CollagePhotoState Function(Photo) createState,
     Offset initialOffset = const Offset(50, 50),
@@ -478,6 +484,7 @@ class CollageController {
     s.zIndex = maxZIndex;
     items.add(s);
     ensureVideoStateFor(s);
+    return s;
   }
 
   Future<void> seekActiveVideoBySeconds({
@@ -564,6 +571,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   late final List<CollagePhotoState> _items = <CollagePhotoState>[];
   late CollageController _controller;
 
+  final Map<String, List<String>> _pickContexts = <String, List<String>>{};
+  final Map<String, Photo> _photoByFileName = <String, Photo>{};
+  final List<Photo> _allPhotosLocal = <Photo>[];
+
   int _maxZIndex = 0;
   int? _activeItemIndex;
 
@@ -623,6 +634,20 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
   }
 
+  void _syncAllPhotosFromWidget() {
+    for (final p in widget.allPhotos) {
+      if (_photoByFileName.containsKey(p.fileName)) continue;
+      _photoByFileName[p.fileName] = p;
+      _allPhotosLocal.add(p);
+    }
+  }
+
+  void _registerPhoto(Photo photo) {
+    if (_photoByFileName.containsKey(photo.fileName)) return;
+    _photoByFileName[photo.fileName] = photo;
+    _allPhotosLocal.add(photo);
+  }
+
   void _initEmptyCollage() {
     _items.clear();
     _videoStates.clear();
@@ -635,6 +660,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    _syncAllPhotosFromWidget();
 
     if (_items.isEmpty) {
       if (widget.initialCollage != null) {
@@ -740,6 +767,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           sortOrder: 0,
         ),
       );
+      _registerPhoto(photo);
 
       final item = CollagePhotoState(
         id: const Uuid().v4(),
@@ -1032,14 +1060,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
             ),
             child: PhotoPickerWidget(
-              onPhotoSelected: (photo) {
+              onPhotoSelected: (result) {
                 Navigator.pop(context);
-                _addPhotoToCollage(photo);
+                _addPickedToCollage(result);
               },
-              onMultiSelectDone: (List<Photo> list) {
+              onMultiSelectDone: (List<PhotoPickResult> list) {
                 Navigator.pop(context);
-                for (final photo in list) {
-                  _addPhotoToCollage(photo);
+                for (final result in list) {
+                  _addPickedToCollage(result);
                 }
               },
             ),
@@ -1049,7 +1077,27 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  void _addPickedToCollage(PhotoPickResult result) {
+    _registerPhoto(result.photo);
+    _pickContexts.putIfAbsent(
+      result.contextId,
+      () => result.contextFileNames,
+    );
+
+    setState(() {
+      final item = _controller.addPhoto(
+        photo: result.photo,
+        createState: _createCollagePhotoState,
+        initialOffset: const Offset(50, 50),
+      );
+      item.pickContextId = result.contextId;
+      item.pickContextIndex = result.indexInContext;
+      _maxZIndex = _controller.maxZIndex;
+    });
+  }
+
   void _addPhotoToCollage(Photo photo) {
+    _registerPhoto(photo);
     setState(() {
       _controller.addPhoto(
         photo: photo,
@@ -1129,66 +1177,100 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (_activeItemIndex! < 0 || _activeItemIndex! >= _items.length) return;
 
     final item = _items[_activeItemIndex!];
-    final currentPhoto = item.photo;
+    final contextId = item.pickContextId;
+    if (contextId != null && _pickContexts.containsKey(contextId)) {
+      final contextFileNames = _pickContexts[contextId]!;
+      if (contextFileNames.isEmpty) return;
 
-    final allIndex =
-        widget.allPhotos.indexWhere((p) => p.fileName == currentPhoto.fileName);
+      int curIndex = item.pickContextIndex ?? -1;
+      if (curIndex < 0 || curIndex >= contextFileNames.length) {
+        curIndex = contextFileNames.indexOf(item.photo.fileName);
+      }
+      if (curIndex < 0) return;
+
+      int newIndex = next ? curIndex + 1 : curIndex - 1;
+      newIndex = newIndex.clamp(0, contextFileNames.length - 1);
+
+      final nextFileName = contextFileNames[newIndex];
+      final nextPhoto = _photoByFileName[nextFileName];
+      if (nextPhoto == null) return;
+
+      setState(() {
+        _applyPhotoSwitch(item, nextPhoto);
+        item.pickContextIndex = newIndex;
+      });
+      return;
+    }
+
+    final currentPhoto = item.photo;
+    final allIndex = _allPhotosLocal
+        .indexWhere((p) => p.fileName == currentPhoto.fileName);
     if (allIndex == -1) return;
 
     int newIndex = next ? allIndex + 1 : allIndex - 1;
-    newIndex = newIndex.clamp(0, widget.allPhotos.length - 1);
+    newIndex = newIndex.clamp(0, _allPhotosLocal.length - 1);
 
     setState(() {
-      final newPhoto = widget.allPhotos[newIndex];
+      final newPhoto = _allPhotosLocal[newIndex];
+      _applyPhotoSwitch(item, newPhoto);
+    });
+  }
 
-      final naturalSize = _getNaturalSizeForPhoto(newPhoto);
-      final naturalWidth = naturalSize.width;
-      final naturalHeight = naturalSize.height;
+  void _applyPhotoSwitch(CollagePhotoState item, Photo newPhoto) {
+    final wasVideo = item.photo.mediaType == 'video';
+    if (wasVideo && newPhoto.mediaType != 'video') {
+      final ui = _videoStates[item.id];
+      ui?.disposeControllerIfAny();
+      _videoStates.remove(item.id);
+    }
 
-      item.internalOffset = Offset.zero;
-      item.cropRect = const Rect.fromLTWH(0, 0, 1, 1);
-      item.photo = newPhoto;
+    final naturalSize = _getNaturalSizeForPhoto(newPhoto);
+    final naturalWidth = naturalSize.width;
+    final naturalHeight = naturalSize.height;
 
-      if (_items.length == 1) {
-        final canvasWidth = MediaQuery.of(context).size.width;
-        final canvasHeight = MediaQuery.of(context).size.height;
+    item.internalOffset = Offset.zero;
+    item.cropRect = const Rect.fromLTWH(0, 0, 1, 1);
+    item.photo = newPhoto;
 
-        final photoAspect = naturalWidth / naturalHeight;
-        final screenAspect = canvasWidth / canvasHeight;
+    if (_items.length == 1) {
+      final canvasWidth = MediaQuery.of(context).size.width;
+      final canvasHeight = MediaQuery.of(context).size.height;
 
-        double scale;
-        if (photoAspect > screenAspect) {
-          scale = canvasWidth / naturalWidth;
-        } else {
-          scale = canvasHeight / naturalHeight;
-        }
+      final photoAspect = naturalWidth / naturalHeight;
+      final screenAspect = canvasWidth / canvasHeight;
 
-        item.baseWidth = naturalWidth * scale;
-        item.baseHeight = naturalHeight * scale;
-
-        item.offset = Offset(
-          (canvasWidth - item.baseWidth) / 2,
-          (canvasHeight - item.baseHeight) / 2,
-        );
-
-        item.scale = 1.0;
+      double scale;
+      if (photoAspect > screenAspect) {
+        scale = canvasWidth / naturalWidth;
       } else {
-        final oldOffset = item.offset;
-        final oldHeight = item.baseHeight;
-
-        final newAspect = naturalWidth / naturalHeight;
-        final newWidth = oldHeight * newAspect;
-
-        item.baseWidth = newWidth;
-        item.baseHeight = oldHeight;
-
-        item.offset = oldOffset;
-        item.scale = 1.0;
+        scale = canvasHeight / naturalHeight;
       }
 
-      // Если заменили на видео — гарантируем VideoUi
-      _controller.ensureVideoStateFor(item);
-    });
+      item.baseWidth = naturalWidth * scale;
+      item.baseHeight = naturalHeight * scale;
+
+      item.offset = Offset(
+        (canvasWidth - item.baseWidth) / 2,
+        (canvasHeight - item.baseHeight) / 2,
+      );
+
+      item.scale = 1.0;
+    } else {
+      final oldOffset = item.offset;
+      final oldHeight = item.baseHeight;
+
+      final newAspect = naturalWidth / naturalHeight;
+      final newWidth = oldHeight * newAspect;
+
+      item.baseWidth = newWidth;
+      item.baseHeight = oldHeight;
+
+      item.offset = oldOffset;
+      item.scale = 1.0;
+    }
+
+    // Если заменили на видео — гарантируем VideoUi
+    _controller.ensureVideoStateFor(item);
   }
 
   Size _getNaturalSizeForPhoto(Photo photo) {
@@ -1939,9 +2021,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               onExit: (_) => setState(() => _controlsHover[item.id] = false),
               child: Builder(
                 builder: (context) {
+                  final isActive = _activeItemIndex != null &&
+                      _items.indexOf(item) == _activeItemIndex;
                   final visible = (_videoHover[item.id] == true) ||
                       (_controlsHover[item.id] == true) ||
-                      item.isEditing;
+                      item.isEditing ||
+                      isActive;
 
                   return AnimatedOpacity(
                     duration: const Duration(milliseconds: 150),
@@ -1951,8 +2036,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       child: Material(
                         type: MaterialType.transparency,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.bottomCenter,

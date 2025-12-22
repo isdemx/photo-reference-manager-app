@@ -1,9 +1,7 @@
 import 'dart:io';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/triangle_volume_slider_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../domain/entities/photo.dart';
@@ -50,19 +48,6 @@ class _GalleryVideoPageState extends State<GalleryVideoPage>
 
   late double _volume; // 0..1
   late double _speed; // 0.25..2.0
-
-  // стиль “как у VideoProgressIndicator по умолчанию”
-  static const double _trackThickness = 4.0;
-
-// высота вертикальных полосок (в 3 раза меньше, чем 92)
-  static const double _vBarHeight = 30.0;
-
-// подпись под полоской
-  static const double _vLabelGap = 6.0;
-  static const double _vLabelHeight = 14.0; // фикс высоты подписи (2 строки)
-
-  final Color _trackColor = const Color.fromRGBO(200, 200, 200, 0.5);
-  final Color _fillColor = const Color.fromRGBO(255, 0, 0, 0.7);
 
   @override
   void initState() {
@@ -211,111 +196,6 @@ class _GalleryVideoPageState extends State<GalleryVideoPage>
     setState(() {});
   }
 
-  // тонкая “прогресс-полоска” вертикальная (volume/speed) тем же визуальным языком
-  Widget _verticalProgressBar({
-    required double value01, // 0..1
-    required ValueChanged<double> onChanged01,
-    required String label,
-  }) {
-    return SizedBox(
-      width: 24,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 24,
-            height: _vBarHeight,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTapDown: (d) =>
-                  _handleVerticalDrag(d.localPosition, onChanged01),
-              onVerticalDragStart: (d) =>
-                  _handleVerticalDrag(d.localPosition, onChanged01),
-              onVerticalDragUpdate: (d) =>
-                  _handleVerticalDrag(d.localPosition, onChanged01),
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final h = c.maxHeight;
-                  final w = c.maxWidth;
-
-                  final v = value01.clamp(0.0, 1.0);
-                  final fillH = h * v;
-
-                  return Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      // track (серый)
-                      Positioned(
-                        left: (w - _trackThickness) / 2,
-                        top: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: _trackThickness,
-                          decoration: BoxDecoration(
-                            color: _trackColor,
-                            borderRadius:
-                                BorderRadius.circular(_trackThickness / 2),
-                          ),
-                        ),
-                      ),
-
-                      // fill (красный) снизу вверх
-                      Positioned(
-                        left: (w - _trackThickness) / 2,
-                        bottom: 0,
-                        height: fillH,
-                        child: Container(
-                          width: _trackThickness,
-                          decoration: BoxDecoration(
-                            color: _fillColor,
-                            borderRadius:
-                                BorderRadius.circular(_trackThickness / 2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-          ),
-          SizedBox(
-            height: _vLabelHeight,
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  softWrap: true,
-                  overflow: TextOverflow.clip,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.white70,
-                    height: 1.0,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _handleVerticalDrag(
-    Offset localPos,
-    ValueChanged<double> onChanged01,
-  ) {
-    final double effectiveH = _vBarHeight;
-
-    final dy = localPos.dy.clamp(0.0, effectiveH);
-    final v = (1.0 - (dy / effectiveH)).clamp(0.0, 1.0);
-    onChanged01(v);
-  }
-
   // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
@@ -336,11 +216,6 @@ class _GalleryVideoPageState extends State<GalleryVideoPage>
 
         final aspect = (c.value.aspectRatio == 0) ? 1.0 : c.value.aspectRatio;
 
-        // speed -> нормируем к 0..1 для полоски (0.25..2.0)
-        final speed01 = ((_speed - 0.25) / (2.0 - 0.25)).clamp(0.0, 1.0);
-
-        final double panelHeight = _vBarHeight + _vLabelGap + _vLabelHeight;
-
         return Column(
           children: [
             Expanded(
@@ -354,9 +229,9 @@ class _GalleryVideoPageState extends State<GalleryVideoPage>
 
             // нижняя панель: play/pause + красная прогресс-полоса + вертикалки
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 2),
               child: SizedBox(
-                height: panelHeight,
+                height: 34,
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -384,40 +259,39 @@ class _GalleryVideoPageState extends State<GalleryVideoPage>
                     Expanded(
                       child: Align(
                         alignment: Alignment.bottomCenter,
-                        child: VideoProgressIndicator(
-                          c,
-                          allowScrubbing: true,
-                          padding: const EdgeInsets.only(top: 6, bottom: 3),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Align(
-                    //   alignment: Alignment.bottomCenter,
-                    //   child: _verticalProgressBar(
-                    //     value01: speed01,
-                    //     onChanged01: (v01) {
-                    //       final newSpeed = 0.25 + v01 * (4.0 - 0.25);
-                    //       final rounded = (newSpeed * 100).round() / 100.0;
-                    //       setState(() => _speed = rounded);
-                    //       c.setPlaybackSpeed(_speed);
-                    //     },
-                    //     label: '${_speed.toStringAsFixed(1)}x',
-                    //   ),
-                    // ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: TriangleVolumeSlider(
-                          value: _volume.clamp(0.0, 1.0),
-                          onChanged: (v01) {
-                            setState(() => _volume = v01);
-                            c.setVolume(_volume);
+                        child: Builder(
+                          builder: (_) {
+                            final duration = c.value.duration;
+                            final position = c.value.position;
+                            final positionFrac = duration == Duration.zero
+                                ? 0.0
+                                : (position.inMilliseconds /
+                                        duration.inMilliseconds)
+                                    .clamp(0.0, 1.0);
+                            return VideoControls(
+                              startFrac: 0.0,
+                              endFrac: 1.0,
+                              positionFrac: positionFrac,
+                              onSeekFrac: (f) {
+                                if (duration == Duration.zero) return;
+                                final target = Duration(
+                                  milliseconds:
+                                      (duration.inMilliseconds * f).round(),
+                                );
+                                c.seekTo(target);
+                              },
+                              onChangeRange: null,
+                              onChangeVolume: (v01) {
+                                setState(() => _volume = v01);
+                                c.setVolume(_volume);
+                              },
+                              onChangeSpeed: null,
+                              volume: _volume,
+                              speed: _speed,
+                              showLoopRange: false,
+                              showSpeed: false,
+                            );
                           },
-                          width: 26,
-                          height: 10, // в 3 раза ниже
-                          hitHeight: 30, // удобная зона для тача/мыши
                         ),
                       ),
                     ),

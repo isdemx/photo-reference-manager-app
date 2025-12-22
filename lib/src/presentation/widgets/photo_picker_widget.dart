@@ -17,10 +17,25 @@ import 'package:photographers_reference_app/src/presentation/bloc/tag_category_b
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
+import 'package:uuid/uuid.dart';
+
+class PhotoPickResult {
+  final Photo photo;
+  final String contextId;
+  final List<String> contextFileNames;
+  final int indexInContext;
+
+  const PhotoPickResult({
+    required this.photo,
+    required this.contextId,
+    required this.contextFileNames,
+    required this.indexInContext,
+  });
+}
 
 class PhotoPickerWidget extends StatefulWidget {
-  final void Function(Photo) onPhotoSelected;
-  final void Function(List<Photo>)? onMultiSelectDone;
+  final void Function(PhotoPickResult) onPhotoSelected;
+  final void Function(List<PhotoPickResult>)? onMultiSelectDone;
 
   const PhotoPickerWidget({
     super.key,
@@ -93,8 +108,28 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               icon: const Icon(Icons.done),
                               tooltip: 'Add selected',
                               onPressed: () {
-                                widget.onMultiSelectDone
-                                    ?.call(List.of(_selectedPhotos));
+                                final contextFileNames = photos
+                                    .map((e) => e.fileName)
+                                    .toList(growable: false);
+                                final indexByFileName = <String, int>{
+                                  for (int i = 0;
+                                      i < contextFileNames.length;
+                                      i++)
+                                    contextFileNames[i]: i,
+                                };
+                                final contextId = const Uuid().v4();
+                                final results = _selectedPhotos
+                                    .map(
+                                      (p) => PhotoPickResult(
+                                        photo: p,
+                                        contextId: contextId,
+                                        contextFileNames: contextFileNames,
+                                        indexInContext:
+                                            indexByFileName[p.fileName] ?? 0,
+                                      ),
+                                    )
+                                    .toList(growable: false);
+                                widget.onMultiSelectDone?.call(results);
                                 _exitMultiSelect();
                               },
                             ),
@@ -194,7 +229,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                 }
 
                                 return GestureDetector(
-                                  onTap: () => _onTap(p),
+                                  onTap: () => _onTap(p, photos),
                                   onLongPress: () => _onLongPress(p),
                                   child: Stack(
                                     fit: StackFit.expand,
@@ -337,11 +372,22 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
     return photos;
   }
 
-  void _onTap(Photo p) {
+  void _onTap(Photo p, List<Photo> context) {
     if (_multiSelect) {
       _toggle(p);
     } else {
-      widget.onPhotoSelected(p);
+      final contextFileNames =
+          context.map((e) => e.fileName).toList(growable: false);
+      final indexInContext =
+          context.indexWhere((e) => e.fileName == p.fileName);
+      widget.onPhotoSelected(
+        PhotoPickResult(
+          photo: p,
+          contextId: const Uuid().v4(),
+          contextFileNames: contextFileNames,
+          indexInContext: indexInContext,
+        ),
+      );
     }
   }
 
