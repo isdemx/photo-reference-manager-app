@@ -1555,21 +1555,28 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       },
                     ),
                   ),
-                  SafeArea(
-                    top: false,
-                    child: Container(
-                      height: ((isSomePhotoInEditMode ? 100.0 : 40.0) +
-                          (isIOS ? bottomInset : 0.0)),
-                      padding:
-                          EdgeInsets.only(bottom: isIOS ? bottomInset : 0.0),
-                      color: const ui.Color.fromARGB(0, 0, 0, 0),
-                      child: isSomePhotoInEditMode && editingPhoto != null
-                          ? _buildEditPanel(editingPhoto)
-                          : _buildDefaultPanel(),
-                    ),
-                  ),
                 ],
               ),
+              if (isSomePhotoInEditMode && editingPhoto != null)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12 + (isIOS ? bottomInset : 0.0),
+                  child: _buildEditPanel(editingPhoto),
+                )
+              else ...[
+                if (Platform.isMacOS)
+                  Positioned(
+                    left: 12,
+                    bottom: 12 + (isIOS ? bottomInset : 0.0),
+                    child: _buildFloatingZoomControl(),
+                  ),
+                Positioned(
+                  right: 12,
+                  bottom: 12 + (isIOS ? bottomInset : 0.0),
+                  child: _buildFloatingActionButtons(),
+                ),
+              ],
               if (_isFullscreen)
                 Positioned(
                   top: 16,
@@ -1591,62 +1598,145 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   // Panels
   // ----------------------------
 
-  Widget _buildDefaultPanel() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        if (Platform.isMacOS)
-          Expanded(
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 120,
-                  child: Slider(
-                    min: _minCollageScale,
-                    max: _maxCollageScale,
-                    value:
-                        _collageScale.clamp(_minCollageScale, _maxCollageScale),
-                    onChanged: (val) {
-                      final clamped =
-                          val.clamp(_minCollageScale, _maxCollageScale);
-                      final focal = _canvasViewportSize == Size.zero
-                          ? Offset.zero
-                          : _canvasViewportSize.center(Offset.zero);
-                      _zoomToScale(clamped, focal);
-                      _saveCollageScale(clamped);
-                    },
+  Widget _buildFloatingZoomControl() {
+    final sliderTheme = SliderTheme.of(context).copyWith(
+      trackHeight: 4,
+      activeTrackColor: Colors.redAccent,
+      inactiveTrackColor: Colors.white,
+      thumbColor: Colors.transparent,
+      overlayColor: Colors.transparent,
+      thumbShape: SliderComponentShape.noThumb,
+      overlayShape: SliderComponentShape.noOverlay,
+    );
+
+    return SizedBox(
+      width: 100,
+      child: _HoverAware(
+        builder: (hovered) {
+          return AnimatedOpacity(
+            opacity: hovered ? 1.0 : 0.5,
+            duration: const Duration(milliseconds: 150),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.35),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hovered)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        'Zoom',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                  SliderTheme(
+                    data: sliderTheme,
+                    child: Slider(
+                      min: _minCollageScale,
+                      max: _maxCollageScale,
+                      value: _collageScale
+                          .clamp(_minCollageScale, _maxCollageScale),
+                      onChanged: (val) {
+                        final clamped =
+                            val.clamp(_minCollageScale, _maxCollageScale);
+                        final focal = _canvasViewportSize == Size.zero
+                            ? Offset.zero
+                            : _canvasViewportSize.center(Offset.zero);
+                        _zoomToScale(clamped, focal);
+                        _saveCollageScale(clamped);
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildFloatingActionButtons() {
+    const iconShadow = [
+      Shadow(
+        color: Colors.black54,
+        blurRadius: 6,
+        offset: Offset(0, 2),
+      ),
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
         IconButton(
-          icon: const Icon(Iconsax.add, color: Colors.white),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Iconsax.add, color: Colors.white, shadows: iconShadow),
           tooltip: 'Add photo',
           onPressed: _showAllPhotosSheet,
         ),
         IconButton(
-          icon: const Icon(Icons.grid_view, color: Colors.white),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon:
+              const Icon(Icons.grid_view, color: Colors.white, shadows: iconShadow),
           tooltip: 'Overview mode',
           onPressed: _toggleOverviewMode,
         ),
         IconButton(
-          icon: const Icon(Iconsax.colorfilter, color: Colors.white),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Iconsax.colorfilter,
+              color: Colors.white, shadows: iconShadow),
           tooltip: 'Change background color',
           onPressed: _showColorPickerDialog,
         ),
         IconButton(
-          icon: const Icon(Iconsax.save_2, color: Colors.white),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Iconsax.save_2, color: Colors.white, shadows: iconShadow),
           tooltip: 'Save collage',
           onPressed: _onSaveCollageToDb,
         ),
         IconButton(
-          icon: const Icon(Iconsax.image, color: Colors.green),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon:
+              const Icon(Iconsax.image, color: Colors.green, shadows: iconShadow),
           tooltip: 'Save collage as image',
           onPressed: _onGenerateCollage,
         ),
         IconButton(
-          icon: const Icon(Icons.close, color: Colors.red),
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Icons.close, color: Colors.red, shadows: iconShadow),
           tooltip: 'Cancel collage',
           onPressed: () => Navigator.pop(context),
         ),
@@ -2117,4 +2207,26 @@ class _CropBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _HoverAware extends StatefulWidget {
+  final Widget Function(bool hovered) builder;
+
+  const _HoverAware({required this.builder});
+
+  @override
+  State<_HoverAware> createState() => _HoverAwareState();
+}
+
+class _HoverAwareState extends State<_HoverAware> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: widget.builder(_hovered),
+    );
+  }
 }
