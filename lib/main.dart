@@ -51,6 +51,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/rating_prom
 import 'package:photographers_reference_app/src/services/export_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/utils/video_preview_migration.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -82,8 +83,9 @@ void main(List<String> args) async {
     final collageBox = await Hive.openBox<Collage>('collages');
     final tagCategoryBox = await Hive.openBox<TagCategory>('tag_categories');
 
-    // 4) Миграции/дефолты
-    await migratePhotoBox(photoBox);
+    // 4) Миграция: перезапись всех превью видео
+    // await VideoPreviewMigration.run(photoBox);
+
     await TagRepositoryImpl(tagBox).initializeDefaultTags();
     await TagCategoryRepositoryImpl(tagCategoryBox, tagBox).initializeDefaultTagCategory();
     await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
@@ -148,34 +150,6 @@ Map<String, dynamic> _safeDecode(String s) {
 
 Future<void> migrateTagBox(Box<Tag> tagBox, Box<Photo> photoBox) async {
   // оставь здесь свою реализацию миграции тегов
-}
-
-Future<void> migratePhotoBox(Box<Photo> photoBox) async {
-  print('Starting migration...');
-  final appDir = await getApplicationDocumentsDirectory();
-  final photosDir = p.join(appDir.path, 'photos');
-
-  for (var key in photoBox.keys) {
-    final photo = photoBox.get(key);
-    if (photo != null) {
-      photo.mediaType ??= 'image';
-      photo.videoPreview ??= '';
-      photo.videoDuration ??= '';
-
-      if (photo.mediaType == 'video' &&
-          photo.videoPreview != null &&
-          photo.videoPreview!.isNotEmpty) {
-        if (photo.videoPreview!.startsWith(photosDir)) {
-          photo.videoPreview = p.basename(photo.videoPreview!);
-          print('Updated videoPreview for photo ${photo.id} to relative path.');
-        }
-      }
-
-      await photoBox.put(key, photo);
-      print('Migrated photo with key $key');
-    }
-  }
-  print('Migration complete');
 }
 
 // --------------------- APP ---------------------

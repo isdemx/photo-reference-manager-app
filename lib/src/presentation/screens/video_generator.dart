@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
@@ -194,8 +195,8 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
         if (ReturnCode.isSuccess(returnCode)) {
           print('FFmpeg SUCCESS => $finalOutputPath');
 
-          // Сохраняем в БД
           final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
+
           final newVideo = Photo(
             id: const Uuid().v4(),
             path: finalOutputPath,
@@ -208,10 +209,24 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
             isStoredInApp: true,
             geoLocation: null,
             mediaType: 'video',
+            videoPreview: null,
+            videoDuration: null,
           );
+
+          // ✅ 1) Генерим превью и длительность сразу
+          final videoResult = await generateVideoThumbnail(newVideo);
+          if (videoResult != null) {
+            newVideo.videoPreview = videoResult['videoPreview'] as String?;
+            newVideo.videoDuration = videoResult['videoDuration'] as String?;
+          } else {
+            print(
+                'Warning: превью не сгенерировалось, сохраним видео без превью');
+          }
+
+          // ✅ 2) Сохраняем уже готовый объект в Hive
           await repo.addPhoto(newVideo);
 
-          // Обновляем Bloc
+          // ✅ 3) Обновляем UI
           context.read<PhotoBloc>().add(LoadPhotos());
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -222,6 +237,7 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
           setState(() {
             generatedVideoPath = finalOutputPath;
           });
+
           Navigator.pop(context);
         } else {
           final logs = await session.getLogs();

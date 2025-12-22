@@ -18,10 +18,7 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
   final int quality = job['quality'] as int;
 
   final img.Image? original = img.decodeImage(bytes);
-  if (original == null) {
-    // Вернём пусто — обработаем ошибку в UI
-    return Uint8List(0);
-  }
+  if (original == null) return Uint8List(0);
 
   final int safeX = x.clamp(0, original.width - 1);
   final int safeY = y.clamp(0, original.height - 1);
@@ -60,6 +57,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   bool _saving = false;
   String _savingText = 'Processing…';
 
+  static const double _bottomBarHeight = 72.0;
+
   Future<void> _save(bool overwrite) async {
     if (_saving) return;
 
@@ -87,7 +86,6 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
       final Uint8List originBytes = await File(path).readAsBytes();
 
-      // Важно: Rect может быть дробный — переводим в int
       final int x = cropRect.left.round();
       final int y = cropRect.top.round();
       final int w = cropRect.width.round();
@@ -102,7 +100,6 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         'quality': 95,
       };
 
-      // ✅ isolate (не блокирует UI)
       final Uint8List outBytes = await compute(cropEncodeJpgIsolate, job);
 
       if (outBytes.isEmpty) {
@@ -133,6 +130,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         ? PhotoPathHelper().getFullPath(widget.photo.fileName)
         : widget.photo.path;
 
+    final double safeBottom = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -147,73 +146,94 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       ),
       body: Stack(
         children: [
-          ExtendedImage.file(
-            File(path),
-            fit: BoxFit.contain,
-            mode: ExtendedImageMode.editor,
-            extendedImageEditorKey: _editorKey,
-            initEditorConfigHandler: (_) => EditorConfig(
-              maxScale: 8.0,
-              cropRectPadding: const EdgeInsets.all(24),
-              hitTestSize: 20,
-              cornerColor: Colors.white,
-              lineColor: Colors.white70,
-              cropLayerPainter: const EditorCropLayerPainter(),
-            ),
-          ),
+          Column(
+            children: [
+              Expanded(
+                child: ExtendedImage.file(
+                  File(path),
+                  fit: BoxFit.contain,
+                  mode: ExtendedImageMode.editor,
+                  extendedImageEditorKey: _editorKey,
+                  initEditorConfigHandler: (_) => EditorConfig(
+                    // ✅ УБИРАЕМ “подлёт/зум”: запрещаем масштабирование редактора
+                    maxScale: 1.0,
 
-          /// Bottom action bar
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: IgnorePointer(
-              ignoring: _saving,
-              child: Opacity(
-                opacity: _saving ? 0.6 : 1.0,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black87,
-                      ],
+                    // ✅ Убираем ощущение “анимации” при перетаскивании crop:
+                    // (если этих полей нет в твоей версии — скажешь, я подстрою под твой API)
+                    speed: 0.0,
+                    animationDuration: Duration.zero,
+
+                    // ✅ Резерв под нижний бар (чтобы снизу было чем тянуть)
+                    cropRectPadding: EdgeInsets.fromLTRB(
+                      24,
+                      24,
+                      24,
+                      24 + _bottomBarHeight + safeBottom,
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => _save(false),
-                          child: const Text('Save as New'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _save(true),
-                          child: const Text('Overwrite'),
-                        ),
-                      ),
-                    ],
+
+                    // ✅ Нормальные ручки
+                    hitTestSize: 20,
+                    cornerColor: Colors.white,
+                    lineColor: Colors.white70,
+
+                    // ✅ Не заставляем кроп “подстраиваться” под экран
+                    initCropRectType: InitCropRectType.imageRect,
+
+                    cropLayerPainter: const EditorCropLayerPainter(),
                   ),
                 ),
               ),
-            ),
+              SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: _bottomBarHeight,
+                  child: IgnorePointer(
+                    ignoring: _saving,
+                    child: Opacity(
+                      opacity: _saving ? 0.6 : 1.0,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black87,
+                            ],
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => _save(false),
+                                child: const Text('Save as New'),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () => _save(true),
+                                child: const Text('Overwrite'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          /// Loader overlay
           if (_saving) ...[
             Positioned.fill(
               child: AbsorbPointer(
                 absorbing: true,
-                child: Container(
-                  color: Colors.black.withOpacity(0.55),
-                ),
+                child: Container(color: Colors.black.withOpacity(0.55)),
               ),
             ),
             Positioned.fill(

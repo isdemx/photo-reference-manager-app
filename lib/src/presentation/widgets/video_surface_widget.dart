@@ -22,6 +22,9 @@ class VideoSurface extends StatefulWidget {
   /// Идентификатор запроса seek — меняем при каждом новом пользовательском действии.
   final int? externalSeekId;
 
+  final ValueChanged<VideoPlayerController>? onControllerReady;
+
+
   const VideoSurface({
     Key? key,
     required this.filePath,
@@ -35,6 +38,7 @@ class VideoSurface extends StatefulWidget {
     this.onDuration,
     this.externalPositionFrac,
     this.externalSeekId,
+    this.onControllerReady,
   }) : super(key: key);
 
   @override
@@ -127,6 +131,9 @@ class _VideoSurfaceState extends State<VideoSurface> {
         await widget.controller!.initialize();
       }
     }
+
+    widget.onControllerReady?.call(_c);
+
 
     await _c.setLooping(false); // лупим вручную в [start; end)
     await _c.setVolume(widget.volume.clamp(0, 1));

@@ -1,5 +1,5 @@
-import 'dart:ffi';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -20,7 +20,6 @@ import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:video_player/video_player.dart';
 
 /// Интенты для горячих клавиш
 class ArrowLeftIntent extends Intent {}
@@ -60,17 +59,21 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   final double _miniatureWidth = 20.0;
   final List<Photo> _selectedPhotos = [];
 
-  // ------ Видео ------
-  VideoPlayerController? _videoController;
+  final Map<String, int> _reloadNonce = <String, int>{};
 
   // ------ Зум (PhotoViewGallery) ------
-  // Для отслеживания, находимся ли мы в зуме (отключать листание)
   bool _isZoomed = false;
   late PhotoViewScaleStateController _scaleStateController;
 
   // ------ Фокус для клавиатуры ------
   final FocusNode _focusNode = FocusNode(debugLabel: 'PhotoViewerFocusNode');
   bool _preventAutoScroll = false; // поле класса
+
+  int _nonce(Photo p) => _reloadNonce[p.id] ?? 0;
+
+  void _bumpNonce(Photo p) {
+    _reloadNonce[p.id] = (_reloadNonce[p.id] ?? 0) + 1;
+  }
 
   // ------------------------------------------------------------------
   // ------------------------ initState / dispose ----------------------
@@ -87,37 +90,34 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     _scaleStateController = PhotoViewScaleStateController();
     _scaleStateController.addIgnorableListener(() {
       final state = _scaleStateController.scaleState;
-      // Если PhotoView в состоянии, где масштаб больше 1 (zoomed)
+
       if (state == PhotoViewScaleState.zoomedIn ||
           state == PhotoViewScaleState.zoomedOut ||
           state == PhotoViewScaleState.originalSize) {
         if (!_isZoomed) {
           setState(() {
             _isZoomed = true;
-            _pageViewScrollable = false; // Отключаем перелистывание
+            _pageViewScrollable = false;
           });
         }
       } else {
         if (_isZoomed) {
           setState(() {
             _isZoomed = false;
-            _pageViewScrollable = true; // Включаем обратно
+            _pageViewScrollable = true;
           });
         }
       }
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Запрашиваем фокус для клавиатуры
       if (!_focusNode.hasFocus) {
         _focusNode.requestFocus();
       }
-      // Инициализируем видео, если нужно
-      _initializeVideoIfNeeded(_currentIndex);
 
       // Прокрутка миниатюр после построения
       _scrollThumbnailsToCenter(_currentIndex).then((_) {
-        setState(() => isInitScrolling = false);
+        if (mounted) setState(() => isInitScrolling = false);
       });
     });
   }
@@ -126,42 +126,24 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   void dispose() {
     _pageController.dispose();
     _thumbnailScrollController.dispose();
-    _videoController?.dispose();
     _focusNode.dispose();
     _scaleStateController.dispose();
-    super.dispose();
-  }
 
-  // ------------------------------------------------------------------
-  // -------------------------- Видео ----------------------------------
-  // ------------------------------------------------------------------
-  Future<void> _initializeVideoIfNeeded(int index) async {
-    // Предыдущий контроллер освобождаем
-    _videoController?.dispose();
-    _videoController = null;
-
-    final photo = widget.photos[index];
-    if (photo.mediaType == 'video') {
-      final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
-      final controller = VideoPlayerController.file(File(fullPath));
-      _videoController = controller;
-
-      try {
-        await controller.initialize();
-        controller.play();
-        controller.setLooping(true);
-        controller.addListener(() => setState(() {}));
-      } catch (e) {
-        // Обработка ошибок при загрузке
-      }
+    // Важно: если viewer закрыли, вернем системный UI в норму и отключим wakelock (на всякий случай)
+    try {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      WakelockPlus.disable();
+    } catch (_) {
+      // ignore
     }
+
+    super.dispose();
   }
 
   // ------------------------------------------------------------------
   // ---------------------- Работа с миниатюрами -----------------------
   // ------------------------------------------------------------------
   Future<void> _scrollThumbnailsToCenter(int index) async {
-    print('_scrollThumbnailsToCenter $index');
     final screenWidth = MediaQuery.of(context).size.width;
     final itemWidth = _miniatureWidth;
 
@@ -179,6 +161,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     }
   }
 
+  String _resolvePhotoPath(Photo p) {
+    return p.isStoredInApp ? PhotoPathHelper().getFullPath(p.fileName) : p.path;
+  }
+
   void _onThumbnailTap(int index) {
     _pageController.jumpToPage(index);
     setState(() {
@@ -186,7 +172,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       _isFlipped = false;
     });
     _scrollThumbnailsToCenter(index);
-    _initializeVideoIfNeeded(index);
   }
 
   void _onThumbnailScroll() {
@@ -208,7 +193,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           _currentIndex = index;
           _isFlipped = false;
         });
-        _initializeVideoIfNeeded(index);
       }
     }
   }
@@ -221,7 +205,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       setState(() {
         _currentIndex++;
         _pageController.jumpToPage(_currentIndex);
-        _initializeVideoIfNeeded(_currentIndex);
       });
     }
   }
@@ -231,7 +214,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       setState(() {
         _currentIndex--;
         _pageController.jumpToPage(_currentIndex);
-        _initializeVideoIfNeeded(_currentIndex);
       });
     }
   }
@@ -241,34 +223,33 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         _selectPhotoMode ? _selectedPhotos : [widget.photos[_currentIndex]];
 
     final res = await ImagesHelpers.deleteImagesWithConfirmation(
-        context, photosToDelete);
+      context,
+      photosToDelete,
+    );
     if (!res) return;
 
     setState(() {
-      // Удаляем из общего списка
       for (final p in photosToDelete) {
         widget.photos.remove(p);
       }
 
-      // Корректируем _currentIndex
+      if (widget.photos.isEmpty) {
+        Navigator.of(context).pop();
+        return;
+      }
+
       if (_currentIndex >= widget.photos.length) {
         _currentIndex = widget.photos.length - 1;
       }
 
-      // Если не осталось ни одного элемента – закрываем окно
-      if (widget.photos.isEmpty) {
-        Navigator.of(context).pop();
-      } else {
-        _pageController.jumpToPage(_currentIndex);
-        _initializeVideoIfNeeded(_currentIndex);
-      }
+      _pageController.jumpToPage(_currentIndex);
+      _isFlipped = false;
     });
   }
 
   // ------------------------------------------------------------------
   // ---------------------- Разные действия ----------------------------
   // ------------------------------------------------------------------
-  /// Переворот изображения
   void _flipPhoto() {
     final currentPhoto = widget.photos[_currentIndex];
     if (currentPhoto.mediaType == 'video') return;
@@ -277,7 +258,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  /// Включить/выключить режим множественного выбора
   void _enableSelectPhotoMode(bool enable) {
     setState(() {
       _selectPhotoMode = enable;
@@ -287,7 +267,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  /// Добавить/убрать фото из выбранных
   void _toggleSelection(Photo photo) {
     setState(() {
       if (_selectedPhotos.contains(photo)) {
@@ -298,7 +277,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  /// Очистить выбор
   void _clearSelection() {
     setState(() {
       _selectedPhotos.clear();
@@ -306,7 +284,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  /// Показать/скрыть верхний AppBar и нижний ActionBar
   void _toggleActions() {
     setState(() {
       _showActions = !_showActions;
@@ -319,18 +296,22 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       }
     });
 
-    // Важно: после setState, чтобы скролл миниатюр был правильный
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollThumbnailsToCenter(_currentIndex);
     });
   }
 
-  /// Шарим выбранные фото
   void _shareSelectedPhotos() async {
     final res = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
     if (res) {
       _clearSelection();
     }
+  }
+
+  double _galleryBottomPadding(Photo p) {
+    if (!_showActions) return 0.0;
+    if (p.mediaType == 'video' && (p.tagIds.isEmpty)) return 50.0;
+    return 90.0;
   }
 
   Future<void> _openEditor(Photo photo) async {
@@ -342,6 +323,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         barrierColor: Colors.black.withOpacity(0.85),
         pageBuilder: (_, __, ___) {
           return PhotoEditorOverlay(
+            key: ValueKey('editor_${photo.id}_${_nonce(photo)}'),
             photo: photo,
             onSave: (Uint8List bytes, bool overwrite) async {
               if (overwrite) {
@@ -350,10 +332,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 await _saveAsNewPhoto(photo, bytes);
               }
 
-              if (mounted) {
-                // 🔥 Чтобы кроп точно отрисовался сразу в viewer
-                setState(() {});
-              }
+              if (mounted) setState(() {});
             },
           );
         },
@@ -364,17 +343,20 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Future<void> _overwriteCurrentPhoto(Photo photo, Uint8List bytes) async {
-    final String fullPath = photo.isStoredInApp
-        ? PhotoPathHelper().getFullPath(photo.fileName)
-        : photo.path;
+    final String fullPath = _resolvePhotoPath(photo);
 
     await File(fullPath).writeAsBytes(bytes, flush: true);
 
-    // ✅ Сброс кеша, иначе FileImage может показать старое
     final provider = FileImage(File(fullPath));
-    imageCache.evict(provider);
 
-    // ✅ Ты просил "перезаписать в базу"
+    PaintingBinding.instance.imageCache.evict(provider);
+    PaintingBinding.instance.imageCache.clearLiveImages();
+
+    // 3) Бамп nonce, чтобы дерево точно пересоздалось
+    setState(() {
+      _bumpNonce(photo);
+    });
+
     if (mounted) {
       context.read<PhotoBloc>().add(UpdatePhoto(photo));
     }
@@ -384,7 +366,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final id = const Uuid().v4();
     final newFileName = 'crop_$id.jpg';
 
-    // Пишем в app storage (как и остальные локальные фотки)
     final newFullPath = PhotoPathHelper().getFullPath(newFileName);
     await File(newFullPath).writeAsBytes(bytes, flush: true);
 
@@ -405,8 +386,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       context.read<PhotoBloc>().add(AddPhoto(newPhoto));
     }
 
-    // Если хочешь, чтобы сразу в этом viewer появился новый файл — добавим в список:
-    widget.photos.insert(_currentIndex + 1, newPhoto);
+    if (mounted) {
+      setState(() {
+        widget.photos.insert(_currentIndex + 1, newPhoto);
+      });
+    }
   }
 
   // ------------------------------------------------------------------
@@ -460,7 +444,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           autofocus: true,
           child: Scaffold(
             extendBodyBehindAppBar: true,
-            // -------------------- AppBar --------------------
             appBar: _showActions
                 ? AppBar(
                     title: Text(
@@ -469,7 +452,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       style: const TextStyle(fontSize: 14.0),
                     ),
                     actions: [
-                      // Если режим выбора – выводим чекбокс
                       if (_selectPhotoMode)
                         GestureDetector(
                           onTap: () => _toggleSelection(currentPhoto),
@@ -498,7 +480,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                             ),
                           ),
                         ),
-                      // Кнопка "перевернуть" для картинок
                       if (currentPhoto.mediaType == 'image')
                         IconButton(
                           icon: const Icon(Iconsax.arrange_circle),
@@ -508,9 +489,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   )
                 : null,
             body: GestureDetector(
-              // Тап по экрану – показать/скрыть панели
               onTap: _toggleActions,
-              // Длинный тап – включить/выключить режим выбора
               onLongPress: () {
                 vibrate();
                 _enableSelectPhotoMode(!_selectPhotoMode);
@@ -518,8 +497,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               onVerticalDragEnd: (details) {
                 if (Platform.isMacOS) return;
 
-                const double velocityThreshold =
-                    1000; // Порог скорости для закрытия
+                const double velocityThreshold = 1000;
                 if (details.primaryVelocity != null &&
                     details.primaryVelocity!.abs() > velocityThreshold) {
                   _closeWithAnimation(context);
@@ -527,9 +505,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               },
               child: Stack(
                 children: [
-                  // ------------ Основная область: PhotoViewGallery -----------
-                  _buildPhotoGallery(),
-                  // ------------ Миниатюры -----------
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom:
+                          _galleryBottomPadding(widget.photos[_currentIndex]),
+                    ),
+                    child: _buildPhotoGallery(),
+                  ),
                   if (!Platform.isMacOS && _showActions)
                     Positioned(
                       bottom: 120,
@@ -538,7 +520,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       height: 40,
                       child: _buildThumbnails(),
                     ),
-                  // ------------ Нижняя панель (ActionBar) -----------
                   if (_showActions)
                     Positioned(
                       bottom: 0,
@@ -590,7 +571,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     Navigator.of(context).pop();
   }
 
-  /// Встроенная галерея для просмотра фото/видео
   Widget _buildPhotoGallery() {
     return PhotoViewGallery.builder(
       pageController: _pageController,
@@ -602,68 +582,77 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         if (!_preventAutoScroll) {
           Future.delayed(const Duration(milliseconds: 1), () {
             _scrollThumbnailsToCenter(index);
-            setState(() {
-              _preventAutoScroll = false; // Только после завершения скролла
-            });
+            if (mounted) {
+              setState(() {
+                _preventAutoScroll = false;
+              });
+            }
           });
         }
+
         setState(() {
           _currentIndex = index;
-          _isFlipped = false; // Сбрасываем переворот
+          _isFlipped = false;
           _preventAutoScroll = false;
         });
-        _initializeVideoIfNeeded(index);
       },
       builder: (context, index) {
         final photo = widget.photos[index];
 
-        // Если это видео — вернём customChild
         if (photo.mediaType == 'video') {
           return PhotoViewGalleryPageOptions.customChild(
             minScale: PhotoViewComputedScale.contained,
             maxScale: PhotoViewComputedScale.contained,
             onTapUp: (BuildContext context, TapUpDetails details,
                 PhotoViewControllerValue controllerValue) {
-              print('Photo tapped!');
-              _toggleActions(); // ваш метод
+              _toggleActions();
             },
-            // Можно разный heroTag задать, если нужно
-            heroAttributes: PhotoViewHeroAttributes(tag: 'video_$index'),
-            // Виджет отображения видео
-            child: VideoView(index, photo, _currentIndex, _videoController),
+            heroAttributes: PhotoViewHeroAttributes(tag: 'video_${photo.id}'),
+            child: GalleryVideoPage(
+              index: index,
+              currentIndex: _currentIndex,
+              photo: photo,
+              autoplay: true,
+              looping: true,
+              volume: 0.0,
+            ),
           );
         } else {
-          // Если это изображение — обычный PhotoView, но с "переворотом" при необходимости
-          final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
+          final fullPath = _resolvePhotoPath(photo);
 
           return PhotoViewGalleryPageOptions.customChild(
             minScale: PhotoViewComputedScale.contained,
             maxScale: PhotoViewComputedScale.covered * 2.0,
             onTapUp: (BuildContext context, TapUpDetails details,
                 PhotoViewControllerValue controllerValue) {
-              print('Photo tapped!');
-              _toggleActions(); // ваш метод
+              _toggleActions();
             },
-            heroAttributes: PhotoViewHeroAttributes(tag: 'image_$index'),
-            child: Transform(
-              alignment: Alignment.center,
-              transform:
-                  _isFlipped ? Matrix4.rotationY(3.14159) : Matrix4.identity(),
-              child: PhotoView(
-                imageProvider: FileImage(File(fullPath)),
-                gaplessPlayback: true,
-                scaleStateController: _scaleStateController,
-                loadingBuilder: (context, progress) =>
-                    const Center(child: null),
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Icon(
-                      Icons.broken_image,
-                      size: 50,
-                      color: Color.fromARGB(255, 171, 244, 54),
-                    ),
-                  );
-                },
+            heroAttributes: PhotoViewHeroAttributes(
+              tag: 'image_${photo.id}_${_nonce(photo)}',
+            ),
+            child: KeyedSubtree(
+              key: ValueKey('image_${photo.id}_${_nonce(photo)}'),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: _isFlipped
+                    ? Matrix4.rotationY(3.14159)
+                    : Matrix4.identity(),
+                child: PhotoView(
+                  imageProvider: FileImage(File(fullPath)),
+                  gaplessPlayback: true,
+                  scaleStateController: _scaleStateController,
+                  loadingBuilder: (context, progress) =>
+                      const Center(child: null),
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Center(
+                      child: Icon(
+                        Icons.broken_image,
+                        size: 50,
+                        color: Color.fromARGB(255, 171, 244, 54),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           );
@@ -672,14 +661,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     );
   }
 
-  /// Миниатюры внизу
   Widget _buildThumbnails() {
     return NotificationListener<ScrollNotification>(
       onNotification: (scrollInfo) {
         if (scrollInfo is ScrollUpdateNotification) {
           setState(() {
-            _preventAutoScroll =
-                true; // пользователь «вручную» скроллит миниатюры
+            _preventAutoScroll = true;
           });
           _onThumbnailScroll();
         }
@@ -690,27 +677,28 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         scrollDirection: Axis.horizontal,
         itemCount: widget.photos.length + 2,
         itemBuilder: (context, index) {
-          // Паддинги в начале/конце
           if (index == 0 || index == widget.photos.length + 1) {
             return SizedBox(
               width: MediaQuery.of(context).size.width * 0.5,
             );
           }
+
           final photo = widget.photos[index - 1];
+
+          final thumbPath = photo.mediaType == 'video'
+              ? PhotoPathHelper().getFullPath(photo.videoPreview!)
+              : _resolvePhotoPath(photo);
+
           return GestureDetector(
             onTap: () => _onThumbnailTap(index - 1),
             child: Container(
               width: _miniatureWidth,
               margin: const EdgeInsets.symmetric(horizontal: 0.0),
-              child: photo.mediaType == 'video'
-                  ? Image.file(
-                      File(PhotoPathHelper().getFullPath(photo.videoPreview!)),
-                      fit: BoxFit.cover,
-                    )
-                  : Image.file(
-                      File(PhotoPathHelper().getFullPath(photo.fileName)),
-                      fit: BoxFit.cover,
-                    ),
+              child: Image.file(
+                File(thumbPath),
+                key: ValueKey('thumb_${photo.id}_${_nonce(photo)}'),
+                fit: BoxFit.cover,
+              ),
             ),
           );
         },

@@ -158,149 +158,191 @@ class FoldersHelpers {
                   return StatefulBuilder(
                     builder: (context, setState) {
                       return AlertDialog(
+                        insetPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 12),
                         title: const Text('Add Photos to Folder'),
-                        content: SizedBox(
-                          width: double.maxFinite,
-                          child: groupedView
-                              ? ListView(
-                                  children: categories.entries.map((entry) {
-                                    final categoryId = entry.key;
-                                    final categoryName = entry.value;
-                                    final categoryFolders =
-                                        categorizedFolders[categoryId] ?? [];
+                        content: SafeArea(
+                          child: SizedBox(
+                            width: double.maxFinite,
+                            // Ограничиваем высоту, чтобы список не выдавливал футер
+                            height:
+                                MediaQuery.of(dialogContext).size.height * 0.70,
+                            child: Column(
+                              children: [
+                                Expanded(
+                                  child: groupedView
+                                      ? ListView(
+                                          children:
+                                              categories.entries.map((entry) {
+                                            final categoryId = entry.key;
+                                            final categoryName = entry.value;
+                                            final categoryFolders =
+                                                categorizedFolders[
+                                                        categoryId] ??
+                                                    [];
 
-                                    return ExpansionTile(
-                                      title: Text(
-                                        categoryName,
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      initiallyExpanded:
-                                          expandedCategory == categoryId,
-                                      onExpansionChanged: (expanded) {
-                                        expandedCategory =
-                                            expanded ? categoryId : null;
-                                        prefs.setString(
-                                          'expandedCategory',
-                                          expandedCategory ?? '',
-                                        );
-                                        setState(() {
-                                          expandedCategory =
-                                              expanded ? categoryId : null;
-                                        });
-                                      },
-                                      children: categoryFolders
-                                          .map(
-                                            (folder) => _buildFolderTile(
-                                              folder,
+                                            return ExpansionTile(
+                                              title: Text(
+                                                categoryName,
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              initiallyExpanded:
+                                                  expandedCategory ==
+                                                      categoryId,
+                                              onExpansionChanged: (expanded) {
+                                                expandedCategory = expanded
+                                                    ? categoryId
+                                                    : null;
+                                                prefs.setString(
+                                                  'expandedCategory',
+                                                  expandedCategory ?? '',
+                                                );
+                                                setState(() {
+                                                  expandedCategory = expanded
+                                                      ? categoryId
+                                                      : null;
+                                                });
+                                              },
+                                              children: categoryFolders
+                                                  .map(
+                                                    (folder) =>
+                                                        _buildFolderTile(
+                                                      folder,
+                                                      photos,
+                                                      setState,
+                                                    ),
+                                                  )
+                                                  .toList(),
+                                            );
+                                          }).toList(),
+                                        )
+                                      : ListView.builder(
+                                          itemCount: folders.length,
+                                          itemBuilder: (context, index) {
+                                            return _buildFolderTile(
+                                              folders[index],
                                               photos,
                                               setState,
-                                            ),
-                                          )
-                                          .toList(),
-                                    );
-                                  }).toList(),
-                                )
-                              : ListView.builder(
-                                  shrinkWrap: true,
-                                  itemCount: folders.length,
-                                  itemBuilder: (context, index) {
-                                    return _buildFolderTile(
-                                      folders[index],
-                                      photos,
-                                      setState,
-                                    );
-                                  },
+                                            );
+                                          },
+                                        ),
                                 ),
+
+                                const SizedBox(height: 12),
+
+                                // НИЖНЯЯ ПАНЕЛЬ: всегда красиво на узких экранах
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Iconsax.add_circle,
+                                          color: Colors.blue),
+                                      tooltip: 'Create New Folder',
+                                      onPressed: () async {
+                                        await showDialog(
+                                          context: context,
+                                          builder: (context) =>
+                                              const AddFolderDialog(),
+                                        );
+                                        setState(() {});
+                                      },
+                                    ),
+                                    IconButton(
+                                      icon: Icon(groupedView
+                                          ? Iconsax.menu
+                                          : Iconsax.category),
+                                      tooltip: 'Switch Mode',
+                                      onPressed: () async {
+                                        groupedView = !groupedView;
+                                        await prefs.setBool(
+                                            'groupedView', groupedView);
+                                        setState(() {});
+                                      },
+                                    ),
+
+                                    const Spacer(),
+
+                                    // Кнопки справа. ConstrainedBox + Flexible чтобы не ломалось.
+                                    ConstrainedBox(
+                                      constraints:
+                                          const BoxConstraints(minWidth: 88),
+                                      child: TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ConstrainedBox(
+                                      constraints:
+                                          const BoxConstraints(minWidth: 72),
+                                      child: FilledButton(
+                                        onPressed: () {
+                                          for (var photo in photos) {
+                                            photo.folderIds.removeWhere(
+                                              (id) => !existingFolderIds
+                                                  .contains(id),
+                                            );
+                                            context
+                                                .read<PhotoBloc>()
+                                                .add(UpdatePhoto(photo));
+                                          }
+
+                                          final Set<String>
+                                              allNewlyAddedFolderIds = {};
+                                          for (final photo in photos) {
+                                            final before =
+                                                originalFolderIds[photo] ??
+                                                    <String>{};
+                                            final now = Set<String>.from(
+                                                photo.folderIds);
+                                            final added =
+                                                now.difference(before);
+                                            allNewlyAddedFolderIds
+                                                .addAll(added);
+                                          }
+
+                                          final addedFolders = folders
+                                              .where((f) =>
+                                                  allNewlyAddedFolderIds
+                                                      .contains(f.id))
+                                              .toList();
+
+                                          if (addedFolders.isNotEmpty) {
+                                            String message;
+                                            if (addedFolders.length == 1) {
+                                              message =
+                                                  'Photos added to "${addedFolders.first.name}"';
+                                            } else {
+                                              message =
+                                                  'Photos added to selected folders';
+                                            }
+
+                                            ScaffoldMessenger.of(outerContext)
+                                                .showSnackBar(
+                                              SnackBar(
+                                                content: Text(message),
+                                                behavior:
+                                                    SnackBarBehavior.floating,
+                                                duration: const Duration(
+                                                    milliseconds: 2200),
+                                              ),
+                                            );
+                                          }
+
+                                          Navigator.of(context).pop(true);
+                                        },
+                                        child: const Text('OK'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                        actions: [
-                          IconButton(
-                            icon: const Icon(
-                              Iconsax.add_circle,
-                              color: Colors.blue,
-                            ),
-                            tooltip: 'Create New Folder',
-                            onPressed: () async {
-                              await showDialog(
-                                context: context,
-                                builder: (context) => const AddFolderDialog(),
-                              );
-                              setState(() {});
-                            },
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              groupedView ? Iconsax.menu : Iconsax.category,
-                            ),
-                            tooltip: 'Switch Mode',
-                            onPressed: () async {
-                              groupedView = !groupedView;
-                              await prefs.setBool('groupedView', groupedView);
-                              setState(() {});
-                            },
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              // 1. Почистим несуществующие папки + обновим фото
-                              for (var photo in photos) {
-                                photo.folderIds.removeWhere(
-                                  (id) => !existingFolderIds.contains(id),
-                                );
-                                context
-                                    .read<PhotoBloc>()
-                                    .add(UpdatePhoto(photo));
-                              }
-
-                              // 2. Посчитаем, какие папки были ДОБАВЛЕНЫ
-                              final Set<String> allNewlyAddedFolderIds = {};
-
-                              for (final photo in photos) {
-                                final before =
-                                    originalFolderIds[photo] ?? <String>{};
-                                final now = Set<String>.from(photo.folderIds);
-                                final added = now.difference(before);
-                                allNewlyAddedFolderIds.addAll(added);
-                              }
-
-                              // 3. Найдём названия добавленных папок
-                              final addedFolders = folders
-                                  .where(
-                                    (f) =>
-                                        allNewlyAddedFolderIds.contains(f.id),
-                                  )
-                                  .toList();
-
-                              if (addedFolders.isNotEmpty) {
-                                String message;
-
-                                if (addedFolders.length == 1) {
-                                  message =
-                                      'Photos added to "${addedFolders.first.name}"';
-                                } else {
-                                  message = 'Photos added to selected folders';
-                                }
-
-                                ScaffoldMessenger.of(outerContext).showSnackBar(
-                                  SnackBar(
-                                    content: Text(message),
-                                    behavior: SnackBarBehavior.floating,
-                                    duration:
-                                        const Duration(milliseconds: 2200),
-                                  ),
-                                );
-                              }
-
-                              Navigator.of(context).pop(true);
-                            },
-                            child: const Text('OK'),
-                          ),
-                        ],
                       );
                     },
                   );

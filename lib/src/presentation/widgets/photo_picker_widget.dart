@@ -173,16 +173,21 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
 
                                 Widget media;
                                 if (p.mediaType == 'video') {
-                                  // автовоспроизведение без звука/кнопок
-                                  media = VideoView(
-                                    i,
-                                    p,
-                                    i,
-                                    null,
-                                    initialVolume: 0,
-                                    hideVolume: true,
-                                    hidePlayPause: true,
-                                  );
+                                  if (p.videoPreview != null) {
+                                    final previewPath = PhotoPathHelper()
+                                        .getFullPath(p.videoPreview!);
+                                    media = Image.file(
+                                      File(previewPath),
+                                      fit: BoxFit.cover,
+                                    );
+                                  } else {
+                                    media = const Center(
+                                      child: Icon(
+                                        Icons.videocam,
+                                        color: Colors.white70,
+                                      ),
+                                    );
+                                  }
                                 } else {
                                   media =
                                       Image.file(File(path), fit: BoxFit.cover);

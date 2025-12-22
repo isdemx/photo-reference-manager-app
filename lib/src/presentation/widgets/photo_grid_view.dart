@@ -416,13 +416,44 @@ class _PhotoGridViewState extends State<PhotoGridView> {
     if (_ratioById.containsKey(photo.id)) return;
     if (_ratioLoading.contains(photo.id)) return;
 
-    // Видео — квадратный placeholder
+    final helper = PhotoPathHelper();
+
+    // ✅ 1) Для видео пытаемся взять ratio из превью-файла
     if (photo.isVideo) {
-      _ratioById[photo.id] = 1.0;
+      String? previewPath;
+
+      if (photo.videoPreview != null && photo.videoPreview!.isNotEmpty) {
+        // videoPreview у тебя хранится как имя файла в documents/photos
+        previewPath = helper.getFullPath(photo.videoPreview!);
+      }
+
+      if (previewPath == null ||
+          previewPath.isEmpty ||
+          !File(previewPath).existsSync()) {
+        // превью нет — даём временно квадрат, но не навсегда
+        _ratioById[photo.id] = 1.0;
+        return;
+      }
+
+      _ratioLoading.add(photo.id);
+      _readImageRatioInIsolate(previewPath).then((ratio) {
+        _ratioLoading.remove(photo.id);
+        if (!mounted) return;
+        setState(() {
+          _ratioById[photo.id] = ratio <= 0 ? 1.0 : ratio;
+        });
+      }).catchError((_) {
+        _ratioLoading.remove(photo.id);
+        if (!mounted) return;
+        setState(() {
+          _ratioById[photo.id] = 1.0;
+        });
+      });
+
       return;
     }
 
-    final helper = PhotoPathHelper();
+    // ✅ 2) Для фото — как было
     final String path =
         photo.isStoredInApp ? helper.getFullPath(photo.fileName) : photo.path;
 
@@ -910,10 +941,17 @@ class _PhotoGridViewState extends State<PhotoGridView> {
             ),
           ),
           if (isSelected)
-            const Positioned(
-              bottom: 8,
-              right: 8,
-              child: Icon(Icons.check_circle, color: Colors.blue, size: 24),
+            Positioned(
+              bottom: 6,
+              right: 6,
+              child: IgnorePointer(
+                ignoring: true,
+                child: Icon(
+                  Icons.check_circle,
+                  color: Colors.blue,
+                  size: 16,
+                ),
+              ),
             ),
         ],
       ),

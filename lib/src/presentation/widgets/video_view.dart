@@ -1,364 +1,433 @@
-import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:iconsax/iconsax.dart';
+import 'package:flutter/services.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/triangle_volume_slider_widget.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../domain/entities/photo.dart';
-import 'video_loop_timeline.dart';
+import '../../utils/photo_path_helper.dart';
 
-class VideoView extends StatefulWidget {
-  /// индекс этого виджета и «текущей» страницы (нужны,
-  /// если VideoView используется в пейджере / ленте)
+class GalleryVideoPage extends StatefulWidget {
   final int index;
   final int currentIndex;
-
-  /// данные о медиа-файле
   final Photo photo;
 
-  /// внешний контроллер, если нужен
-  final VideoPlayerController? videoController;
+  final bool autoplay;
+  final bool looping;
 
-  /// --- новые параметры -----------------------------------------------------
-  final double? initialVolume; // (0..1)
-  final bool hideVolume; // скрыть регулятор
-  final bool hidePlayPause; // скрыть кнопку play / pause
-  /// скрыть слайдер выбора петли
-  final bool loopSliderHide;
+  final double volume; // 0..1
+  final double speed; // 0.25..2.0
 
-  /// показывать название файла
-  final bool showTitle;
+  /// чтобы родитель мог делать seek/play/pause по хоткеям
+  final ValueChanged<VideoPlayerController?>? onControllerChanged;
 
-  /// скорость воспроизведения (0.1..4.0), null => 1.0
-  final double? initialSpeed;
-
-  /// скрыть регулятор скорости
-  final bool hideSpeed;
-  // -------------------------------------------------------------------------
-
-  const VideoView(
-    this.index,
-    this.photo,
-    this.currentIndex,
-    this.videoController, {
-    Key? key,
-    this.initialVolume, // теперь по умолчанию будет 0.0 (см. initState)
-    this.hideVolume = false,
-    this.hidePlayPause = false,
-    this.loopSliderHide = false,
-    this.showTitle = false,
-    this.initialSpeed, // по умолчанию 1.0 (см. initState)
-    this.hideSpeed = false,
-  }) : super(key: key);
+  const GalleryVideoPage({
+    super.key,
+    required this.index,
+    required this.currentIndex,
+    required this.photo,
+    this.autoplay = true,
+    this.looping = true,
+    this.volume = 1.0,
+    this.speed = 1.0,
+    this.onControllerChanged,
+  });
 
   @override
-  State<VideoView> createState() => _VideoViewState();
+  State<GalleryVideoPage> createState() => _GalleryVideoPageState();
 }
 
-class _VideoViewState extends State<VideoView> {
-  late VideoPlayerController _internalController;
-  bool _ownsController = false;
-  bool _isInitializing = false;
+class _GalleryVideoPageState extends State<GalleryVideoPage>
+    with WidgetsBindingObserver {
+  VideoPlayerController? _c;
+  Future<void>? _init;
 
-  // громкость и скорость
-  late double _volume; // (0..1)
-  late double _speed; // (0.1..4.0)
+  bool _wasPlayingBeforeBackground = false;
 
-  double _loopStart = 0;
-  double _loopEnd = 1;
-  Timer? _loopTimer;
+  bool get _isCurrent => widget.index == widget.currentIndex;
 
-  // ──────────────────────────────────────────────────────────────────────────
+  late double _volume; // 0..1
+  late double _speed; // 0.25..2.0
+
+  // стиль “как у VideoProgressIndicator по умолчанию”
+  static const double _trackThickness = 4.0;
+
+// высота вертикальных полосок (в 3 раза меньше, чем 92)
+  static const double _vBarHeight = 30.0;
+
+// подпись под полоской
+  static const double _vLabelGap = 6.0;
+  static const double _vLabelHeight = 14.0; // фикс высоты подписи (2 строки)
+
+  final Color _trackColor = const Color.fromRGBO(200, 200, 200, 0.5);
+  final Color _fillColor = const Color.fromRGBO(255, 0, 0, 0.7);
+
   @override
   void initState() {
     super.initState();
-    // ГРОМКОСТЬ: дефолт теперь 0.0 если не задана initialVolume
-    _volume = (widget.initialVolume ?? 0.0).clamp(0.0, 1.0);
-    // СКОРОСТЬ: дефолт 1.0 если не задана initialSpeed
-    _speed = (widget.initialSpeed ?? 1.0).clamp(0.1, 4.0);
-    _createControllerIfNeeded();
+    WidgetsBinding.instance.addObserver(this);
+
+    _volume = widget.volume.clamp(0.0, 1.0);
+    _speed = widget.speed.clamp(0.25, 2.0);
+
+    if (_isCurrent) _start();
   }
 
   @override
-  void didUpdateWidget(covariant VideoView oldWidget) {
+  void didUpdateWidget(covariant GalleryVideoPage oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // сменилось видео → пересоздаём контроллер
-    if (widget.videoController == null &&
-        widget.photo.path != oldWidget.photo.path) {
-      _createControllerIfNeeded(recreate: true);
+    final wasCurrent = oldWidget.index == oldWidget.currentIndex;
+    final isCurrentNow = _isCurrent;
+
+    final videoChanged = oldWidget.photo.path != widget.photo.path ||
+        oldWidget.photo.fileName != widget.photo.fileName;
+
+    if (videoChanged) {
+      _stop();
+      if (isCurrentNow) _start();
+      return;
     }
 
-    // изменили громкость извне
-    if (widget.initialVolume != null &&
-        widget.initialVolume != oldWidget.initialVolume) {
-      _volume = widget.initialVolume!.clamp(0.0, 1.0);
-      final c = widget.videoController ?? _internalController;
-      if (_controllerReady(c)) c.setVolume(_volume);
+    if (!wasCurrent && isCurrentNow) {
+      _start();
+      return;
     }
 
-    // изменили скорость извне
-    if (widget.initialSpeed != null &&
-        widget.initialSpeed != oldWidget.initialSpeed) {
-      _speed = widget.initialSpeed!.clamp(0.1, 4.0);
-      final c = widget.videoController ?? _internalController;
-      if (_controllerReady(c)) c.setPlaybackSpeed(_speed);
-    }
-
-    // авто-пауза / авто-плей
-    final c = widget.videoController ?? _internalController;
-    if (_controllerReady(c)) {
-      widget.index == widget.currentIndex ? c.play() : c.pause();
+    if (wasCurrent && !isCurrentNow) {
+      _stop();
+      return;
     }
   }
 
   @override
   void dispose() {
-    if (_ownsController) _internalController.dispose();
-    _loopTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _stop();
     super.dispose();
   }
 
-  // ─────────────────── helpers ──────────────────────────────────────────────
-  bool _controllerReady(VideoPlayerController c) =>
-      !_isInitializing && c.value.isInitialized;
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final c = _c;
+    if (c == null || !c.value.isInitialized) return;
 
-  String _fmt(Duration d) =>
-      '${d.inMinutes.remainder(60).toString().padLeft(2, '0')}:'
-      '${d.inSeconds.remainder(60).toString().padLeft(2, '0')}';
+    final bool isMobile = Platform.isIOS || Platform.isAndroid;
 
-  Future<void> _createControllerIfNeeded({bool recreate = false}) async {
-    if (widget.videoController != null) return; // внешний
-
-    if (_isInitializing) return;
-
-    if (recreate && _ownsController) {
-      await _internalController.dispose();
-      _ownsController = false;
-    }
-
-    _isInitializing = true;
-    _internalController = VideoPlayerController.file(File(widget.photo.path));
-    await _internalController.initialize();
-    _internalController
-      ..setLooping(true)
-      ..setVolume(_volume)
-      ..setPlaybackSpeed(_speed); // ← применяем скорость
-
-    if (widget.index == widget.currentIndex) _internalController.play();
-
-    _loopTimer?.cancel();
-    _loopTimer = Timer.periodic(const Duration(milliseconds: 200), (_) {
-      final c = widget.videoController ?? _internalController;
-      if (_controllerReady(c)) {
-        final pos = c.value.position;
-        final dur = c.value.duration;
-        final start =
-            Duration(milliseconds: (dur.inMilliseconds * _loopStart).toInt());
-        final end =
-            Duration(milliseconds: (dur.inMilliseconds * _loopEnd).toInt());
-
-        if (pos >= end) {
-          c.seekTo(start);
-        }
+    // На macOS/desktop не считаем "inactive/hidden" поводом ставить видео на паузу —
+    // это часто просто потеря фокуса окна.
+    if (isMobile) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive ||
+          state == AppLifecycleState.hidden) {
+        _wasPlayingBeforeBackground = c.value.isPlaying;
+        c.pause();
+        return;
       }
-    });
 
-    setState(() {
-      _ownsController = true;
-      _isInitializing = false;
-    });
+      if (state == AppLifecycleState.resumed) {
+        // Возвращаем только если действительно играло до ухода
+        if (_isCurrent && _wasPlayingBeforeBackground) {
+          c.play();
+        }
+        return;
+      }
+    }
   }
 
-  // ─────────────────── UI ───────────────────────────────────────────────────
+  String _resolveVideoPath(Photo p) {
+    if (p.path.isNotEmpty && File(p.path).existsSync()) return p.path;
+
+    final byFileName = PhotoPathHelper().getFullPath(p.fileName);
+    if (File(byFileName).existsSync()) return byFileName;
+
+    return p.path;
+  }
+
+  void _start() {
+    if (!_isCurrent) return;
+    if (_c != null) return;
+
+    final resolved = _resolveVideoPath(widget.photo);
+    final file = File(resolved);
+
+    if (!file.existsSync()) {
+      setState(() {});
+      return;
+    }
+
+    final controller = VideoPlayerController.file(file);
+    _c = controller;
+    widget.onControllerChanged?.call(controller);
+
+    _init = controller.initialize().then((_) async {
+      if (!mounted) return;
+
+      await controller.setLooping(widget.looping);
+      await controller.setVolume(_volume);
+
+      // скорость применяем после init; на большинстве платформ ок.
+      // если на iOS будет “самоплей”, можно перенести setPlaybackSpeed в момент play.
+      await controller.setPlaybackSpeed(_speed);
+
+      if (widget.autoplay && _isCurrent) {
+        await controller.play();
+      }
+
+      if (mounted) setState(() {});
+    });
+
+    setState(() {});
+  }
+
+  void _stop() {
+    final c = _c;
+    _c = null;
+    _init = null;
+
+    if (c != null) {
+      if (c.value.isInitialized) {
+        c.pause();
+        c.setVolume(0.0);
+      }
+      c.dispose();
+    }
+
+    widget.onControllerChanged?.call(null);
+
+    if (mounted) setState(() {});
+  }
+
+  // ---------- helpers ----------
+  void _togglePlayPause(VideoPlayerController c) {
+    if (!c.value.isInitialized) return;
+    if (c.value.isPlaying) {
+      c.pause();
+    } else {
+      c.play();
+    }
+    setState(() {});
+  }
+
+  // тонкая “прогресс-полоска” вертикальная (volume/speed) тем же визуальным языком
+  Widget _verticalProgressBar({
+    required double value01, // 0..1
+    required ValueChanged<double> onChanged01,
+    required String label,
+  }) {
+    return SizedBox(
+      width: 24,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 24,
+            height: _vBarHeight,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) =>
+                  _handleVerticalDrag(d.localPosition, onChanged01),
+              onVerticalDragStart: (d) =>
+                  _handleVerticalDrag(d.localPosition, onChanged01),
+              onVerticalDragUpdate: (d) =>
+                  _handleVerticalDrag(d.localPosition, onChanged01),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final h = c.maxHeight;
+                  final w = c.maxWidth;
+
+                  final v = value01.clamp(0.0, 1.0);
+                  final fillH = h * v;
+
+                  return Stack(
+                    alignment: Alignment.bottomCenter,
+                    children: [
+                      // track (серый)
+                      Positioned(
+                        left: (w - _trackThickness) / 2,
+                        top: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: _trackThickness,
+                          decoration: BoxDecoration(
+                            color: _trackColor,
+                            borderRadius:
+                                BorderRadius.circular(_trackThickness / 2),
+                          ),
+                        ),
+                      ),
+
+                      // fill (красный) снизу вверх
+                      Positioned(
+                        left: (w - _trackThickness) / 2,
+                        bottom: 0,
+                        height: fillH,
+                        child: Container(
+                          width: _trackThickness,
+                          decoration: BoxDecoration(
+                            color: _fillColor,
+                            borderRadius:
+                                BorderRadius.circular(_trackThickness / 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+          SizedBox(
+            height: _vLabelHeight,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: true,
+                  overflow: TextOverflow.clip,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.white70,
+                    height: 1.0,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _handleVerticalDrag(
+    Offset localPos,
+    ValueChanged<double> onChanged01,
+  ) {
+    final double effectiveH = _vBarHeight;
+
+    final dy = localPos.dy.clamp(0.0, effectiveH);
+    final v = (1.0 - (dy / effectiveH)).clamp(0.0, 1.0);
+    onChanged01(v);
+  }
+
+  // ---------- UI ----------
   @override
   Widget build(BuildContext context) {
-    final controller = widget.videoController ?? _internalController;
+    if (!_isCurrent) return const SizedBox.expand();
 
-    if (widget.index != widget.currentIndex || !_controllerReady(controller)) {
+    final c = _c;
+    if (c == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final pos = controller.value.position;
-    final dur = controller.value.duration;
+    return FutureBuilder<void>(
+      future: _init,
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done ||
+            !c.value.isInitialized) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-    // фракция текущей позиции (0..1)
-    final double positionFrac = dur.inMilliseconds == 0
-        ? 0.0
-        : (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
+        final aspect = (c.value.aspectRatio == 0) ? 1.0 : c.value.aspectRatio;
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        // сам плеер -----------------------------------------------------------
-        Expanded(
-          child: FittedBox(
-            fit: BoxFit.cover,
-            child: SizedBox(
-              width: controller.value.size.width,
-              height: controller.value.size.height,
-              child: VideoPlayer(controller),
-            ),
-          ),
-        ),
-        if (widget.showTitle)
-          Padding(
-            padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
-            child: Text(
-              widget.photo.fileName,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-          ),
+        // speed -> нормируем к 0..1 для полоски (0.25..2.0)
+        final speed01 = ((_speed - 0.25) / (2.0 - 0.25)).clamp(0.0, 1.0);
 
-        // нижняя панель ------------------------------------------------------
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  // Text(_fmt(pos)),
-                  const SizedBox(width: 8),
+        final double panelHeight = _vBarHeight + _vLabelGap + _vLabelHeight;
 
-                  /// Видео-прогресс + loop в одном виджете
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (!widget.loopSliderHide)
-                          VideoLoopTimeline(
-                            position: positionFrac,
-                            loopStart: _loopStart,
-                            loopEnd: _loopEnd,
-                            onPositionChanged: (frac) {
-                              final c =
-                                  widget.videoController ?? _internalController;
-                              if (!_controllerReady(c)) return;
-                              final d = c.value.duration;
-                              if (d.inMilliseconds == 0) return;
-                              final targetMs =
-                                  (d.inMilliseconds * frac).round();
-                              c.seekTo(Duration(milliseconds: targetMs));
-                            },
-                            onLoopChanged: (range) {
-                              final c =
-                                  widget.videoController ?? _internalController;
-                              setState(() {
-                                final prevStart = _loopStart;
-                                _loopStart = range.start;
-                                _loopEnd = range.end;
-
-                                // если поменяли начало петли — сразу прыгаем туда
-                                if (_loopStart != prevStart &&
-                                    _controllerReady(c)) {
-                                  final d = c.value.duration;
-                                  if (d.inMilliseconds > 0) {
-                                    final startMs =
-                                        (d.inMilliseconds * _loopStart)
-                                            .round();
-                                    c.seekTo(
-                                        Duration(milliseconds: startMs));
-                                  }
-                                }
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  /// Регулятор скорости (0.1x..4x)
-                  if (!widget.hideSpeed)
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          height: 60,
-                          child: RotatedBox(
-                            quarterTurns: -1,
-                            child: Slider(
-                              min: 0.1,
-                              max: 4.0,
-                              divisions: 39, // шаг ~0.1x
-                              value: _speed,
-                              onChanged: (v) {
-                                setState(() {
-                                  _speed = double.parse(v.toStringAsFixed(2));
-                                  controller.setPlaybackSpeed(_speed);
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${_speed.toStringAsFixed(2)}x',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                  const SizedBox(width: 8),
-
-                  /// Громкость
-                  if (!widget.hideVolume)
-                    Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          height: 60,
-                          child: RotatedBox(
-                            quarterTurns: -1,
-                            child: Slider(
-                              min: 0.0,
-                              max: 1.0,
-                              divisions: 10,
-                              value: _volume,
-                              onChanged: (v) {
-                                setState(() {
-                                  _volume = v;
-                                  controller.setVolume(_volume);
-                                });
-                              },
-                            ),
-                          ),
-                        ),
-                        Text(
-                          '${(_volume * 100).round()}%',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  const SizedBox(width: 8),
-                  // Text(_fmt(dur)),
-                ],
+        return Column(
+          children: [
+            Expanded(
+              child: Center(
+                child: AspectRatio(
+                  aspectRatio: aspect,
+                  child: VideoPlayer(c),
+                ),
               ),
-            ],
-          ),
-        ),
+            ),
 
-        // play / pause -------------------------------------------------------
-        if (!widget.hidePlayPause)
-          IconButton(
-            icon:
-                Icon(controller.value.isPlaying ? Iconsax.pause : Iconsax.play),
-            onPressed: () => setState(() => controller.value.isPlaying
-                ? controller.pause()
-                : controller.play()),
-          ),
-      ],
+            // нижняя панель: play/pause + красная прогресс-полоса + вертикалки
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+              child: SizedBox(
+                height: panelHeight,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: SizedBox(
+                        width: 36,
+                        height: 18,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints.tightFor(
+                              width: 36, height: 36),
+                          iconSize: 22,
+                          splashRadius: 18,
+                          icon: Icon(
+                            c.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: Colors.white,
+                          ),
+                          onPressed: () => _togglePlayPause(c),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: VideoProgressIndicator(
+                          c,
+                          allowScrubbing: true,
+                          padding: const EdgeInsets.only(top: 6, bottom: 3),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Align(
+                    //   alignment: Alignment.bottomCenter,
+                    //   child: _verticalProgressBar(
+                    //     value01: speed01,
+                    //     onChanged01: (v01) {
+                    //       final newSpeed = 0.25 + v01 * (4.0 - 0.25);
+                    //       final rounded = (newSpeed * 100).round() / 100.0;
+                    //       setState(() => _speed = rounded);
+                    //       c.setPlaybackSpeed(_speed);
+                    //     },
+                    //     label: '${_speed.toStringAsFixed(1)}x',
+                    //   ),
+                    // ),
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: TriangleVolumeSlider(
+                          value: _volume.clamp(0.0, 1.0),
+                          onChanged: (v01) {
+                            setState(() => _volume = v01);
+                            c.setVolume(_volume);
+                          },
+                          width: 26,
+                          height: 10, // в 3 раза ниже
+                          hitHeight: 30, // удобная зона для тача/мыши
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

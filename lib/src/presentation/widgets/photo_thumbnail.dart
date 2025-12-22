@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:extended_image/extended_image.dart';
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
@@ -33,45 +32,108 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
 
   @override
   Widget build(BuildContext context) {
-    // Для видео используем videoPreview, для изображений fileName
-    final imagePath = widget.photo.mediaType == 'video' &&
-            widget.photo.videoPreview != null &&
-            widget.photo.videoPreview!.isNotEmpty
-        ? PhotoPathHelper().getFullPath(widget.photo.videoPreview!)
-        : PhotoPathHelper().getFullPath(widget.photo.fileName);
+    final isVideo = widget.photo.mediaType == 'video';
 
-    // Логирование для отладки
-    final file = File(imagePath);
-    if (file.existsSync()) {
-      final size = file.lengthSync();
-      print('Файл миниатюры существует: $imagePath, размер: $size байт');
-    } else {
-      print('Файл миниатюры НЕ существует: $imagePath');
-    }
+    // Видео превью: хранится как относительное имя (в photos/), собираем полный путь.
+    final String? previewPath = (isVideo &&
+            widget.photo.videoPreview != null &&
+            widget.photo.videoPreview!.isNotEmpty)
+        ? PhotoPathHelper().getFullPath(widget.photo.videoPreview!)
+        : null;
+
+    final bool hasPreview =
+        previewPath != null && File(previewPath).existsSync();
 
     Widget imageWidget;
-    if (widget.photo.mediaType == 'video') {
-      // Видео: показываем имя файла (+ размер, если есть) текстом
-      final title = widget.fileSizeLabel != null
-          ? '${widget.photo.fileName} • ${widget.fileSizeLabel}'
-          : widget.photo.fileName;
 
-      imageWidget = Container(
-        height: 100,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Text(
-          title,
-          style: const TextStyle(fontSize: 14, color: Colors.white70),
-          textAlign: TextAlign.center,
-          softWrap: true,
-          maxLines: 3,
-        ),
-      );
+    if (isVideo) {
+      if (hasPreview) {
+        // ✅ Видео: показываем превью-картинку
+        final previewFile = File(previewPath!);
+
+        final previewImage = widget.isPinterestLayout
+            ? ExtendedImage.file(
+                previewFile,
+                fit: BoxFit.cover,
+                cacheWidth: 240,
+                clearMemoryCacheIfFailed: true,
+                cacheRawData: true,
+              )
+            : ExtendedImage.file(
+                previewFile,
+                fit: BoxFit.cover,
+                width: double.infinity,
+                height: double.infinity,
+                cacheWidth: 240,
+                clearMemoryCacheIfFailed: true,
+                cacheRawData: true,
+              );
+
+        imageWidget = Stack(
+          fit: StackFit.expand,
+          children: [
+            previewImage,
+          ],
+        );
+      } else {
+        // ❌ Нет превью — fallback (оставим твой текстовый вариант + play)
+        final title = widget.fileSizeLabel != null
+            ? '${widget.photo.fileName} • ${widget.fileSizeLabel}'
+            : widget.photo.fileName;
+
+        imageWidget = Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              color: Colors.black.withOpacity(0.2),
+              child: Text(
+                title,
+                style: const TextStyle(fontSize: 14, color: Colors.white70),
+                textAlign: TextAlign.center,
+                softWrap: true,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+      }
+
+      // ✅ Накладываем duration (если есть) — справа снизу
+      if (widget.photo.videoDuration != null &&
+          widget.photo.videoDuration!.isNotEmpty) {
+        imageWidget = Stack(
+          fit: StackFit.expand,
+          children: [
+            imageWidget,
+            Positioned(
+              right: 6,
+              bottom: 6,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  widget.photo.videoDuration!,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
     } else {
       // Фото: ExtendedImage + оверлей размера, если есть
-      final imgFile =
-          File(PhotoPathHelper().getFullPath(widget.photo.fileName));
+      final imgFile = File(PhotoPathHelper().getFullPath(widget.photo.fileName));
 
       final baseImage = widget.isPinterestLayout
           ? ExtendedImage.file(
@@ -100,7 +162,8 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
               left: 6,
               bottom: 6,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.6),
                   borderRadius: BorderRadius.circular(6),
@@ -114,30 +177,6 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
                 ),
               ),
             ),
-        ],
-      );
-    }
-
-    // Если это видео и задана длительность, накладываем её поверх.
-    if (widget.photo.mediaType == 'video' &&
-        widget.photo.videoDuration != null &&
-        widget.photo.videoDuration!.isNotEmpty) {
-      imageWidget = Stack(
-        alignment: Alignment.center,
-        children: [
-          imageWidget,
-          Positioned(
-            bottom: 8,
-            right: 8,
-            child: Container(
-              padding: const EdgeInsets.all(0),
-              color: Colors.black.withOpacity(0.5),
-              child: Text(
-                widget.photo.videoDuration!,
-                style: const TextStyle(color: Colors.white, fontSize: 12),
-              ),
-            ),
-          ),
         ],
       );
     }
@@ -156,18 +195,15 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
       },
       child: Stack(
         children: [
-          // 1️⃣ изображение диктует высоту Masonry-ячейки
           imageWidget,
 
-          // 2️⃣ иконка удаления (если нужна)
           if (_showDeleteIcon)
-            Positioned(
+            const Positioned(
               top: 4,
               right: 4,
-              child: const Icon(Icons.delete, color: Colors.red),
+              child: Icon(Icons.delete, color: Colors.red),
             ),
 
-          // 3️⃣ рамка выбора, не влияющая на лайаут
           if (widget.isSelected)
             Positioned.fill(
               child: IgnorePointer(
