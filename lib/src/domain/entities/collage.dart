@@ -66,6 +66,12 @@ class CollageItem extends HiveObject {
   @HiveField(20)
   double? videoSpeed; // 0.1..4.0
 
+  @HiveField(21)
+  double contrast;
+
+  @HiveField(22)
+  double opacity;
+
   CollageItem({
     required this.fileName,
     required this.offsetX,
@@ -88,6 +94,8 @@ class CollageItem extends HiveObject {
     this.videoStartFrac,
     this.videoEndFrac,
     this.videoSpeed,
+    this.contrast = 1.0,
+    this.opacity = 1.0,
   });
 
   factory CollageItem.fromJson(Map<String, dynamic> json) => CollageItem(
@@ -118,6 +126,8 @@ class CollageItem extends HiveObject {
         videoSpeed: (json.containsKey('videoSpeed'))
             ? (json['videoSpeed'] as num?)?.toDouble()
             : null,
+        contrast: (json['contrast'] as num?)?.toDouble() ?? 1.0,
+        opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
       );
 
   Map<String, dynamic> toJson() => {
@@ -142,6 +152,8 @@ class CollageItem extends HiveObject {
         'videoStartFrac': videoStartFrac, // <-- new
         'videoEndFrac': videoEndFrac, // <-- new
         'videoSpeed': videoSpeed, // <-- new
+        'contrast': contrast,
+        'opacity': opacity,
       };
 }
 

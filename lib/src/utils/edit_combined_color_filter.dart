@@ -1,13 +1,14 @@
 import 'dart:math' as math;
 import 'dart:ui';
 
-/// Комбинируем яркость + насыщенность + контраст + hue
-  ColorFilter combinedColorFilter(
-    double brightness,
-    double saturation,
-    double temp,
-    double hue,
-  ) {
+/// Комбинируем яркость + насыщенность + контраст + temp + hue
+ColorFilter combinedColorFilter(
+  double brightness,
+  double saturation,
+  double contrast,
+  double temp,
+  double hue,
+) {
     // 1) Матрица яркости (brightness)
     final b = brightness;
     final brightnessMatrix = [
@@ -62,9 +63,19 @@ import 'dart:ui';
       0,
     ];
 
-    // 3) Матрица контраста (temperature)
+    // 3) Матрица контраста
+    final c = contrast;
+    final t = 128 * (1 - c);
+    final contrastMatrix = [
+      c, 0, 0, 0, t,
+      0, c, 0, 0, t,
+      0, 0, c, 0, t,
+      0, 0, 0, 1, 0,
+    ];
+
+    // 4) Матрица температуры
     // Если temp в диапазоне [-1..1],
-// то при temp>0 картинка теплеет, при temp<0 – холодеет.
+    // то при temp>0 картинка теплеет, при temp<0 – холодеет.
 
     final temperatureMatrix = [
       // R' = R + 2*temp
@@ -77,7 +88,7 @@ import 'dart:ui';
       0, 0, 0, 1, 0,
     ];
 
-    // 4) Матрица оттенка (hue)
+    // 5) Матрица оттенка (hue)
     final cosA = math.cos(hue);
     final sinA = math.sin(hue);
     // Пример поворота матрицы для hue
@@ -123,19 +134,24 @@ import 'dart:ui';
       return out;
     }
 
-    // Последовательно умножаем: brightness -> saturation -> temp -> hue
+    // Последовательно умножаем: brightness -> contrast -> saturation -> temp -> hue
     final m1 = multiply(
       brightnessMatrix.map((e) => e.toDouble()).toList(),
-      saturationMatrix.map((e) => e.toDouble()).toList(),
+      contrastMatrix.map((e) => e.toDouble()).toList(),
     );
     final m2 = multiply(
       m1.map((e) => e.toDouble()).toList(),
-      temperatureMatrix.map((e) => e.toDouble()).toList(),
+      saturationMatrix.map((e) => e.toDouble()).toList(),
     );
     final m3 = multiply(
       m2.map((e) => e.toDouble()).toList(),
+      temperatureMatrix.map((e) => e.toDouble()).toList(),
+    );
+
+    final m4 = multiply(
+      m3.map((e) => e.toDouble()).toList(),
       hueMatrix.map((e) => e.toDouble()).toList(),
     );
 
-    return ColorFilter.matrix(m3);
+    return ColorFilter.matrix(m4);
   }

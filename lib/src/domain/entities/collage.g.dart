@@ -38,13 +38,15 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       videoStartFrac: fields[18] as double?,
       videoEndFrac: fields[19] as double?,
       videoSpeed: fields[20] as double?,
+      contrast: (fields[21] as double?) ?? 1.0,
+      opacity: (fields[22] as double?) ?? 1.0,
     );
   }
 
   @override
   void write(BinaryWriter writer, CollageItem obj) {
     writer
-      ..writeByte(21)
+      ..writeByte(23)
       ..writeByte(0)
       ..write(obj.fileName)
       ..writeByte(1)
@@ -86,7 +88,11 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       ..writeByte(19)
       ..write(obj.videoEndFrac)
       ..writeByte(20)
-      ..write(obj.videoSpeed);
+      ..write(obj.videoSpeed)
+      ..writeByte(21)
+      ..write(obj.contrast)
+      ..writeByte(22)
+      ..write(obj.opacity);
   }
 
   @override

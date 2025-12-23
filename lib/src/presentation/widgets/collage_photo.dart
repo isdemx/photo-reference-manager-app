@@ -96,6 +96,12 @@ class CollagePhotoState {
   /// Температура (условно -5..5)
   double temp;
 
+  /// Контраст (0..2), по умолчанию 1
+  double contrast;
+
+  /// Прозрачность (0..1), по умолчанию 1
+  double opacity;
+
   /// Контекст выбора из PhotoPickerWidget
   String? pickContextId;
   int? pickContextIndex;
@@ -115,6 +121,8 @@ class CollagePhotoState {
     this.saturation = 1.0,
     this.temp = 0.0,
     this.hue = 0.0,
+    this.contrast = 1.0,
+    this.opacity = 1.0,
     this.flipX = false,
     this.pickContextId,
     this.pickContextIndex,
@@ -360,6 +368,8 @@ class CollagePersistService {
         saturation: it.saturation,
         temp: it.temp,
         hue: it.hue,
+        contrast: it.contrast,
+        opacity: it.opacity,
         cropRectLeft: it.cropRect.left,
         cropRectTop: it.cropRect.top,
         cropRectRight: it.cropRect.right,
@@ -785,6 +795,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         saturation: src.saturation,
         temp: src.temp,
         hue: src.hue,
+        contrast: src.contrast,
+        opacity: src.opacity,
         cropRect: Rect.fromLTRB(
           src.cropRectLeft,
           src.cropRectTop,
@@ -920,6 +932,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       saturation: 1.0,
       temp: 0.0,
       hue: 0.0,
+      contrast: 1.0,
+      opacity: 1.0,
       flipX: false,
     );
   }
@@ -1994,7 +2008,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, c) {
-                  final twoCols = c.maxWidth > 640;
+                  final columns = c.maxWidth > 900 ? 3 : 2;
 
                   final sliders = [
                     MiniSlider(
@@ -2035,9 +2049,29 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                           '${(v * 180 / math.pi).toStringAsFixed(0)}°',
                       onChanged: (v) => setState(() => item.hue = v),
                     ),
+                    MiniSlider(
+                      label: 'Cnt',
+                      value: item.contrast,
+                      min: 0.0,
+                      max: 2.0,
+                      divisions: 20,
+                      centerValue: 1.0,
+                      format: (v) => '${v.toStringAsFixed(2)}x',
+                      onChanged: (v) => setState(() => item.contrast = v),
+                    ),
+                    MiniSlider(
+                      label: 'Op',
+                      value: item.opacity,
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 20,
+                      centerValue: 1.0,
+                      format: (v) => '${(v * 100).round()}%',
+                      onChanged: (v) => setState(() => item.opacity = v),
+                    ),
                   ];
 
-                  if (!twoCols) {
+                  if (columns == 2) {
                     return Wrap(
                       spacing: 12,
                       runSpacing: 6,
@@ -2048,7 +2082,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     );
                   }
 
-                  final colW = (c.maxWidth - 12) / 2;
+                  final colW = (c.maxWidth - 24) / 3;
                   return Row(
                     children: [
                       SizedBox(
@@ -2069,6 +2103,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                             sliders[2],
                             const SizedBox(height: 6),
                             sliders[3],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SizedBox(
+                        width: colW,
+                        child: Column(
+                          children: [
+                            sliders[4],
+                            const SizedBox(height: 6),
+                            sliders[5],
                           ],
                         ),
                       ),
@@ -2241,6 +2286,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final filter = combinedColorFilter(
       item.brightness,
       item.saturation,
+      item.contrast,
       item.temp,
       item.hue,
     );
@@ -2262,58 +2308,62 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             heightFactor: item.cropRect.height,
             child: Transform.translate(
               offset: Offset(-cropLeft, -cropTop) + item.internalOffset,
-              child: ColorFiltered(
-                colorFilter: filter,
-                child: SizedBox(
-                  width: effectiveWidth,
-                  height: effectiveHeight,
-                  child: isVideo
-                      ? MouseRegion(
-                          onEnter: (_) =>
-                              setState(() => _videoHover[item.id] = true),
-                          onExit: (_) =>
-                              setState(() => _videoHover[item.id] = false),
-                          child: VideoSurface(
-                            key: ValueKey(
-                                'vs-${item.id}-${(uiState?.duration.inMilliseconds ?? 0)}'),
-                            filePath: fullPath,
-                            startTime: fracToTime(
-                                uiState?.duration ?? Duration.zero,
-                                uiState?.startFrac ?? 0.0),
-                            endTime: (uiState == null ||
-                                    uiState.duration == Duration.zero)
-                                ? null
-                                : fracToTime(uiState.duration, uiState.endFrac),
-                            volume: uiState?.volume ?? 0.0,
-                            speed: uiState?.speed ?? 1.0,
-                            autoplay: uiState != null &&
-                                uiState.duration != Duration.zero,
-                            onDuration: (d) {
-                              final ui = _videoStates[item.id];
-                              if (ui == null) return;
-                              setState(() => ui.duration = d);
-                            },
-                            onPosition: (p) {
-                              final ui = _videoStates[item.id];
-                              if (ui == null) return;
-                              setState(() =>
-                                  ui.posFrac = timeToFrac(ui.duration, p));
-                            },
-                            externalPositionFrac: uiState?.posFrac ?? 0.0,
-                            externalSeekId: uiState?.seekRequestId ?? 0,
-                            onControllerReady: (c) {
-                              final ui = _videoStates[item.id];
-                              if (ui == null) return;
-                              setState(() => ui.controller = c);
-                            },
+              child: Opacity(
+                opacity: item.opacity.clamp(0.0, 1.0),
+                child: ColorFiltered(
+                  colorFilter: filter,
+                  child: SizedBox(
+                    width: effectiveWidth,
+                    height: effectiveHeight,
+                    child: isVideo
+                        ? MouseRegion(
+                            onEnter: (_) =>
+                                setState(() => _videoHover[item.id] = true),
+                            onExit: (_) =>
+                                setState(() => _videoHover[item.id] = false),
+                            child: VideoSurface(
+                              key: ValueKey(
+                                  'vs-${item.id}-${(uiState?.duration.inMilliseconds ?? 0)}'),
+                              filePath: fullPath,
+                              startTime: fracToTime(
+                                  uiState?.duration ?? Duration.zero,
+                                  uiState?.startFrac ?? 0.0),
+                              endTime: (uiState == null ||
+                                      uiState.duration == Duration.zero)
+                                  ? null
+                                  : fracToTime(
+                                      uiState.duration, uiState.endFrac),
+                              volume: uiState?.volume ?? 0.0,
+                              speed: uiState?.speed ?? 1.0,
+                              autoplay: uiState != null &&
+                                  uiState.duration != Duration.zero,
+                              onDuration: (d) {
+                                final ui = _videoStates[item.id];
+                                if (ui == null) return;
+                                setState(() => ui.duration = d);
+                              },
+                              onPosition: (p) {
+                                final ui = _videoStates[item.id];
+                                if (ui == null) return;
+                                setState(() =>
+                                    ui.posFrac = timeToFrac(ui.duration, p));
+                              },
+                              externalPositionFrac: uiState?.posFrac ?? 0.0,
+                              externalSeekId: uiState?.seekRequestId ?? 0,
+                              onControllerReady: (c) {
+                                final ui = _videoStates[item.id];
+                                if (ui == null) return;
+                                setState(() => ui.controller = c);
+                              },
+                            ),
+                          )
+                        : Image.file(
+                            File(fullPath),
+                            width: effectiveWidth,
+                            height: effectiveHeight,
+                            fit: BoxFit.cover,
                           ),
-                        )
-                      : Image.file(
-                          File(fullPath),
-                          width: effectiveWidth,
-                          height: effectiveHeight,
-                          fit: BoxFit.cover,
-                        ),
+                  ),
                 ),
               ),
             ),
