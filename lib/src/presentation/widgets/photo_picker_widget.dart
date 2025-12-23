@@ -18,6 +18,28 @@ import 'package:photographers_reference_app/src/presentation/widgets/video_view.
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 import 'package:uuid/uuid.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_surface_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
+
+class _VideoThumbUi {
+  double startFrac;
+  double endFrac;
+  double posFrac;
+  double volume;
+  double speed;
+  Duration duration;
+  int seekRequestId;
+
+  _VideoThumbUi({
+    this.startFrac = 0.0,
+    this.endFrac = 1.0,
+    this.posFrac = 0.0,
+    this.volume = 0.0,
+    this.speed = 1.0,
+    this.duration = Duration.zero,
+    this.seekRequestId = 0,
+  });
+}
 
 class PhotoPickResult {
   final Photo photo;
@@ -59,6 +81,9 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
 
   bool _multiSelect = false;
   final List<Photo> _selectedPhotos = [];
+  final Map<String, _VideoThumbUi> _videoThumbStates = <String, _VideoThumbUi>{};
+  final Map<String, bool> _videoHover = <String, bool>{};
+  final Map<String, bool> _controlsHover = <String, bool>{};
 
   /// Состояние панели фильтров (по умолчанию открыта)
   bool _filtersOpen = true;
@@ -99,9 +124,83 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
 
                 return Scaffold(
                   appBar: AppBar(
-                    title: Text(_multiSelect
-                        ? 'Selected: ${_selectedPhotos.length}'
-                        : 'Choose photo (${photos.length})'),
+                    title: GestureDetector(
+                      onTap: () =>
+                          setState(() => _filtersOpen = !_filtersOpen),
+                      child: Wrap(
+                        spacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          const Icon(Icons.filter_list,
+                              color: Colors.white70, size: 18),
+                          Text(
+                            'Filters',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodyMedium
+                                ?.copyWith(color: Colors.white),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _filtersOpen ? 'Hide' : 'Show',
+                              style: const TextStyle(
+                                  color: Colors.white70, fontSize: 11),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: ToggleButtons(
+                              isSelected: [_tagLogicAnd == false, _tagLogicAnd],
+                              onPressed: (index) {
+                                setState(() => _tagLogicAnd = index == 1);
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              borderColor: Colors.transparent,
+                              selectedBorderColor: Colors.transparent,
+                              fillColor: Colors.blueGrey.shade700,
+                              color: Colors.white70,
+                              selectedColor: Colors.white,
+                              constraints: const BoxConstraints(
+                                minHeight: 24,
+                                minWidth: 36,
+                              ),
+                              children: const [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text('OR', style: TextStyle(fontSize: 11)),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 8),
+                                  child: Text('AND', style: TextStyle(fontSize: 11)),
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () =>
+                                setState(() => _selectedTagIds.clear()),
+                            icon: const Icon(Icons.clear,
+                                size: 14, color: Colors.white70),
+                            label: const Text(
+                              'Clear',
+                              style:
+                                  TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     actions: _multiSelect
                         ? [
                             IconButton(
@@ -144,11 +243,6 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                   body: Column(
                     children: [
                       // ------------------ панель фильтра (сворачиваемая) ----------------
-                      _FiltersHeader(
-                        open: _filtersOpen,
-                        onToggle: () =>
-                            setState(() => _filtersOpen = !_filtersOpen),
-                      ),
                       AnimatedSize(
                         duration: const Duration(milliseconds: 200),
                         curve: Curves.easeOutCubic,
@@ -208,21 +302,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
 
                                 Widget media;
                                 if (p.mediaType == 'video') {
-                                  if (p.videoPreview != null) {
-                                    final previewPath = PhotoPathHelper()
-                                        .getFullPath(p.videoPreview!);
-                                    media = Image.file(
-                                      File(previewPath),
-                                      fit: BoxFit.cover,
-                                    );
-                                  } else {
-                                    media = const Center(
-                                      child: Icon(
-                                        Icons.videocam,
-                                        color: Colors.white70,
-                                      ),
-                                    );
-                                  }
+                                  media = _buildVideoThumb(p);
                                 } else {
                                   media =
                                       Image.file(File(path), fit: BoxFit.cover);
@@ -239,27 +319,27 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                         child: media,
                                       ),
 
-                                      // подпись файла на видео
-                                      if (p.mediaType == 'video')
-                                        Positioned(
-                                          left: 0,
-                                          right: 0,
-                                          bottom:
-                                              28, // оставили место под Tag кнопку
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                vertical: 2, horizontal: 4),
-                                            color: Colors.black45,
-                                            child: Text(
-                                              p.fileName,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 11),
-                                              textAlign: TextAlign.center,
-                                            ),
-                                          ),
-                                        ),
+                                      // // подпись файла на видео
+                                      // if (p.mediaType == 'video')
+                                      //   Positioned(
+                                      //     left: 0,
+                                      //     right: 0,
+                                      //     bottom: 0,
+                                      //     child: Container(
+                                      //       padding: const EdgeInsets.symmetric(
+                                      //           vertical: 2, horizontal: 4)
+                                      //         .copyWith(left: 34),
+                                      //       color: Colors.black45,
+                                      //       child: Text(
+                                      //         p.fileName,
+                                      //         overflow: TextOverflow.ellipsis,
+                                      //         style: const TextStyle(
+                                      //             color: Colors.white,
+                                      //             fontSize: 11),
+                                      //         textAlign: TextAlign.left,
+                                      //       ),
+                                      //     ),
+                                      //   ),
 
                                       // кнопка "Tag" снизу слева
                                       Positioned(
@@ -316,7 +396,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                 child: Center(
                                   child: ConstrainedBox(
                                     constraints: const BoxConstraints(
-                                      maxWidth: 540,
+                                      maxWidth: 500,
                                     ),
                                     child: _GridSizeSlider(
                                       value: _gridColumnsSlider,
@@ -372,6 +452,134 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
     return photos;
   }
 
+  _VideoThumbUi _ensureVideoUi(Photo photo) {
+    return _videoThumbStates.putIfAbsent(photo.fileName, () => _VideoThumbUi());
+  }
+
+  Duration _fracToTime(Duration total, double f) {
+    if (total == Duration.zero) return Duration.zero;
+    final ms = (total.inMilliseconds * f.clamp(0.0, 1.0)).round();
+    return Duration(milliseconds: ms);
+  }
+
+  double _timeToFrac(Duration total, Duration t) {
+    if (total == Duration.zero) return 0.0;
+    return (t.inMilliseconds / total.inMilliseconds).clamp(0.0, 1.0);
+  }
+
+  Widget _buildVideoThumb(Photo photo) {
+    final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
+    final ui = _ensureVideoUi(photo);
+    final visible = (_videoHover[photo.fileName] == true) ||
+        (_controlsHover[photo.fileName] == true);
+
+    Widget preview;
+    if (photo.videoPreview != null) {
+      final previewPath = PhotoPathHelper().getFullPath(photo.videoPreview!);
+      preview = Image.file(File(previewPath), fit: BoxFit.cover);
+    } else {
+      preview = const Center(
+        child: Icon(Icons.videocam, color: Colors.white70),
+      );
+    }
+
+    if (!File(fullPath).existsSync()) {
+      return preview;
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _videoHover[photo.fileName] = true),
+      onExit: (_) {
+        setState(() {
+          _videoHover[photo.fileName] = false;
+          _controlsHover[photo.fileName] = false;
+        });
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: preview),
+          if (_videoHover[photo.fileName] == true)
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: true,
+                child: VideoSurface(
+                  key: ValueKey(
+                      'picker-vs-${photo.fileName}-${ui.duration.inMilliseconds}'),
+                  filePath: fullPath,
+                  startTime: _fracToTime(ui.duration, ui.startFrac),
+                  endTime: ui.duration == Duration.zero
+                      ? null
+                      : _fracToTime(ui.duration, ui.endFrac),
+                  volume: ui.volume,
+                  speed: ui.speed,
+                  autoplay: true,
+                  onDuration: (d) {
+                    setState(() => ui.duration = d);
+                  },
+                  onPosition: (p) {
+                    setState(() => ui.posFrac = _timeToFrac(ui.duration, p));
+                  },
+                  externalPositionFrac: ui.posFrac,
+                  externalSeekId: ui.seekRequestId,
+                ),
+              ),
+            ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: MouseRegion(
+              onEnter: (_) =>
+                  setState(() => _controlsHover[photo.fileName] = true),
+              onExit: (_) =>
+                  setState(() => _controlsHover[photo.fileName] = false),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 150),
+                opacity: visible ? 1.0 : 0.0,
+                child: IgnorePointer(
+                  ignoring: !visible,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6)
+                        .copyWith(left: 34),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black45, Colors.transparent],
+                      ),
+                    ),
+                    child: VideoControls(
+                      startFrac: ui.startFrac,
+                      endFrac: ui.endFrac,
+                      positionFrac: ui.posFrac,
+                      volume: ui.volume,
+                      speed: ui.speed,
+                      onSeekFrac: (f) => setState(() {
+                        ui.posFrac = f.clamp(0.0, 1.0);
+                        ui.seekRequestId++;
+                      }),
+                      onChangeRange: (rv) => setState(() {
+                        ui.startFrac = rv.start;
+                        ui.endFrac = rv.end;
+                      }),
+                      onChangeVolume: (v) => setState(() => ui.volume = v),
+                      onChangeSpeed: (s) => setState(() => ui.speed = s),
+                      totalDuration: ui.duration,
+                      showLoopRange: false,
+                      showVolume: false,
+                      showSpeed: false,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onTap(Photo p, List<Photo> context) {
     if (_multiSelect) {
       _toggle(p);
@@ -412,6 +620,11 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
       _multiSelect = false;
       _selectedPhotos.clear();
     });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }
 
@@ -517,35 +730,49 @@ class _GridSizeSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.black.withOpacity(0.72),
-      elevation: 4,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.grid_on, color: Colors.white70, size: 18),
-            const SizedBox(width: 8),
-            Text(
-              'Columns: ${value.round()}',
-              style: const TextStyle(color: Colors.white, fontSize: 12),
+    final sliderTheme = SliderTheme.of(context).copyWith(
+      trackHeight: 4,
+      activeTrackColor: Colors.redAccent,
+      inactiveTrackColor: Colors.white,
+      thumbColor: Colors.transparent,
+      overlayColor: Colors.transparent,
+      thumbShape: SliderComponentShape.noThumb,
+      overlayShape: SliderComponentShape.noOverlay,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.35),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Cols ${value.round()}',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
             ),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 220,
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            width: 160,
+            child: SliderTheme(
+              data: sliderTheme,
               child: Slider(
                 value: value,
                 min: 2,
                 max: 8,
                 divisions: 6,
-                label: value.round().toString(),
                 onChanged: onChanged,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -626,47 +853,6 @@ class _FilterPanel extends StatelessWidget {
                   ),
                 ],
                 onChanged: onFolderChanged,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-
-        // --- Tag logic & clear
-        Row(
-          children: [
-            const Text('Tags:', style: TextStyle(color: Colors.white)),
-            const SizedBox(width: 8),
-            ChoiceChip(
-              label: const Text('OR'),
-              selected: !tagLogicAnd,
-              onSelected: (_) => onToggleLogic(),
-              selectedColor: Colors.blueGrey.shade700,
-              labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
-              visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              labelPadding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-            ),
-            const SizedBox(width: 6),
-            ChoiceChip(
-              label: const Text('AND'),
-              selected: tagLogicAnd,
-              onSelected: (_) => onToggleLogic(),
-              selectedColor: Colors.blueGrey.shade700,
-              labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
-              visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              labelPadding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: onClearAllTags,
-              icon: const Icon(Icons.clear, size: 16, color: Colors.white70),
-              label: const Text(
-                'Clear',
-                style: TextStyle(color: Colors.white70),
               ),
             ),
           ],

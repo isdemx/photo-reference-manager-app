@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:ui';
+import 'dart:io';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart'; // <- здесь живёт DartPluginRegistrant
 import 'package:hive_flutter/hive_flutter.dart';
@@ -11,6 +13,7 @@ import 'package:path/path.dart' as p;
 import 'package:photographers_reference_app/backup.service.dart';
 // desktop_multi_window не обязателен здесь, но пускай остаётся — окно создаётся из сервиса
 import 'package:desktop_multi_window/desktop_multi_window.dart';
+import 'package:window_manager/window_manager.dart';
 
 // ==== DATA / DOMAIN ====
 import 'package:photographers_reference_app/src/data/repositories/category_repository_impl.dart';
@@ -67,6 +70,12 @@ void main(List<String> args) async {
   final Map<String, dynamic> initialArgs = _safeDecode(payload);
 
   // Без window_manager в дочерних окнах
+  final bool isChildWindow = ((initialArgs['route'] as String?) ?? '').isNotEmpty;
+  if (!kIsWeb &&
+      (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
+      !isChildWindow) {
+    await windowManager.ensureInitialized();
+  }
 
   runZonedGuarded(() async {
     // 1) Hive init

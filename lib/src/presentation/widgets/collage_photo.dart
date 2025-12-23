@@ -20,6 +20,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
+import 'package:window_manager/window_manager.dart';
 
 // --- твои доменные/проектные импорты ---
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
@@ -593,6 +594,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   // --- UI ---
   Color _backgroundColor = Colors.black;
   bool _isFullscreen = false;
+  bool _wasMaximizedBeforeFullscreen = false;
 
   bool _showTutorial = false;
   bool _showForInitDeleteIcon = true;
@@ -994,10 +996,30 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   // UI actions
   // ----------------------------
 
-  void _toggleFullscreen() {
+  Future<void> _toggleFullscreen() async {
+    final next = !_isFullscreen;
     setState(() {
-      _isFullscreen = !_isFullscreen;
+      _isFullscreen = next;
     });
+    if (!Platform.isMacOS) return;
+    try {
+      if (next) {
+        _wasMaximizedBeforeFullscreen = await windowManager.isMaximized();
+        await windowManager.setTitleBarStyle(
+          TitleBarStyle.hidden,
+          windowButtonVisibility: false,
+        );
+        await windowManager.maximize();
+      } else {
+        await windowManager.setTitleBarStyle(
+          TitleBarStyle.normal,
+          windowButtonVisibility: true,
+        );
+        if (!_wasMaximizedBeforeFullscreen) {
+          await windowManager.unmaximize();
+        }
+      }
+    } catch (_) {}
   }
 
   void _showHelp() {
@@ -1020,12 +1042,104 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         return AlertDialog(
           title: const Text('Pick Background Color'),
           content: SingleChildScrollView(
-            child: BlockPicker(
-              pickerColor: tempColor,
-              onColorChanged: (c) {
-                tempColor = c;
-                setState(() => _backgroundColor = tempColor);
-              },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                BlockPicker(
+                  pickerColor: tempColor,
+                  availableColors: const [
+                    Colors.white,
+                    Colors.black,
+                    Color(0xFF111111),
+                    Colors.grey,
+                    Colors.blueGrey,
+                    Colors.brown,
+                    Colors.red,
+                    Colors.redAccent,
+                    Colors.pink,
+                    Colors.purple,
+                    Colors.indigo,
+                    Colors.blue,
+                    Colors.lightBlue,
+                    Colors.cyan,
+                    Colors.teal,
+                    Colors.green,
+                    Colors.lightGreen,
+                    Colors.lime,
+                    Colors.yellow,
+                    Colors.amber,
+                    Colors.orange,
+                    Colors.deepOrange,
+                  ],
+                  layoutBuilder: (context, colors, child) {
+                    return SizedBox(
+                      width: 260,
+                      height: 150,
+                      child: GridView.count(
+                        crossAxisCount: 8,
+                        crossAxisSpacing: 3,
+                        mainAxisSpacing: 3,
+                        children: [for (final c in colors) child(c)],
+                      ),
+                    );
+                  },
+                  itemBuilder: (color, isCurrentColor, changeColor) {
+                    final isLight = color.computeLuminance() > 0.7;
+                    return Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: color,
+                            border: Border.all(
+                              color: isLight ? Colors.black12 : Colors.white12,
+                              width: 1,
+                            ),
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: changeColor,
+                              customBorder: const CircleBorder(),
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: isCurrentColor ? 1 : 0,
+                                child: Icon(
+                                  Icons.check,
+                                  color: isLight ? Colors.black : Colors.white,
+                                  size: 10,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  onColorChanged: (c) {
+                    tempColor = c;
+                    setState(() => _backgroundColor = tempColor);
+                  },
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: 260,
+                  child: HueRingPicker(
+                    pickerColor: tempColor,
+                    onColorChanged: (c) {
+                      tempColor = c;
+                      setState(() => _backgroundColor = tempColor);
+                    },
+                    colorPickerHeight: 140,
+                    hueRingStrokeWidth: 14,
+                    enableAlpha: false,
+                    displayThumbColor: false,
+                    portraitOnly: true,
+                  ),
+                ),
+              ],
             ),
           ),
           actions: [
@@ -1055,22 +1169,29 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         return FractionallySizedBox(
           widthFactor: 1,
           heightFactor: 1,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: Colors.black,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-            ),
-            child: PhotoPickerWidget(
-              onPhotoSelected: (result) {
-                Navigator.pop(context);
-                _addPickedToCollage(result);
-              },
-              onMultiSelectDone: (List<PhotoPickResult> list) {
-                Navigator.pop(context);
-                for (final result in list) {
-                  _addPickedToCollage(result);
-                }
-              },
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: 1000,
+              ),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                ),
+                child: PhotoPickerWidget(
+                  onPhotoSelected: (result) {
+                    Navigator.pop(context);
+                    _addPickedToCollage(result);
+                  },
+                  onMultiSelectDone: (List<PhotoPickResult> list) {
+                    Navigator.pop(context);
+                    for (final result in list) {
+                      _addPickedToCollage(result);
+                    }
+                  },
+                ),
+              ),
             ),
           ),
         );
@@ -1349,6 +1470,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               return KeyEventResult.handled;
             }
           }
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyF) {
+          _toggleFullscreen();
+          return KeyEventResult.handled;
         }
 
         final shift = HardwareKeyboard.instance.isShiftPressed;
@@ -1821,6 +1947,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             );
           },
         ),
+        const SizedBox(width: 6),
+        IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          tooltip: 'Toggle Fullscreen',
+          icon: const Icon(Icons.fullscreen, color: Colors.white, shadows: iconShadow),
+          onPressed: _toggleFullscreen,
+        ),
       ],
     );
   }
@@ -2034,7 +2171,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
                   final base = item.baseScaleOnGesture ?? item.scale;
                   final nextScale = base * details.scale;
-                  item.scale = nextScale.clamp(0.05, 10.0);
+                  item.scale = math.max(0.001, nextScale);
                   return;
                 }
 
