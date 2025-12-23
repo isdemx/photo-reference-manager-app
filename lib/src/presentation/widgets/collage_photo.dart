@@ -1395,36 +1395,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           }
         },
         child: Scaffold(
-          appBar: !_isFullscreen
-              ? AppBar(
-                  title: Text(
-                      '${widget.initialCollage?.title ?? "Collage"} (${_items.length} images)'),
-                  actions: [
-                    IconButton(
-                      tooltip: 'Help / Info',
-                      icon: const Icon(Icons.info_outline),
-                      onPressed: _showHelp,
-                    ),
-                    IconButton(
-                      tooltip: 'Toggle Fullscreen',
-                      icon: const Icon(Icons.fullscreen_exit,
-                          color: Colors.white),
-                      onPressed: _toggleFullscreen,
-                    ),
-                    IconButton(
-                      tooltip: 'Open New Window',
-                      icon: const Icon(Icons.window, color: Colors.white),
-                      onPressed: () {
-                        WindowService.openWindow(
-                          route: '/my_collages',
-                          args: {},
-                          title: 'Refma — Collage',
-                        );
-                      },
-                    ),
-                  ],
-                )
-              : null,
           body: Stack(
             children: [
               Column(
@@ -1598,6 +1568,24 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     onPressed: _toggleFullscreen,
                   ),
                 ),
+              if (!_isFullscreen) ...[
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _buildFloatingHeader(),
+                  ),
+                ),
+                Positioned(
+                  right: 12,
+                  top: 12,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _buildTopRightActions(),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1750,6 +1738,88 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           icon: const Icon(Icons.close, color: Colors.red, shadows: iconShadow),
           tooltip: 'Cancel collage',
           onPressed: () => Navigator.pop(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFloatingHeader() {
+    const textShadow = [
+      Shadow(
+        color: Colors.black54,
+        blurRadius: 6,
+        offset: Offset(0, 2),
+      ),
+    ];
+
+    final title =
+        '${widget.initialCollage?.title ?? "Collage"} (${_items.length} images)';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Icons.arrow_back, color: Colors.white, shadows: textShadow),
+          tooltip: 'Back',
+          onPressed: () => Navigator.pop(context),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            shadows: textShadow,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopRightActions() {
+    const iconShadow = [
+      Shadow(
+        color: Colors.black54,
+        blurRadius: 6,
+        offset: Offset(0, 2),
+      ),
+    ];
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          tooltip: 'Help / Info',
+          icon: const Icon(Icons.info_outline, color: Colors.white, shadows: iconShadow),
+          onPressed: _showHelp,
+        ),
+        const SizedBox(width: 6),
+        IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          tooltip: 'Open New Window',
+          icon: const Icon(Icons.window, color: Colors.white, shadows: iconShadow),
+          onPressed: () {
+            WindowService.openWindow(
+              route: '/my_collages',
+              args: {},
+              title: 'Refma — Collage',
+            );
+          },
         ),
       ],
     );
