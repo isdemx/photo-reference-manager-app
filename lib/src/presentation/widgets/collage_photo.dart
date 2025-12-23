@@ -1458,6 +1458,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         })
         .toList(growable: false);
 
+    final rotationOverlays = sorted
+        .where((it) => it.isEditing)
+        .map(_buildRotationSliderViewportOverlay)
+        .toList(growable: false);
+
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
@@ -1602,6 +1607,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                   ),
                                 ),
                                 ...videoOverlays,
+                                ...rotationOverlays,
                                 if (!isSomePhotoInEditMode &&
                                     (_showForInitDeleteIcon ||
                                         _draggingIndex != null))
@@ -2382,6 +2388,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  double _rotationToSliderValue(double rotation) {
+    const min = -math.pi / 2;
+    const max = math.pi / 2;
+    return rotation.clamp(min, max);
+  }
+
   Rect _getItemScreenRect(CollagePhotoState item) {
     final w = item.baseWidth * item.scale;
     final h = item.baseHeight * item.scale;
@@ -2472,6 +2484,24 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  Widget _buildRotationSliderViewportOverlay(CollagePhotoState item) {
+    final rect = _getItemScreenRect(item);
+    if (rect.isEmpty) return const SizedBox.shrink();
+
+    final sliderWidth = (rect.width * 0.9).clamp(80.0, 160.0);
+
+    return Positioned(
+      left: rect.left + (rect.width - sliderWidth) / 2,
+      top: rect.bottom + 6,
+      width: sliderWidth,
+      child: _RotationSlider(
+        width: sliderWidth,
+        value: _rotationToSliderValue(item.rotation),
+        onChanged: (v) => setState(() => item.rotation = v),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _transformationController.removeListener(_handleTransformChanged);
@@ -2504,6 +2534,96 @@ class _CropBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _RotationSlider extends StatefulWidget {
+  static const double _min = -math.pi / 2;
+  static const double _max = math.pi / 2;
+
+  final double value;
+  final double width;
+  final ValueChanged<double> onChanged;
+
+  const _RotationSlider({
+    super.key,
+    required this.width,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  State<_RotationSlider> createState() => _RotationSliderState();
+}
+
+class _RotationSliderState extends State<_RotationSlider> {
+  bool _isDragging = false;
+  double _lastValue = 0.0;
+
+  @override
+  void didUpdateWidget(covariant _RotationSlider oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _lastValue = widget.value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sliderTheme = SliderTheme.of(context).copyWith(
+      trackHeight: 2,
+      activeTrackColor: Colors.white,
+      inactiveTrackColor: Colors.white,
+      thumbColor: Colors.white70,
+      overlayColor: Colors.transparent,
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
+      overlayShape: SliderComponentShape.noOverlay,
+    );
+
+    final angleDeg = (_lastValue * 180 / math.pi).round();
+
+    return SizedBox(
+      width: widget.width,
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.center,
+        children: [
+          if (_isDragging)
+            Positioned(
+              top: -16,
+              child: Text(
+                '$angleDeg°',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: SliderTheme(
+              data: sliderTheme,
+              child: Slider(
+                min: _RotationSlider._min,
+                max: _RotationSlider._max,
+                value: widget.value
+                    .clamp(_RotationSlider._min, _RotationSlider._max),
+                onChangeStart: (v) =>
+                    setState(() => _isDragging = true),
+                onChangeEnd: (v) => setState(() => _isDragging = false),
+                onChanged: (v) {
+                  setState(() => _lastValue = v);
+                  widget.onChanged(v);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _HoverAware extends StatefulWidget {
