@@ -603,6 +603,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   final Map<String, bool> _videoHover = <String, bool>{};
 
   Size _canvasViewportSize = Size.zero;
+  static const double _videoControlsHeight = 34.0;
 
   @override
   void initState() {
@@ -1313,6 +1314,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final bool isIOS = Platform.isIOS;
     final double bottomInset = MediaQuery.of(context).padding.bottom;
 
+    final videoOverlays = sorted
+        .where((it) => it.isVideo)
+        .map((item) {
+          final uiState = _videoStates[item.id];
+          if (uiState == null) return const SizedBox.shrink();
+          return _buildVideoControlsViewportOverlay(item, uiState);
+        })
+        .toList(growable: false);
+
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
@@ -1481,6 +1491,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                     ),
                                   ),
                                 ),
+                                ...videoOverlays,
                                 if (!isSomePhotoInEditMode &&
                                     (_showForInitDeleteIcon ||
                                         _draggingIndex != null))
@@ -2101,67 +2112,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             ),
           ),
         ),
-        if (isVideo && uiState != null)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: MouseRegion(
-              onEnter: (_) => setState(() => _controlsHover[item.id] = true),
-              onExit: (_) => setState(() => _controlsHover[item.id] = false),
-              child: Builder(
-                builder: (context) {
-                  final isActive = _activeItemIndex != null &&
-                      _items.indexOf(item) == _activeItemIndex;
-                  final visible = (_videoHover[item.id] == true) ||
-                      (_controlsHover[item.id] == true) ||
-                      item.isEditing ||
-                      isActive;
-
-                  return AnimatedOpacity(
-                    duration: const Duration(milliseconds: 150),
-                    opacity: visible ? 1.0 : 0.0,
-                    child: IgnorePointer(
-                      ignoring: !visible,
-                      child: Material(
-                        type: MaterialType.transparency,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
-                              colors: [Colors.black45, Colors.transparent],
-                            ),
-                          ),
-                          child: VideoControls(
-                            startFrac: uiState.startFrac,
-                            endFrac: uiState.endFrac,
-                            positionFrac: uiState.posFrac,
-                            volume: uiState.volume,
-                            speed: uiState.speed,
-                            onSeekFrac: (f) => setState(() {
-                              uiState.posFrac = f.clamp(0.0, 1.0);
-                              uiState.seekRequestId++;
-                            }),
-                            onChangeRange: (rv) => setState(() {
-                              uiState.startFrac = rv.start;
-                              uiState.endFrac = rv.end;
-                            }),
-                            onChangeVolume: (v) =>
-                                setState(() => uiState.volume = v),
-                            onChangeSpeed: (s) =>
-                                setState(() => uiState.speed = s),
-                            totalDuration: uiState.duration,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
         if (item.isEditing) ...[
           Positioned.fill(child: CustomPaint(painter: _CropBorderPainter())),
           ...buildCropHandles(
@@ -2172,6 +2122,96 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
         ],
       ],
+    );
+  }
+
+  Rect _getItemScreenRect(CollagePhotoState item) {
+    final w = item.baseWidth * item.scale;
+    final h = item.baseHeight * item.scale;
+    final topLeft =
+        MatrixUtils.transformPoint(_transformationController.value, item.offset);
+    final bottomRight = MatrixUtils.transformPoint(
+      _transformationController.value,
+      item.offset + Offset(w, h),
+    );
+    return Rect.fromPoints(topLeft, bottomRight);
+  }
+
+  Widget _buildVideoControlsViewportOverlay(
+    CollagePhotoState item,
+    VideoUi uiState,
+  ) {
+    final rect = _getItemScreenRect(item);
+    if (rect.isEmpty) return const SizedBox.shrink();
+
+    final isActive =
+        _activeItemIndex != null && _items.indexOf(item) == _activeItemIndex;
+    final visible = (_videoHover[item.id] == true) ||
+        (_controlsHover[item.id] == true) ||
+        item.isEditing ||
+        isActive;
+
+    return Positioned(
+      left: rect.left,
+      top: rect.bottom - _videoControlsHeight,
+      width: rect.width,
+      child: Builder(
+        builder: (context) {
+          final baseVisible = (_videoHover[item.id] == true) ||
+              item.isEditing ||
+              isActive;
+          final controlsHover = _controlsHover[item.id] == true;
+          final show = baseVisible || controlsHover;
+
+          return MouseRegion(
+            onEnter: (_) {
+              if (!baseVisible) return;
+              setState(() => _controlsHover[item.id] = true);
+            },
+            onExit: (_) => setState(() => _controlsHover[item.id] = false),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: show ? 1.0 : 0.0,
+              child: IgnorePointer(
+                ignoring: !show,
+                child: Material(
+                  type: MaterialType.transparency,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black45, Colors.transparent],
+                      ),
+                    ),
+                    child: VideoControls(
+                      startFrac: uiState.startFrac,
+                      endFrac: uiState.endFrac,
+                      positionFrac: uiState.posFrac,
+                      volume: uiState.volume,
+                      speed: uiState.speed,
+                      onSeekFrac: (f) => setState(() {
+                        uiState.posFrac = f.clamp(0.0, 1.0);
+                        uiState.seekRequestId++;
+                      }),
+                      onChangeRange: (rv) => setState(() {
+                        uiState.startFrac = rv.start;
+                        uiState.endFrac = rv.end;
+                      }),
+                      onChangeVolume: (v) =>
+                          setState(() => uiState.volume = v),
+                      onChangeSpeed: (s) =>
+                          setState(() => uiState.speed = s),
+                      totalDuration: uiState.duration,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
