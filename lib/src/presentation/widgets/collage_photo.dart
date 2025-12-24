@@ -491,12 +491,19 @@ class CollageController {
     Offset initialOffset = const Offset(50, 50),
   }) {
     final s = createState(photo);
-    s.offset = initialOffset;
-    maxZIndex++;
-    s.zIndex = maxZIndex;
-    items.add(s);
-    ensureVideoStateFor(s);
+    addState(s, initialOffset: initialOffset);
     return s;
+  }
+
+  void addState(
+    CollagePhotoState state, {
+    Offset? initialOffset,
+  }) {
+    state.offset = initialOffset ?? state.offset;
+    maxZIndex++;
+    state.zIndex = maxZIndex;
+    items.add(state);
+    ensureVideoStateFor(state);
   }
 
   Future<void> seekActiveVideoBySeconds({
@@ -715,13 +722,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
       _activeItemIndex = 0;
     } else {
-      const cascadeOffset = 50.0;
       for (int i = 0; i < _items.length; i++) {
         final it = _items[i];
-        it.offset = Offset(
-          (i * cascadeOffset) % (canvasWidth - it.baseWidth),
-          (i * cascadeOffset) % (canvasHeight - it.baseHeight),
-        );
+        it.offset = _cascadeOffsetForIndex(i, it);
       }
     }
 
@@ -943,13 +946,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
       _activeItemIndex = 0;
     } else {
-      const cascadeOffset = 50.0;
       for (int i = 0; i < _items.length; i++) {
         final it = _items[i];
-        it.offset = Offset(
-          (i * cascadeOffset) % (canvasWidth - it.baseWidth),
-          (i * cascadeOffset) % (canvasHeight - it.baseHeight),
-        );
+        it.offset = _cascadeOffsetForIndex(i, it);
       }
     }
 
@@ -1297,11 +1296,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
 
     setState(() {
-      final item = _controller.addPhoto(
-        photo: result.photo,
-        createState: _createCollagePhotoState,
-        initialOffset: const Offset(50, 50),
-      );
+      final item = _createCollagePhotoState(result.photo);
+      final offset = _cascadeOffsetForIndex(_items.length, item);
+      _controller.addState(item, initialOffset: offset);
       item.pickContextId = result.contextId;
       item.pickContextIndex = result.indexInContext;
       _maxZIndex = _controller.maxZIndex;
@@ -1311,11 +1308,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _addPhotoToCollage(Photo photo) {
     _registerPhoto(photo);
     setState(() {
-      _controller.addPhoto(
-        photo: photo,
-        createState: _createCollagePhotoState,
-        initialOffset: const Offset(50, 50),
-      );
+      final item = _createCollagePhotoState(photo);
+      final offset = _cascadeOffsetForIndex(_items.length, item);
+      _controller.addState(item, initialOffset: offset);
       _maxZIndex = _controller.maxZIndex;
     });
   }
@@ -1485,16 +1480,40 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _controller.ensureVideoStateFor(item);
   }
 
-  bool _shouldSkipDroppedPath(String path) {
+  Size _currentCanvasSize() {
+    if (_canvasViewportSize != Size.zero) return _canvasViewportSize;
+    return MediaQuery.of(context).size;
+  }
+
+  Offset _cascadeOffsetForIndex(int index, CollagePhotoState item) {
+    const cascadeOffset = 50.0;
+    final size = _currentCanvasSize();
+    final maxX = math.max(1.0, size.width - item.baseWidth);
+    final maxY = math.max(1.0, size.height - item.baseHeight);
+    return Offset(
+      (index * cascadeOffset) % maxX,
+      (index * cascadeOffset) % maxY,
+    );
+  }
+
+  bool _shouldSkipDroppedFile(File file) {
     final now = DateTime.now();
     _recentlyDropped.removeWhere(
-      (_, ts) => now.difference(ts) > const Duration(seconds: 2),
+      (_, ts) => now.difference(ts) > const Duration(seconds: 3),
     );
-    final last = _recentlyDropped[path];
-    if (last != null && now.difference(last) < const Duration(seconds: 1)) {
+    String key = p.basename(file.path);
+    try {
+      final stat = file.statSync();
+      final name = p.basename(file.path);
+      key = '$name:${stat.size}:${stat.modified.millisecondsSinceEpoch}';
+    } catch (_) {
+      // fallback to basename-only to de-dupe double onDragDone with alias paths
+    }
+    final last = _recentlyDropped[key];
+    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
       return true;
     }
-    _recentlyDropped[path] = now;
+    _recentlyDropped[key] = now;
     return false;
   }
 
@@ -1610,9 +1629,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       child: DropTarget(
         onDragDone: (details) async {
           for (final xfile in details.files) {
-            if (_shouldSkipDroppedPath(xfile.path)) continue;
             final file = File(xfile.path);
+            if (!file.existsSync()) {
+              continue;
+            }
+            if (_shouldSkipDroppedFile(file)) continue;
             final bytes = await file.readAsBytes();
+            if (bytes.isEmpty) {
+              continue;
+            }
             final fileName = p.basename(file.path);
             final mediaType = getMediaType(file.path);
 
@@ -1622,6 +1647,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               context: context,
               mediaType: mediaType,
             );
+            if (!File(newPhoto.path).existsSync()) {
+              continue;
+            }
 
             if (!mounted) return;
             setState(() {
