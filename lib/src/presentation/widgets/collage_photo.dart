@@ -20,6 +20,7 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
 
 // --- твои доменные/проектные импорты ---
@@ -543,12 +544,14 @@ class PhotoCollageWidget extends StatefulWidget {
   final List<Photo> photos; // Уже выбранные фото
   final List<Photo> allPhotos; // Все доступные фото
   final Collage? initialCollage;
+  final bool startWithSelectedPhotos;
 
   const PhotoCollageWidget({
     super.key,
     required this.photos,
     required this.allPhotos,
     this.initialCollage,
+    this.startWithSelectedPhotos = false,
   });
 
   @override
@@ -593,6 +596,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Rect _deleteRect = Rect.zero;
   bool _deleteHover = false;
   int? _draggingIndex; // индекс в _items (не в sorted!)
+  final Map<String, DateTime> _recentlyDropped = <String, DateTime>{};
 
   // --- Modes ---
   bool _overviewMode = false;
@@ -670,6 +674,66 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     setState(() {});
   }
 
+  void _initCollageFromSelectedPhotos() {
+    _items.clear();
+    _videoStates.clear();
+
+    final filtered = widget.photos.where(
+      (p) => p.mediaType == 'image' || p.mediaType == 'video',
+    );
+
+    for (final p in filtered) {
+      final s = _createCollagePhotoState(p);
+      _items.add(s);
+      if (p.mediaType == 'video') {
+        _videoStates[s.id] = VideoUi();
+      }
+    }
+
+    final canvasWidth = MediaQuery.of(context).size.width;
+    final canvasHeight = MediaQuery.of(context).size.height;
+
+    if (_items.length == 1) {
+      final item = _items.first;
+
+      final photoAspect = item.baseWidth / item.baseHeight;
+      final screenAspect = canvasWidth / canvasHeight;
+
+      double scale;
+      if (photoAspect > screenAspect) {
+        scale = canvasWidth / item.baseWidth;
+      } else {
+        scale = canvasHeight / item.baseHeight;
+      }
+
+      final newWidth = item.baseWidth * scale;
+      final newHeight = item.baseHeight * scale;
+
+      item.offset =
+          Offset((canvasWidth - newWidth) / 2, (canvasHeight - newHeight) / 2);
+      item.scale = scale;
+
+      _activeItemIndex = 0;
+    } else {
+      const cascadeOffset = 50.0;
+      for (int i = 0; i < _items.length; i++) {
+        final it = _items[i];
+        it.offset = Offset(
+          (i * cascadeOffset) % (canvasWidth - it.baseWidth),
+          (i * cascadeOffset) % (canvasHeight - it.baseHeight),
+        );
+      }
+    }
+
+    for (int i = 0; i < _items.length; i++) {
+      _items[i].zIndex = i;
+    }
+    _maxZIndex = _items.length;
+    _controller.maxZIndex = _maxZIndex;
+
+    setState(() {});
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -679,6 +743,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (_items.isEmpty) {
       if (widget.initialCollage != null) {
         _initCollageFromExisting(widget.initialCollage!);
+      } else if (widget.startWithSelectedPhotos && widget.photos.isNotEmpty) {
+        _initCollageFromSelectedPhotos();
       } else {
         _initEmptyCollage(); // ✅ только пусто
       }
@@ -902,7 +968,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     double baseW = targetShortSide;
     double baseH = targetShortSide;
 
-    final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
+    final fullPath = _resolvePhotoPath(photo);
     final file = File(fullPath);
 
     if (photo.mediaType == 'image') {
@@ -1015,6 +1081,16 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     setState(() {
       _isFullscreen = next;
     });
+    if (Platform.isIOS) {
+      if (next) {
+        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        WakelockPlus.enable();
+      } else {
+        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        WakelockPlus.disable();
+      }
+      return;
+    }
     if (!Platform.isMacOS) return;
     try {
       if (next) {
@@ -1409,6 +1485,19 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _controller.ensureVideoStateFor(item);
   }
 
+  bool _shouldSkipDroppedPath(String path) {
+    final now = DateTime.now();
+    _recentlyDropped.removeWhere(
+      (_, ts) => now.difference(ts) > const Duration(seconds: 2),
+    );
+    final last = _recentlyDropped[path];
+    if (last != null && now.difference(last) < const Duration(seconds: 1)) {
+      return true;
+    }
+    _recentlyDropped[path] = now;
+    return false;
+  }
+
   Size _getNaturalSizeForPhoto(Photo photo) {
     const double targetShortSide = 150;
 
@@ -1521,6 +1610,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       child: DropTarget(
         onDragDone: (details) async {
           for (final xfile in details.files) {
+            if (_shouldSkipDroppedPath(xfile.path)) continue;
             final file = File(xfile.path);
             final bytes = await file.readAsBytes();
             final fileName = p.basename(file.path);
@@ -1691,7 +1781,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   bottom: 12 + (isIOS ? bottomInset : 0.0),
                   child: _buildEditPanel(editingPhoto),
                 )
-              else ...[
+              else if (_draggingIndex == null) ...[
                 if (Platform.isMacOS)
                   Positioned(
                     left: 12,
@@ -1704,17 +1794,22 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   child: _buildFloatingActionButtons(),
                 ),
               ],
-              if (_isFullscreen)
+              if (_isFullscreen && _draggingIndex == null)
                 Positioned(
-                  top: 16,
-                  right: 16,
-                  child: IconButton(
-                    icon:
-                        const Icon(Icons.fullscreen_exit, color: Colors.white),
-                    onPressed: _toggleFullscreen,
+                  top: 0,
+                  right: 0,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: IconButton(
+                        icon: const Icon(Icons.fullscreen_exit,
+                            color: Colors.white),
+                        onPressed: _toggleFullscreen,
+                      ),
+                    ),
                   ),
                 ),
-              if (!_isFullscreen) ...[
+              if (!_isFullscreen && _draggingIndex == null) ...[
                 Positioned(
                   left: 12,
                   top: 12,
@@ -1819,72 +1914,89 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       ),
     ];
 
+    final isHorizontal = Platform.isIOS || Platform.isMacOS;
+    final buttons = [
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon: const Icon(Iconsax.add, color: Colors.white, shadows: iconShadow),
+        tooltip: 'Add photo',
+        onPressed: _showAllPhotosSheet,
+      ),
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon:
+            const Icon(Icons.grid_view, color: Colors.white, shadows: iconShadow),
+        tooltip: 'Overview mode',
+        onPressed: _toggleOverviewMode,
+      ),
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon: const Icon(Iconsax.colorfilter,
+            color: Colors.white, shadows: iconShadow),
+        tooltip: 'Change background color',
+        onPressed: _showColorPickerDialog,
+      ),
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon: const Icon(Iconsax.save_2, color: Colors.white, shadows: iconShadow),
+        tooltip: 'Save collage',
+        onPressed: _onSaveCollageToDb,
+      ),
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon:
+            const Icon(Iconsax.image, color: Colors.green, shadows: iconShadow),
+        tooltip: 'Save collage as image',
+        onPressed: _onGenerateCollage,
+      ),
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon: const Icon(Icons.close, color: Colors.red, shadows: iconShadow),
+        tooltip: 'Cancel collage',
+        onPressed: () => Navigator.pop(context),
+      ),
+    ];
+
+    if (isHorizontal) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < buttons.length; i++) ...[
+            if (i != 0) const SizedBox(width: 6),
+            buttons[i],
+          ],
+        ],
+      );
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-          ),
-          icon: const Icon(Iconsax.add, color: Colors.white, shadows: iconShadow),
-          tooltip: 'Add photo',
-          onPressed: _showAllPhotosSheet,
-        ),
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-          ),
-          icon:
-              const Icon(Icons.grid_view, color: Colors.white, shadows: iconShadow),
-          tooltip: 'Overview mode',
-          onPressed: _toggleOverviewMode,
-        ),
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-          ),
-          icon: const Icon(Iconsax.colorfilter,
-              color: Colors.white, shadows: iconShadow),
-          tooltip: 'Change background color',
-          onPressed: _showColorPickerDialog,
-        ),
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-          ),
-          icon: const Icon(Iconsax.save_2, color: Colors.white, shadows: iconShadow),
-          tooltip: 'Save collage',
-          onPressed: _onSaveCollageToDb,
-        ),
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-          ),
-          icon:
-              const Icon(Iconsax.image, color: Colors.green, shadows: iconShadow),
-          tooltip: 'Save collage as image',
-          onPressed: _onGenerateCollage,
-        ),
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
-          ),
-          icon: const Icon(Icons.close, color: Colors.red, shadows: iconShadow),
-          tooltip: 'Cancel collage',
-          onPressed: () => Navigator.pop(context),
-        ),
+        for (final button in buttons) button,
       ],
     );
   }
@@ -1951,23 +2063,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           onPressed: _showHelp,
         ),
         const SizedBox(width: 6),
-        IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
+        if (!Platform.isIOS) ...[
+          IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+            ),
+            tooltip: 'Open New Window',
+            icon:
+                const Icon(Icons.window, color: Colors.white, shadows: iconShadow),
+            onPressed: () {
+              WindowService.openWindow(
+                route: '/my_collages',
+                args: {},
+                title: 'Refma — Collage',
+              );
+            },
           ),
-          tooltip: 'Open New Window',
-          icon: const Icon(Icons.window, color: Colors.white, shadows: iconShadow),
-          onPressed: () {
-            WindowService.openWindow(
-              route: '/my_collages',
-              args: {},
-              title: 'Refma — Collage',
-            );
-          },
-        ),
-        const SizedBox(width: 6),
+          const SizedBox(width: 6),
+        ],
         IconButton(
           style: IconButton.styleFrom(
             backgroundColor: Colors.transparent,
@@ -1975,7 +2090,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             surfaceTintColor: Colors.transparent,
           ),
           tooltip: 'Toggle Fullscreen',
-          icon: const Icon(Icons.fullscreen, color: Colors.white, shadows: iconShadow),
+          icon:
+              const Icon(Icons.fullscreen, color: Colors.white, shadows: iconShadow),
           onPressed: _toggleFullscreen,
         ),
       ],
@@ -2297,7 +2413,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       item.hue,
     );
 
-    final fullPath = PhotoPathHelper().getFullPath(item.photo.fileName);
+    final fullPath = _resolvePhotoPath(item.photo);
     final isVideo = item.photo.mediaType == 'video';
 
     // ВАЖНО: здесь НЕ создаём state в build “на лету” для не-видео.
@@ -2406,6 +2522,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return Rect.fromPoints(topLeft, bottomRight);
   }
 
+  String _resolvePhotoPath(Photo photo) {
+    if (photo.path.isNotEmpty) {
+      final direct = File(photo.path);
+      if (direct.existsSync()) return photo.path;
+    }
+    return PhotoPathHelper().getFullPath(photo.fileName);
+  }
+
   Widget _buildVideoControlsViewportOverlay(
     CollagePhotoState item,
     VideoUi uiState,
@@ -2504,6 +2628,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   @override
   void dispose() {
+    if (Platform.isIOS && _isFullscreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      WakelockPlus.disable();
+    }
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
     _focusNode.dispose();

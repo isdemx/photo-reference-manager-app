@@ -11,11 +11,11 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_editor_overlay.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
-import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:uuid/uuid.dart';
@@ -308,6 +308,25 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     }
   }
 
+  void _openCollageWithPhotos(List<Photo> photos) {
+    if (photos.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          body: PhotoCollageWidget(
+            key: ValueKey('photo_collage_from_view_${const Uuid().v4()}'),
+            photos: photos,
+            allPhotos: widget.photos,
+            startWithSelectedPhotos: true,
+          ),
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _clearSelection();
+    });
+  }
+
   double _galleryBottomPadding(Photo p) {
     if (!_showActions) return 0.0;
     if (p.mediaType == 'video' && (p.tagIds.isEmpty)) return 50.0;
@@ -555,6 +574,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                           );
                           if (ok) _clearSelection();
                         },
+                        onAddToCollage: () =>
+                            _openCollageWithPhotos([currentPhoto]),
+                        onAddToCollageMulti: () =>
+                            _openCollageWithPhotos(_selectedPhotos),
                         onEdit: () => _openEditor(currentPhoto),
                       ),
                     ),

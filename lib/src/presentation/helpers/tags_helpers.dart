@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
@@ -317,245 +318,272 @@ class TagsHelpers {
                   backgroundColor: Colors.transparent,
                   insetPadding: EdgeInsets.zero,
                   child: SafeArea(
-                    child: Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // Верхняя панель: заголовок + крестик
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  title,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                tooltip: 'Close',
-                                icon: const Icon(Icons.close,
-                                    color: Colors.white),
-                                onPressed: () =>
-                                    Navigator.of(dialogCtx).pop(false),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            subtitle,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              color: Colors.white70,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final isMacOS =
+                            defaultTargetPlatform == TargetPlatform.macOS;
+                        final size = MediaQuery.of(context).size;
+                        final maxWidth = isMacOS
+                            ? (size.width * 0.6).clamp(420.0, 900.0)
+                            : size.width;
+                        final maxHeight = isMacOS
+                            ? (size.height * 0.9).clamp(420.0, size.height)
+                            : size.height;
+
+                        return Align(
+                          alignment: Alignment.center,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: maxWidth,
+                              maxHeight: maxHeight,
                             ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          if (allowNewTagCreation)
-                            _NewTagInlineEditor(
-                              controller: controller,
-                              categories: categories,
-                              onCategoryChanged: (val) {
-                                selectedCategoryId = val;
-                              },
-                              onSubmitAdd: () {
-                                final String tagName = controller.text.trim();
-                                if (tagName.isNotEmpty && singlePhoto != null) {
-                                  _addTagToBloc(
-                                    dialogCtx,
-                                    tagName,
-                                    singlePhoto,
-                                    tagCategoryId:
-                                        selectedCategoryId, // ← передаём выбранную категорию
-                                  );
-                                  anyChanged = true;
-                                  controller.clear();
-                                }
-                              },
-                            ),
-
-                          // Список секций с тегами
-                          Expanded(
-                            child: sections.isEmpty
-                                ? const Center(
-                                    child: Text(
-                                      'No tags yet',
-                                      style: TextStyle(
-                                        color: Colors.white54,
-                                      ),
-                                    ),
-                                  )
-                                : Scrollbar(
-                                    thumbVisibility: true,
-                                    child: ListView.builder(
-                                      itemCount: sections.length,
-                                      itemBuilder: (_, index) {
-                                        final s = sections[index];
-                                        return Padding(
-                                          padding:
-                                              const EdgeInsets.only(bottom: 16),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                s.title,
-                                                style: const TextStyle(
-                                                  fontWeight: FontWeight.w600,
-                                                  fontSize: 15,
-                                                  color: Colors.white,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 8),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: s.tags.map((tag) {
-                                                  final allHave = photos.every(
-                                                    (p) => p.tagIds
-                                                        .contains(tag.id),
-                                                  );
-                                                  final someHave = photos.any(
-                                                    (p) => p.tagIds
-                                                        .contains(tag.id),
-                                                  );
-
-                                                  // selected для single/multi
-                                                  final isSelected = multiAssign
-                                                      ? allHave
-                                                      : photos.first.tagIds
-                                                          .contains(tag.id);
-
-                                                  IconData? icon;
-                                                  if (multiAssign) {
-                                                    if (allHave) {
-                                                      icon = Icons.check;
-                                                    } else if (someHave) {
-                                                      icon = Icons.remove;
-                                                    }
-                                                  }
-
-                                                  return ChoiceChip(
-                                                    avatar: icon != null
-                                                        ? Icon(
-                                                            icon,
-                                                            size: 16,
-                                                            color: Colors.white,
-                                                          )
-                                                        : null,
-                                                    label: Text(
-                                                      tag.name,
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                    selected: isSelected,
-                                                    selectedColor:
-                                                        Color(tag.colorValue)
-                                                            .withOpacity(0.7),
-                                                    backgroundColor:
-                                                        Color(tag.colorValue),
-                                                    labelStyle: const TextStyle(
-                                                      color: Colors.white,
-                                                    ),
-                                                    onSelected: (selected) {
-                                                      final photoBloc =
-                                                          dialogCtx.read<
-                                                              PhotoBloc>();
-
-                                                      if (!multiAssign) {
-                                                        // Один кадр: просто тумблер
-                                                        final p = photos.first;
-                                                        if (selected) {
-                                                          if (!p.tagIds
-                                                              .contains(
-                                                                  tag.id)) {
-                                                            p.tagIds
-                                                                .add(tag.id);
-                                                            photoBloc.add(
-                                                                UpdatePhoto(p));
-                                                          }
-                                                        } else {
-                                                          if (p.tagIds.contains(
-                                                              tag.id)) {
-                                                            p.tagIds
-                                                                .remove(tag.id);
-                                                            photoBloc.add(
-                                                                UpdatePhoto(p));
-                                                          }
-                                                        }
-                                                        anyChanged = true;
-                                                      } else {
-                                                        // Мультивыбор: логика all/some
-                                                        for (final p
-                                                            in photos) {
-                                                          if (allHave ||
-                                                              someHave) {
-                                                            p.tagIds
-                                                                .remove(tag.id);
-                                                          } else {
-                                                            if (!p.tagIds
-                                                                .contains(
-                                                                    tag.id)) {
-                                                              p.tagIds
-                                                                  .add(tag.id);
-                                                            }
-                                                          }
-                                                          photoBloc.add(
-                                                              UpdatePhoto(p));
-                                                        }
-                                                        anyChanged = true;
-                                                      }
-
-                                                      (tagCtx as Element)
-                                                          .markNeedsBuild();
-                                                    },
-                                                  );
-                                                }).toList(),
-                                              ),
-                                            ],
+                            child: Container(
+                              width: maxWidth,
+                              height: maxHeight,
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  // Верхняя панель: заголовок + крестик
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          title,
+                                          style: const TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
                                           ),
-                                        );
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Close',
+                                        icon: const Icon(Icons.close,
+                                            color: Colors.white),
+                                        onPressed: () =>
+                                            Navigator.of(dialogCtx).pop(false),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    subtitle,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  if (allowNewTagCreation)
+                                    _NewTagInlineEditor(
+                                      controller: controller,
+                                      categories: categories,
+                                      onCategoryChanged: (val) {
+                                        selectedCategoryId = val;
+                                      },
+                                      onSubmitAdd: () {
+                                        final String tagName =
+                                            controller.text.trim();
+                                        if (tagName.isNotEmpty &&
+                                            singlePhoto != null) {
+                                          _addTagToBloc(
+                                            dialogCtx,
+                                            tagName,
+                                            singlePhoto,
+                                            tagCategoryId:
+                                                selectedCategoryId, // ← передаём выбранную категорию
+                                          );
+                                          anyChanged = true;
+                                          controller.clear();
+                                        }
                                       },
                                     ),
-                                  ),
-                          ),
 
-                          // Нижняя панель с кнопками
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              TextButton(
-                                onPressed: () =>
-                                    Navigator.of(dialogCtx).pop(false),
-                                child: const Text('Cancel'),
+                                  // Список секций с тегами
+                                  Expanded(
+                                    child: sections.isEmpty
+                                        ? const Center(
+                                            child: Text(
+                                              'No tags yet',
+                                              style: TextStyle(
+                                                color: Colors.white54,
+                                              ),
+                                            ),
+                                          )
+                                        : Scrollbar(
+                                            thumbVisibility: true,
+                                            child: ListView.builder(
+                                              itemCount: sections.length,
+                                              itemBuilder: (_, index) {
+                                                final s = sections[index];
+                                                return Padding(
+                                                  padding: const EdgeInsets.only(
+                                                      bottom: 16),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        s.title,
+                                                        style: const TextStyle(
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          fontSize: 15,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 8),
+                                                      Wrap(
+                                                        spacing: 8,
+                                                        runSpacing: 8,
+                                                        children: s.tags.map((tag) {
+                                                          final allHave = photos.every(
+                                                            (p) => p.tagIds
+                                                                .contains(tag.id),
+                                                          );
+                                                          final someHave = photos.any(
+                                                            (p) => p.tagIds
+                                                                .contains(tag.id),
+                                                          );
+
+                                                          // selected для single/multi
+                                                          final isSelected = multiAssign
+                                                              ? allHave
+                                                              : photos.first.tagIds
+                                                                  .contains(tag.id);
+
+                                                          IconData? icon;
+                                                          if (multiAssign) {
+                                                            if (allHave) {
+                                                              icon = Icons.check;
+                                                            } else if (someHave) {
+                                                              icon = Icons.remove;
+                                                            }
+                                                          }
+
+                                                          return ChoiceChip(
+                                                            avatar: icon != null
+                                                                ? Icon(
+                                                                    icon,
+                                                                    size: 16,
+                                                                    color: Colors.white,
+                                                                  )
+                                                                : null,
+                                                            label: Text(
+                                                              tag.name,
+                                                              overflow:
+                                                                  TextOverflow.ellipsis,
+                                                            ),
+                                                            selected: isSelected,
+                                                            selectedColor:
+                                                                Color(tag.colorValue)
+                                                                    .withOpacity(0.7),
+                                                            backgroundColor:
+                                                                Color(tag.colorValue),
+                                                            labelStyle: const TextStyle(
+                                                              color: Colors.white,
+                                                            ),
+                                                            onSelected: (selected) {
+                                                              final photoBloc =
+                                                                  dialogCtx.read<
+                                                                      PhotoBloc>();
+
+                                                              if (!multiAssign) {
+                                                                // Один кадр: просто тумблер
+                                                                final p = photos.first;
+                                                                if (selected) {
+                                                                  if (!p.tagIds
+                                                                      .contains(
+                                                                          tag.id)) {
+                                                                    p.tagIds
+                                                                        .add(tag.id);
+                                                                    photoBloc.add(
+                                                                        UpdatePhoto(p));
+                                                                  }
+                                                                } else {
+                                                                  if (p.tagIds.contains(
+                                                                      tag.id)) {
+                                                                    p.tagIds
+                                                                        .remove(tag.id);
+                                                                    photoBloc.add(
+                                                                        UpdatePhoto(p));
+                                                                  }
+                                                                }
+                                                                anyChanged = true;
+                                                              } else {
+                                                                // Мультивыбор: логика all/some
+                                                                for (final p
+                                                                    in photos) {
+                                                                  if (allHave ||
+                                                                      someHave) {
+                                                                    p.tagIds
+                                                                        .remove(tag.id);
+                                                                  } else {
+                                                                    if (!p.tagIds
+                                                                        .contains(
+                                                                            tag.id)) {
+                                                                      p.tagIds
+                                                                          .add(tag.id);
+                                                                    }
+                                                                  }
+                                                                  photoBloc.add(
+                                                                      UpdatePhoto(p));
+                                                                }
+                                                                anyChanged = true;
+                                                              }
+
+                                                              (tagCtx as Element)
+                                                                  .markNeedsBuild();
+                                                            },
+                                                          );
+                                                        }).toList(),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            ),
+                                          ),
+                                  ),
+
+                                  // Нижняя панель с кнопками
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.of(dialogCtx).pop(false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      if (allowNewTagCreation)
+                                        ElevatedButton(
+                                          onPressed: () {
+                                            // Просто закрываем диалог.
+                                            // Само добавление тега делается через onSubmitAdd
+                                            // внутри _NewTagInlineEditor, когда юзер жмёт
+                                            // на кнопку [+] рядом с инпутом.
+                                            Navigator.of(dialogCtx).pop(anyChanged);
+                                          },
+                                          child: const Text('Done'),
+                                        )
+                                      else
+                                        ElevatedButton(
+                                          onPressed: () =>
+                                              Navigator.of(dialogCtx).pop(anyChanged),
+                                          child: const Text('OK'),
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              if (allowNewTagCreation)
-                                ElevatedButton(
-                                  onPressed: () {
-                                    // Просто закрываем диалог.
-                                    // Само добавление тега делается через onSubmitAdd
-                                    // внутри _NewTagInlineEditor, когда юзер жмёт
-                                    // на кнопку [+] рядом с инпутом.
-                                    Navigator.of(dialogCtx).pop(anyChanged);
-                                  },
-                                  child: const Text('Done'),
-                                )
-                              else
-                                ElevatedButton(
-                                  onPressed: () =>
-                                      Navigator.of(dialogCtx).pop(anyChanged),
-                                  child: const Text('OK'),
-                                ),
-                            ],
+                            ),
                           ),
-                        ],
-                      ),
+                        );
+                      },
                     ),
                   ),
                 );

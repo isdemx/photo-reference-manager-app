@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:iconsax/iconsax.dart';
 import 'package:path/path.dart' as p;
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
@@ -79,8 +78,8 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                       context: context,
                       mediaType: mediaType,
                     );
-
-                    context.read<PhotoBloc>().add(AddPhoto(newPhoto));
+                    // PhotoSaveHelper already persists and triggers LoadPhotos.
+                    // Avoid double insert by not dispatching AddPhoto here.
                   }
                 },
                 onDragEntered: (_) => setState(() => _dragOver = true),

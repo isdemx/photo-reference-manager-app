@@ -17,6 +17,8 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onAddToFolder;
   final VoidCallback onAddToFolderMulti;
   final VoidCallback onAddToTag;
+  final VoidCallback onAddToCollage;
+  final VoidCallback onAddToCollageMulti;
 
   // ✅ NEW
   final VoidCallback onEdit;
@@ -33,6 +35,8 @@ class ActionBar extends StatelessWidget {
     required this.onAddToFolder,
     required this.onAddToFolderMulti,
     required this.onAddToTag,
+    required this.onAddToCollage,
+    required this.onAddToCollageMulti,
     required this.onEdit, // ✅ NEW
   });
 
@@ -83,6 +87,16 @@ class ActionBar extends StatelessWidget {
                     child: const Icon(Iconsax.folder_add, color: Colors.white),
                   ),
                   ElevatedButton(
+                    onPressed: onAddToCollageMulti,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 49, 106, 83),
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(12),
+                      minimumSize: const Size(48, 48),
+                    ),
+                    child: const Icon(Iconsax.grid_2, color: Colors.white),
+                  ),
+                  ElevatedButton(
                     onPressed: onShare,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(255, 35, 107, 166),
@@ -113,6 +127,14 @@ class ActionBar extends StatelessWidget {
                     photos: [photo],
                     onFolderAdded: () {},
                   ),
+                  IconButton(
+                    icon: const Icon(
+                      Iconsax.grid_2,
+                      color: Color.fromARGB(255, 29, 104, 77),
+                    ),
+                    onPressed: onAddToCollage,
+                    tooltip: 'Add to collage',
+                  ),
                   AddToEditWidget(
                     onEdit: onEdit,
                   ),
@@ -132,7 +154,6 @@ class ActionBar extends StatelessWidget {
     );
   }
 }
-
 
 
 
