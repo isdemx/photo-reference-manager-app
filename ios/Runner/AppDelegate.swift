@@ -22,6 +22,62 @@ import Flutter
         result(FlutterMethodNotImplemented)
       }
     })
+
+    let sharedImportChannel = FlutterMethodChannel(
+      name: "refma/shared_import",
+      binaryMessenger: controller.binaryMessenger
+    )
+    sharedImportChannel.setMethodCallHandler { (call, result) in
+      let appGroupId = "group.app.greenmonster.photoreferencemanager"
+      let inboxFolder = "SharedInbox"
+      let manifestKey = "refma.shared.import.manifest"
+      let defaults = UserDefaults(suiteName: appGroupId)
+
+      func containerURL() -> URL? {
+        return FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId)
+      }
+
+      switch call.method {
+      case "getManifest":
+        guard let defaults = defaults,
+              let container = containerURL() else {
+          result([])
+          return
+        }
+        let manifest = defaults.array(forKey: manifestKey) as? [[String: Any]] ?? []
+        let withPaths = manifest.compactMap { entry -> [String: Any]? in
+          guard let rel = entry["relativePath"] as? String else { return nil }
+          let fileURL = container.appendingPathComponent(rel)
+          if !FileManager.default.fileExists(atPath: fileURL.path) { return nil }
+          var out = entry
+          out["filePath"] = fileURL.path
+          return out
+        }
+        result(withPaths)
+      case "clearManifest":
+        defaults?.set([], forKey: manifestKey)
+        defaults?.synchronize()
+        result(true)
+      case "deleteSharedFiles":
+        guard let args = call.arguments as? [String] else {
+          result(false)
+          return
+        }
+        for path in args {
+          try? FileManager.default.removeItem(atPath: path)
+        }
+        if let container = containerURL() {
+          let inboxURL = container.appendingPathComponent(inboxFolder, isDirectory: true)
+          if let items = try? FileManager.default.contentsOfDirectory(atPath: inboxURL.path),
+             items.isEmpty {
+            try? FileManager.default.removeItem(at: inboxURL)
+          }
+        }
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
     
     // Устанавливаем черный фон для всего окнаr
     window?.backgroundColor = UIColor.black

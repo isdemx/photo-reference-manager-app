@@ -160,17 +160,25 @@ class BackupService {
                     },
                   );
 
-                  print('[Backup] Открываем системное окно share...');
-                  await Share.shareXFiles(
-                    [XFile(zipPath)],
-                    text: 'Photographers Reference backup',
-                  );
-
-                  print('[Backup] Backup завершён успешно!');
-
                   if (Navigator.of(dialogCtx).canPop()) {
                     Navigator.of(dialogCtx).pop(); // закрываем прогресс-диалог
                   }
+
+                  await Future<void>.delayed(
+                      const Duration(milliseconds: 200));
+
+                  print('[Backup] Открываем системное окно share...');
+                  final rootContext =
+                      Navigator.of(context, rootNavigator: true).context;
+                  final shareOrigin = _shareOriginRect(rootContext);
+                  print('[Backup] sharePositionOrigin: $shareOrigin');
+                  await Share.shareXFiles(
+                    [XFile(zipPath)],
+                    text: 'Photographers Reference backup',
+                    sharePositionOrigin: shareOrigin,
+                  );
+
+                  print('[Backup] Backup завершён успешно!');
                 } catch (e, st) {
                   print('[Backup] Ошибка при создании backup: $e');
                   print('[Backup] Stacktrace:\n$st');
@@ -205,6 +213,31 @@ class BackupService {
           },
         );
       },
+    );
+  }
+
+  static Rect _shareOriginRect(BuildContext context) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box != null && box.hasSize) {
+      final size = box.size;
+      print('[Backup] share origin box size: $size');
+      final topLeft = box.localToGlobal(Offset.zero);
+      return topLeft & box.size;
+    }
+    final view = WidgetsBinding.instance.platformDispatcher.views.isNotEmpty
+        ? WidgetsBinding.instance.platformDispatcher.views.first
+        : null;
+    final size = view == null
+        ? MediaQuery.of(context).size
+        : view.physicalSize / view.devicePixelRatio;
+    print('[Backup] share origin fallback size: $size');
+    final safeWidth = size.width <= 0 ? 1.0 : size.width;
+    final safeHeight = size.height <= 0 ? 1.0 : size.height;
+    return Rect.fromLTWH(
+      safeWidth / 2,
+      safeHeight / 2,
+      1,
+      1,
     );
   }
 }

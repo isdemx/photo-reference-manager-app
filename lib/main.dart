@@ -52,11 +52,13 @@ import 'package:photographers_reference_app/src/presentation/screens/upload_scre
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 
 import 'package:photographers_reference_app/src/services/export_service.dart';
+import 'package:photographers_reference_app/src/services/shared_inbox_import_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/utils/video_preview_migration.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+bool _ratingPromptScheduled = false;
 
 // --------------------- ENTRY ---------------------
 
@@ -99,6 +101,17 @@ void main(List<String> args) async {
     await TagCategoryRepositoryImpl(tagCategoryBox, tagBox).initializeDefaultTagCategory();
     await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
     await PhotoPathHelper().initialize();
+    if (Platform.isIOS) {
+      try {
+        await SharedInboxImportService().importIfAvailable(
+          PhotoRepositoryImpl(photoBox),
+        );
+      } catch (e, st) {
+        // Avoid crashing app on startup if share import fails.
+        // ignore: avoid_print
+        print('[SharedInboxImport] $e\n$st');
+      }
+    }
 
     // 5) Запуск приложения
     runApp(MyApp(
@@ -230,10 +243,13 @@ class MyApp extends StatelessWidget {
           // Рейтинг-попап — только при «обычном» запуске
           builder: (context, child) {
             final hasCustomRoute = ((initialArgs['route'] as String?) ?? '').isNotEmpty;
-            if (!hasCustomRoute) {
+            if (!hasCustomRoute && !_ratingPromptScheduled) {
+              _ratingPromptScheduled = true;
               WidgetsBinding.instance.addPostFrameCallback((_) async {
+                final navContext = navigatorKey.currentContext;
+                if (navContext == null) return;
                 if (await RatingPromptHandler.shouldShowPrompt()) {
-                  RatingPromptHandler.showRatingDialog(context);
+                  RatingPromptHandler.showRatingDialog(navContext);
                 }
               });
             }

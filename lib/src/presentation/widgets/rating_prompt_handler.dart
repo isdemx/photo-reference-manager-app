@@ -36,6 +36,7 @@ class RatingPromptHandler {
   }
 
   static void showRatingDialog(BuildContext context) {
+    if (Navigator.maybeOf(context) == null) return;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
