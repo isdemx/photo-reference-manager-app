@@ -40,6 +40,15 @@ class SharedInboxImportService {
       final mediaType = (item['mediaType'] as String?) ??
           _inferMediaType(p.extension(srcPath));
       final shouldCompress = (item['compress'] as bool?) ?? true;
+      final tagIdsRaw = item['tagIds'];
+      final tagIds = <String>[];
+      if (tagIdsRaw is List) {
+        for (final id in tagIdsRaw) {
+          if (id is String && id.isNotEmpty) {
+            tagIds.add(id);
+          }
+        }
+      }
       final originalName = (item['originalName'] as String?) ?? 'shared';
       final targetName = _resolveUniqueName(
         photosDir.path,
@@ -62,7 +71,7 @@ class SharedInboxImportService {
         dateAdded: DateTime.now(),
         folderIds: [],
         comment: '',
-        tagIds: [],
+        tagIds: tagIds,
         sortOrder: 0,
         isStoredInApp: true,
         geoLocation: null,

@@ -9,16 +9,74 @@ import UIKit
 import Social
 import MobileCoreServices
 
+struct SharedTag {
+    let id: String
+    let name: String
+    let colorValue: Int
+}
+
 final class ShareItem {
     let provider: NSItemProvider
     let typeIdentifier: String
     var thumbnail: UIImage?
     var compress: Bool
+    var selectedTagIds: Set<String>
 
     init(provider: NSItemProvider, typeIdentifier: String, compress: Bool) {
         self.provider = provider
         self.typeIdentifier = typeIdentifier
         self.compress = compress
+        self.selectedTagIds = []
+    }
+}
+
+final class TagChipButton: UIButton {
+    let tagModel: SharedTag
+
+    init(tag: SharedTag, selected: Bool) {
+        self.tagModel = tag
+        super.init(frame: .zero)
+        setTitle(tag.name, for: .normal)
+        titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        setTitleColor(.white, for: .normal)
+        backgroundColor = TagChipButton.colorFromFlutter(tag.colorValue)
+            .withAlphaComponent(selected ? 1.0 : 0.4)
+        layer.cornerRadius = 12
+        contentEdgeInsets = UIEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    static func colorFromFlutter(_ value: Int) -> UIColor {
+        let v = UInt32(truncatingIfNeeded: value)
+        let a = CGFloat((v >> 24) & 0xFF) / 255.0
+        let r = CGFloat((v >> 16) & 0xFF) / 255.0
+        let g = CGFloat((v >> 8) & 0xFF) / 255.0
+        let b = CGFloat(v & 0xFF) / 255.0
+        return UIColor(red: r, green: g, blue: b, alpha: a)
+    }
+}
+
+final class SelectedTagChip: UIButton {
+    let tagModel: SharedTag
+
+    init(tag: SharedTag) {
+        self.tagModel = tag
+        super.init(frame: .zero)
+        setTitle(tag.name, for: .normal)
+        titleLabel?.font = UIFont.systemFont(ofSize: 11, weight: .medium)
+        setTitleColor(.white, for: .normal)
+        backgroundColor = TagChipButton.colorFromFlutter(tag.colorValue)
+        layer.cornerRadius = 10
+        contentEdgeInsets = UIEdgeInsets(top: 2, left: 8, bottom: 2, right: 8)
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 
@@ -28,7 +86,11 @@ final class ShareItemCell: UITableViewCell {
     private let thumbImageView = UIImageView()
     private let compressLabel = UILabel()
     private let compressSwitch = UISwitch()
-    private var onToggle: ((Bool) -> Void)?
+    private let selectedTagsScrollView = UIScrollView()
+    private let selectedTagsStack = UIStackView()
+
+    private var onToggleCompress: ((Bool) -> Void)?
+    private var onRemoveTag: ((SharedTag) -> Void)?
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -47,23 +109,44 @@ final class ShareItemCell: UITableViewCell {
         compressSwitch.translatesAutoresizingMaskIntoConstraints = false
         compressSwitch.addTarget(self, action: #selector(handleToggle), for: .valueChanged)
 
+        selectedTagsScrollView.translatesAutoresizingMaskIntoConstraints = false
+        selectedTagsScrollView.showsHorizontalScrollIndicator = false
+
+        selectedTagsStack.translatesAutoresizingMaskIntoConstraints = false
+        selectedTagsStack.axis = .horizontal
+        selectedTagsStack.spacing = 8
+        selectedTagsStack.alignment = .center
+
+        selectedTagsScrollView.addSubview(selectedTagsStack)
+
         contentView.addSubview(thumbImageView)
         contentView.addSubview(compressLabel)
         contentView.addSubview(compressSwitch)
+        contentView.addSubview(selectedTagsScrollView)
 
         NSLayoutConstraint.activate([
             thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            thumbImageView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            thumbImageView.heightAnchor.constraint(equalToConstant: 56),
+            thumbImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
             thumbImageView.widthAnchor.constraint(equalToConstant: 56),
+            thumbImageView.heightAnchor.constraint(equalToConstant: 56),
 
             compressSwitch.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            compressSwitch.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            compressSwitch.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
 
             compressLabel.trailingAnchor.constraint(equalTo: compressSwitch.leadingAnchor, constant: -8),
             compressLabel.centerYAnchor.constraint(equalTo: compressSwitch.centerYAnchor),
 
-            thumbImageView.trailingAnchor.constraint(lessThanOrEqualTo: compressLabel.leadingAnchor, constant: -12)
+            selectedTagsScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            selectedTagsScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            selectedTagsScrollView.topAnchor.constraint(equalTo: thumbImageView.bottomAnchor, constant: 8),
+            selectedTagsScrollView.heightAnchor.constraint(equalToConstant: 26),
+            selectedTagsScrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+
+            selectedTagsStack.leadingAnchor.constraint(equalTo: selectedTagsScrollView.leadingAnchor, constant: 16),
+            selectedTagsStack.trailingAnchor.constraint(equalTo: selectedTagsScrollView.trailingAnchor, constant: -16),
+            selectedTagsStack.topAnchor.constraint(equalTo: selectedTagsScrollView.topAnchor),
+            selectedTagsStack.bottomAnchor.constraint(equalTo: selectedTagsScrollView.bottomAnchor),
+            selectedTagsStack.heightAnchor.constraint(equalTo: selectedTagsScrollView.heightAnchor)
         ])
 
         backgroundColor = .clear
@@ -76,14 +159,45 @@ final class ShareItemCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
 
-    func configure(thumbnail: UIImage?, compress: Bool, onToggle: @escaping (Bool) -> Void) {
+    func configure(
+        thumbnail: UIImage?,
+        compress: Bool,
+        selectedTags: [SharedTag],
+        onToggleCompress: @escaping (Bool) -> Void,
+        onRemoveTag: @escaping (SharedTag) -> Void
+    ) {
         thumbImageView.image = thumbnail ?? UIImage(systemName: "photo")
         compressSwitch.isOn = compress
-        self.onToggle = onToggle
+        self.onToggleCompress = onToggleCompress
+        self.onRemoveTag = onRemoveTag
+
+        selectedTagsStack.arrangedSubviews.forEach { view in
+            selectedTagsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        if selectedTags.isEmpty {
+            let placeholder = UILabel()
+            placeholder.text = "No tags"
+            placeholder.font = UIFont.systemFont(ofSize: 11, weight: .medium)
+            placeholder.textColor = .secondaryLabel
+            selectedTagsStack.addArrangedSubview(placeholder)
+            return
+        }
+
+        for tag in selectedTags {
+            let chip = SelectedTagChip(tag: tag)
+            chip.addTarget(self, action: #selector(handleRemoveTag(_:)), for: .touchUpInside)
+            selectedTagsStack.addArrangedSubview(chip)
+        }
     }
 
     @objc private func handleToggle() {
-        onToggle?(compressSwitch.isOn)
+        onToggleCompress?(compressSwitch.isOn)
+    }
+
+    @objc private func handleRemoveTag(_ sender: SelectedTagChip) {
+        onRemoveTag?(sender.tagModel)
     }
 }
 
@@ -91,21 +205,24 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
     private let appGroupId = "group.app.greenmonster.photoreferencemanager"
     private let inboxFolderName = "SharedInbox"
     private let manifestKey = "refma.shared.import.manifest"
+    private let sharedTagsKey = "refma.shared.tags.json"
 
     private var shareItems: [ShareItem] = []
+    private var sharedTags: [SharedTag] = []
+    private var globalTagIds: Set<String> = []
+
+    private let headerBlock = UIView()
     private let itemsTableView = UITableView(frame: .zero, style: .insetGrouped)
     private let compressAllSwitch = UISwitch()
     private let addButton = UIButton(type: .system)
+    private let tagsScrollView = UIScrollView()
+    private let tagsStack = UIStackView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        loadSharedTags()
         loadShareItems()
-    }
-
-    override func viewDidAppear(_ animated: Bool) {
-        super.viewDidAppear(animated)
-        navigationItem.rightBarButtonItem?.title = "Add"
     }
 
     override func isContentValid() -> Bool {
@@ -132,10 +249,11 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             for provider in providers {
                 if provider.hasItemConformingToTypeIdentifier(typeImage) {
                     let compress = compressSetting(for: provider)
+                    let tagIds = tagIdsForProvider(provider)
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeImage, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "image", compress: compress) {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "image", compress: compress, tagIds: tagIds) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -146,7 +264,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeMovie, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "video", compress: false) {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "video", compress: false, tagIds: []) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -157,7 +275,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeFileURL, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false) {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false, tagIds: []) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -168,7 +286,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeData, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false) {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false, tagIds: []) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -188,15 +306,14 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
 
     private func setupUI() {
         title = "Import"
-        navigationItem.rightBarButtonItem?.title = "Add"
         textView.isHidden = true
         textView.isEditable = false
         textView.isUserInteractionEnabled = false
         textView.heightAnchor.constraint(equalToConstant: 0).isActive = true
 
-        let headerView = UIView()
-        headerView.translatesAutoresizingMaskIntoConstraints = false
+        view.backgroundColor = .systemGroupedBackground
 
+        headerBlock.translatesAutoresizingMaskIntoConstraints = false
         let headerLabel = UILabel()
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
         headerLabel.text = "Compress all"
@@ -204,48 +321,80 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         headerLabel.textColor = .label
 
         compressAllSwitch.translatesAutoresizingMaskIntoConstraints = false
+        compressAllSwitch.isOn = true
         compressAllSwitch.addTarget(self, action: #selector(handleCompressAll), for: .valueChanged)
 
-        headerView.addSubview(headerLabel)
-        headerView.addSubview(compressAllSwitch)
+        let tagsLabel = UILabel()
+        tagsLabel.translatesAutoresizingMaskIntoConstraints = false
+        tagsLabel.text = "Tags"
+        tagsLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        tagsLabel.textColor = .secondaryLabel
+
+        tagsScrollView.translatesAutoresizingMaskIntoConstraints = false
+        tagsScrollView.showsHorizontalScrollIndicator = false
+
+        tagsStack.translatesAutoresizingMaskIntoConstraints = false
+        tagsStack.axis = .horizontal
+        tagsStack.spacing = 8
+        tagsStack.alignment = .center
+
+        tagsScrollView.addSubview(tagsStack)
+        headerBlock.addSubview(headerLabel)
+        headerBlock.addSubview(compressAllSwitch)
+        headerBlock.addSubview(tagsLabel)
+        headerBlock.addSubview(tagsScrollView)
 
         NSLayoutConstraint.activate([
-            headerLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 16),
-            headerLabel.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
+            headerLabel.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor, constant: 16),
+            headerLabel.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 12),
 
-            compressAllSwitch.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -16),
-            compressAllSwitch.centerYAnchor.constraint(equalTo: headerView.centerYAnchor)
+            compressAllSwitch.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor, constant: -16),
+            compressAllSwitch.centerYAnchor.constraint(equalTo: headerLabel.centerYAnchor),
+
+            tagsLabel.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor, constant: 16),
+            tagsLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 10),
+
+            tagsScrollView.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor),
+            tagsScrollView.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor),
+            tagsScrollView.topAnchor.constraint(equalTo: tagsLabel.bottomAnchor, constant: 6),
+            tagsScrollView.heightAnchor.constraint(equalToConstant: 34),
+            tagsScrollView.bottomAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: -12),
+
+            tagsStack.leadingAnchor.constraint(equalTo: tagsScrollView.leadingAnchor, constant: 16),
+            tagsStack.trailingAnchor.constraint(equalTo: tagsScrollView.trailingAnchor, constant: -16),
+            tagsStack.topAnchor.constraint(equalTo: tagsScrollView.topAnchor),
+            tagsStack.bottomAnchor.constraint(equalTo: tagsScrollView.bottomAnchor),
+            tagsStack.heightAnchor.constraint(equalTo: tagsScrollView.heightAnchor)
         ])
 
         itemsTableView.translatesAutoresizingMaskIntoConstraints = false
         itemsTableView.dataSource = self
         itemsTableView.delegate = self
-        itemsTableView.rowHeight = 76
+        itemsTableView.rowHeight = UITableView.automaticDimension
+        itemsTableView.estimatedRowHeight = 110
         itemsTableView.tableFooterView = UIView()
         itemsTableView.separatorStyle = .none
         itemsTableView.backgroundColor = .clear
         itemsTableView.register(ShareItemCell.self, forCellReuseIdentifier: ShareItemCell.reuseId)
 
         addButton.translatesAutoresizingMaskIntoConstraints = false
-        addButton.setTitle("Add", for: .normal)
+        addButton.setTitle("Add photo", for: .normal)
         addButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         addButton.backgroundColor = UIColor(red: 35.0/255.0, green: 107.0/255.0, blue: 166.0/255.0, alpha: 1.0)
         addButton.setTitleColor(.white, for: .normal)
         addButton.layer.cornerRadius = 10
         addButton.addTarget(self, action: #selector(handleAdd), for: .touchUpInside)
 
-        view.addSubview(headerView)
+        view.addSubview(headerBlock)
         view.addSubview(itemsTableView)
         view.addSubview(addButton)
-        view.backgroundColor = .systemGroupedBackground
 
         NSLayoutConstraint.activate([
-            headerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-            headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            headerView.heightAnchor.constraint(equalToConstant: 52),
+            headerBlock.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
+            headerBlock.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            headerBlock.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            itemsTableView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 4),
+            itemsTableView.topAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: 8),
             itemsTableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             itemsTableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             itemsTableView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8),
@@ -257,6 +406,45 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         ])
     }
 
+    private func loadSharedTags() {
+        guard let defaults = UserDefaults(suiteName: appGroupId) else { return }
+        guard let json = defaults.string(forKey: sharedTagsKey),
+              let data = json.data(using: .utf8) else {
+            sharedTags = []
+            reloadTagChips()
+            return
+        }
+
+        do {
+            let payload = try JSONSerialization.jsonObject(with: data, options: [])
+            if let items = payload as? [[String: Any]] {
+                sharedTags = items.compactMap { item -> SharedTag? in
+                    guard let id = item["id"] as? String,
+                          let name = item["name"] as? String else { return nil }
+                    let colorValue = (item["colorValue"] as? Int) ?? 0xFF777777
+                    return SharedTag(id: id, name: name, colorValue: colorValue)
+                }
+            }
+        } catch {
+            sharedTags = []
+        }
+        reloadTagChips()
+    }
+
+    private func reloadTagChips() {
+        tagsStack.arrangedSubviews.forEach { view in
+            tagsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        for tag in sharedTags {
+            let selected = globalTagIds.contains(tag.id)
+            let chip = TagChipButton(tag: tag, selected: selected)
+            chip.addTarget(self, action: #selector(handleGlobalTagTap(_:)), for: .touchUpInside)
+            tagsStack.addArrangedSubview(chip)
+        }
+    }
+
     private func loadShareItems() {
         guard let items = extensionContext?.inputItems as? [NSExtensionItem] else { return }
 
@@ -266,7 +454,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         for item in items {
             guard let providers = item.attachments else { continue }
             for provider in providers where provider.hasItemConformingToTypeIdentifier(typeImage) {
-                collected.append(ShareItem(provider: provider, typeIdentifier: typeImage, compress: false))
+                collected.append(ShareItem(provider: provider, typeIdentifier: typeImage, compress: true))
             }
         }
 
@@ -288,42 +476,11 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                 image = UIImage(contentsOfFile: url.path)
             }
 
-            if image == nil {
-                item.provider.loadItem(forTypeIdentifier: item.typeIdentifier, options: nil) { data, _ in
-                    var fallback: UIImage?
-                    if let url = data as? URL {
-                        fallback = UIImage(contentsOfFile: url.path)
-                    } else if let uiImage = data as? UIImage {
-                        fallback = uiImage
-                    } else if let raw = data as? Data {
-                        fallback = UIImage(data: raw)
-                    }
-                    DispatchQueue.main.async {
-                        item.thumbnail = fallback
-                        self.itemsTableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .automatic)
-                    }
-                }
-                return
-            }
-
             DispatchQueue.main.async {
                 item.thumbnail = image
-                self.itemsTableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .automatic)
+                self.itemsTableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
             }
         }
-    }
-
-    @objc private func handleCompressAll() {
-        for item in shareItems {
-            item.compress = compressAllSwitch.isOn
-        }
-        itemsTableView.reloadData()
-    }
-
-    @objc private func handleAdd() {
-        addButton.isEnabled = false
-        addButton.alpha = 0.6
-        didSelectPost()
     }
 
     private func updateCompressAllSwitch() {
@@ -335,25 +492,47 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         for item in shareItems where item.provider === provider {
             return item.compress
         }
-        return false
+        return compressAllSwitch.isOn
     }
 
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return shareItems.count
+    private func tagIdsForProvider(_ provider: NSItemProvider) -> [String] {
+        for item in shareItems where item.provider === provider {
+            return Array(item.selectedTagIds)
+        }
+        return Array(globalTagIds)
     }
 
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let cell = tableView.dequeueReusableCell(withIdentifier: ShareItemCell.reuseId, for: indexPath) as? ShareItemCell else {
-            return UITableViewCell()
+    @objc private func handleCompressAll() {
+        for item in shareItems {
+            item.compress = compressAllSwitch.isOn
         }
-        let item = shareItems[indexPath.row]
-        cell.configure(thumbnail: item.thumbnail, compress: item.compress) { [weak self] isOn in
-            guard let self = self else { return }
-            item.compress = isOn
-            self.updateCompressAllSwitch()
-        }
-        return cell
+        itemsTableView.reloadData()
     }
+
+    @objc private func handleGlobalTagTap(_ sender: TagChipButton) {
+        let tag = sender.tagModel
+        if globalTagIds.contains(tag.id) {
+            globalTagIds.remove(tag.id)
+            for item in shareItems {
+                item.selectedTagIds.remove(tag.id)
+            }
+        } else {
+            globalTagIds.insert(tag.id)
+            for item in shareItems {
+                item.selectedTagIds.insert(tag.id)
+            }
+        }
+        reloadTagChips()
+        itemsTableView.reloadData()
+    }
+
+    @objc private func handleAdd() {
+        addButton.isEnabled = false
+        addButton.alpha = 0.6
+        didSelectPost()
+    }
+
+    // MARK: Temporary storage
 
     private func appGroupInboxURL() -> URL? {
         guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupId) else {
@@ -366,26 +545,26 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         return inbox
     }
 
-    private func handleLoadedItem(_ item: NSSecureCoding?, mediaTypeHint: String?, compress: Bool) -> [String: Any]? {
+    private func handleLoadedItem(_ item: NSSecureCoding?, mediaTypeHint: String?, compress: Bool, tagIds: [String]) -> [String: Any]? {
         if let url = item as? URL {
-            return copyFile(from: url, mediaTypeHint: mediaTypeHint, compress: compress)
+            return copyFile(from: url, mediaTypeHint: mediaTypeHint, compress: compress, tagIds: tagIds)
         }
         if let image = item as? UIImage {
             guard let data = image.pngData() else { return nil }
-            return writeData(data, ext: "png", originalName: "shared.png", mediaType: "image", compress: compress)
+            return writeData(data, ext: "png", originalName: "shared.png", mediaType: "image", compress: compress, tagIds: tagIds)
         }
         if let data = item as? Data {
             if mediaTypeHint == "image" {
                 let ext = inferImageExtension(from: data)
                 let name = ext.isEmpty ? "shared" : "shared.\(ext)"
-                return writeData(data, ext: ext.isEmpty ? "img" : ext, originalName: name, mediaType: "image", compress: compress)
+                return writeData(data, ext: ext.isEmpty ? "img" : ext, originalName: name, mediaType: "image", compress: compress, tagIds: tagIds)
             }
-            return writeData(data, ext: "bin", originalName: "shared.bin", mediaType: mediaTypeHint ?? "file", compress: compress)
+            return writeData(data, ext: "bin", originalName: "shared.bin", mediaType: mediaTypeHint ?? "file", compress: compress, tagIds: tagIds)
         }
         return nil
     }
 
-    private func copyFile(from url: URL, mediaTypeHint: String?, compress: Bool) -> [String: Any]? {
+    private func copyFile(from url: URL, mediaTypeHint: String?, compress: Bool, tagIds: [String]) -> [String: Any]? {
         let access = url.startAccessingSecurityScopedResource()
         defer {
             if access { url.stopAccessingSecurityScopedResource() }
@@ -395,8 +574,6 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
 
         let originalName = url.lastPathComponent
         let ext = url.pathExtension.isEmpty ? "bin" : url.pathExtension
-        let mediaType = mediaTypeHint ?? inferMediaType(fromExtension: ext)
-
         let targetName = "\(UUID().uuidString).\(ext)"
         let dest = inbox.appendingPathComponent(targetName)
 
@@ -409,17 +586,19 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             return nil
         }
 
+        let mediaType = mediaTypeHint ?? inferMediaType(fromExtension: ext)
         return [
             "fileName": targetName,
             "relativePath": "\(inboxFolderName)/\(targetName)",
             "originalName": originalName,
             "mediaType": mediaType,
             "compress": compress,
+            "tagIds": tagIds,
             "createdAt": Date().timeIntervalSince1970
         ]
     }
 
-    private func writeData(_ data: Data, ext: String, originalName: String, mediaType: String, compress: Bool) -> [String: Any]? {
+    private func writeData(_ data: Data, ext: String, originalName: String, mediaType: String, compress: Bool, tagIds: [String]) -> [String: Any]? {
         guard let inbox = appGroupInboxURL() else { return nil }
 
         let targetName = "\(UUID().uuidString).\(ext)"
@@ -437,6 +616,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             "originalName": originalName,
             "mediaType": mediaType,
             "compress": compress,
+            "tagIds": tagIds,
             "createdAt": Date().timeIntervalSince1970
         ]
     }
@@ -478,5 +658,40 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         let updated = existing + entries
         defaults.set(updated, forKey: manifestKey)
         defaults.synchronize()
+    }
+
+    // MARK: UITableViewDataSource
+
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        return shareItems.count
+    }
+
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        guard let cell = tableView.dequeueReusableCell(withIdentifier: ShareItemCell.reuseId, for: indexPath) as? ShareItemCell else {
+            return UITableViewCell()
+        }
+        let item = shareItems[indexPath.row]
+        let selectedTags = sharedTags.filter { item.selectedTagIds.contains($0.id) }
+
+        cell.configure(
+            thumbnail: item.thumbnail,
+            compress: item.compress,
+            selectedTags: selectedTags,
+            onToggleCompress: { [weak self] isOn in
+                guard let self = self else { return }
+                item.compress = isOn
+                self.updateCompressAllSwitch()
+            },
+            onRemoveTag: { [weak self] tag in
+                guard let self = self else { return }
+                item.selectedTagIds.remove(tag.id)
+                self.globalTagIds = self.shareItems.reduce(item.selectedTagIds) { result, next in
+                    result.intersection(next.selectedTagIds)
+                }
+                self.reloadTagChips()
+                self.itemsTableView.reloadRows(at: [indexPath], with: .none)
+            }
+        )
+        return cell
     }
 }

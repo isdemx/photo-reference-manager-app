@@ -8,11 +8,8 @@ import 'package:flutter/widgets.dart'; // <- здесь живёт DartPluginReg
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
 
-import 'package:photographers_reference_app/backup.service.dart';
 // desktop_multi_window не обязателен здесь, но пускай остаётся — окно создаётся из сервиса
-import 'package:desktop_multi_window/desktop_multi_window.dart';
 import 'package:window_manager/window_manager.dart';
 
 // ==== DATA / DOMAIN ====
@@ -29,8 +26,6 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/user_settings.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
-import 'package:photographers_reference_app/src/domain/repositories/tag_category_repository.dart';
-
 // ==== BLoC / UI ====
 import 'package:photographers_reference_app/src/presentation/bloc/category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
@@ -51,8 +46,8 @@ import 'package:photographers_reference_app/src/presentation/screens/tag_screen.
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 
-import 'package:photographers_reference_app/src/services/export_service.dart';
 import 'package:photographers_reference_app/src/services/shared_inbox_import_service.dart';
+import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/utils/video_preview_migration.dart';
@@ -97,8 +92,10 @@ void main(List<String> args) async {
     // 4) Миграция: перезапись всех превью видео
     // await VideoPreviewMigration.run(photoBox);
 
-    await TagRepositoryImpl(tagBox).initializeDefaultTags();
+    final tagRepository = TagRepositoryImpl(tagBox);
+    await tagRepository.initializeDefaultTags();
     await TagCategoryRepositoryImpl(tagCategoryBox, tagBox).initializeDefaultTagCategory();
+    await SharedTagsSyncService().syncTags(await tagRepository.getTags());
     await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
     await PhotoPathHelper().initialize();
     if (Platform.isIOS) {

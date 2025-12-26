@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/repositories/tag_repository.dart';
+import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
 
 class TagRepositoryImpl implements TagRepository {
   final Box<Tag> tagBox;
@@ -15,6 +16,7 @@ class TagRepositoryImpl implements TagRepository {
   Future<void> addTag(Tag tag) async {
     print('addTag $tag');
     await tagBox.put(tag.id, tag);
+    await _syncSharedTags();
   }
 
   @override
@@ -27,6 +29,7 @@ class TagRepositoryImpl implements TagRepository {
     print('deleteTag ${id}');
     await tagBox.delete(id);
     print('deleted Tag ${id}');
+    await _syncSharedTags();
   }
 
   @override
@@ -35,6 +38,7 @@ class TagRepositoryImpl implements TagRepository {
       print('repo updateTag ${tag.toString()}');
       await tagBox.put(tag.id, tag);
       print('TAG SAVED');
+      await _syncSharedTags();
     } catch (e) {
       print('Error saving tag: $e');
       rethrow;
@@ -68,5 +72,10 @@ class TagRepositoryImpl implements TagRepository {
             'Default tag "${tagData['name']}" has been added to the database.');
       }
     }
+  }
+
+  Future<void> _syncSharedTags() async {
+    final tags = tagBox.values.toList();
+    await SharedTagsSyncService().syncTags(tags);
   }
 }
