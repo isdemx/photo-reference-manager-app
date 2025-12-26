@@ -28,6 +28,8 @@ class SharedInboxImportService {
     final importedPaths = <String>[];
     int imported = 0;
 
+    const defaultCompressSizeKb = 300;
+
     for (final item in raw) {
       if (item is! Map) continue;
       final srcPath = item['filePath'] as String?;
@@ -37,6 +39,7 @@ class SharedInboxImportService {
 
       final mediaType = (item['mediaType'] as String?) ??
           _inferMediaType(p.extension(srcPath));
+      final shouldCompress = (item['compress'] as bool?) ?? true;
       final originalName = (item['originalName'] as String?) ?? 'shared';
       final targetName = _resolveUniqueName(
         photosDir.path,
@@ -67,7 +70,10 @@ class SharedInboxImportService {
         videoDuration: null,
       );
 
-      await repo.addPhoto(photo);
+      final compressSizeKb = (mediaType == 'image' && shouldCompress)
+          ? defaultCompressSizeKb
+          : 0;
+      await repo.addPhoto(photo, compressSizeKb: compressSizeKb);
 
       if (mediaType == 'video') {
         final videoResult = await generateVideoThumbnail(photo);

@@ -75,6 +75,29 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     _reloadNonce[p.id] = (_reloadNonce[p.id] ?? 0) + 1;
   }
 
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    final mb = kb / 1024;
+    if (mb < 1024) return '${mb.toStringAsFixed(1)} MB';
+    final gb = mb / 1024;
+    return '${gb.toStringAsFixed(2)} GB';
+  }
+
+  String _fileSizeLabel(Photo photo) {
+    try {
+      final path = _resolvePhotoPath(photo);
+      final file = File(path);
+      if (file.existsSync()) {
+        return _formatBytes(file.lengthSync());
+      }
+    } catch (_) {
+      // ignore
+    }
+    return '';
+  }
+
   // ------------------------------------------------------------------
   // ------------------------ initState / dispose ----------------------
   // ------------------------------------------------------------------
@@ -419,6 +442,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   Widget build(BuildContext context) {
     final currentPhoto = widget.photos[_currentIndex];
     final isSelected = _selectedPhotos.contains(currentPhoto);
+    final sizeLabel = _fileSizeLabel(currentPhoto);
 
     return Shortcuts(
       shortcuts: {
@@ -467,7 +491,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 ? AppBar(
                     title: Text(
                       '${_currentIndex + 1}/${widget.photos.length}, '
-                      '${formatDate(currentPhoto.dateAdded)}',
+                      '${formatDate(currentPhoto.dateAdded)}'
+                      '${sizeLabel.isEmpty ? '' : ', $sizeLabel'}',
                       style: const TextStyle(fontSize: 14.0),
                     ),
                     actions: [

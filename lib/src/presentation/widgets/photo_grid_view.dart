@@ -12,7 +12,6 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
-import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
