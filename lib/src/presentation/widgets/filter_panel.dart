@@ -15,6 +15,7 @@ class FilterPanel extends StatelessWidget {
   /// true = AND, false = OR
   final bool useAndMode;
   final VoidCallback onToggleLogic;
+  final Widget? extraAction;
 
   bool get isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
 
@@ -23,6 +24,7 @@ class FilterPanel extends StatelessWidget {
     required this.tags,
     required this.useAndMode,
     required this.onToggleLogic,
+    this.extraAction,
   });
 
   @override
@@ -61,11 +63,11 @@ class FilterPanel extends StatelessWidget {
                   // ---------------- Row: заголовок + OR / AND + Clear
                   Row(
                     children: [
-                      const Text(
-                        'Tags:',
-                        style: TextStyle(color: Colors.white),
-                      ),
-                      const SizedBox(width: 8),
+                      // const Text(
+                      //   'Tags:',
+                      //   style: TextStyle(color: Colors.white),
+                      // ),
+                      // const SizedBox(width: 8),
                       ChoiceChip(
                         label: const Text('OR'),
                         selected: !useAndMode,
@@ -107,6 +109,10 @@ class FilterPanel extends StatelessWidget {
                           vertical: 0,
                         ),
                       ),
+                      if (extraAction != null) ...[
+                        const SizedBox(width: 15),
+                        extraAction!,
+                      ],
                       const Spacer(),
                       TextButton.icon(
                         onPressed: () {

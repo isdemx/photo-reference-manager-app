@@ -45,6 +45,10 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                 for (final t in tags ?? <Tag>[]) t.id: t,
               };
 
+              final List<Tag> visibleTags = _filterNotRef
+                  ? tags.where((tag) => tag.name != 'Not Ref').toList()
+                  : tags;
+
               final List<Photo> photosFiltered = _filterNotRef
                   ? photoState.photos.where((photo) {
                       // Если у фото нет тегов — считаем его проходным (true)
@@ -89,14 +93,44 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                   body: PhotoGridView(
                     title: 'Images',
                     photos: photosFiltered,
-                    tags: tags,
-                    actionFromParent: GestureDetector(
-                      onTap: () {
+                    tags: visibleTags,
+                    actionFromParent: RawChip(
+                      label: const Text('NOT REF'),
+                      selected: !_filterNotRef,
+                      showCheckmark: false,
+                      avatar: !_filterNotRef
+                          ? const Padding(
+                              padding: EdgeInsets.only(left: 2, right: 2),
+                              child: Icon(
+                                Icons.check,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                            )
+                          : null,
+                      onSelected: (_) {
                         setState(() {
                           _filterNotRef = !_filterNotRef;
                         });
                       },
-                      child: Container(),
+                      selectedColor: Colors.red.shade600,
+                      backgroundColor: Colors.red.shade300,
+                      labelStyle: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                      visualDensity: const VisualDensity(
+                        horizontal: -2,
+                        vertical: -2,
+                      ),
+                      shape: const StadiumBorder(),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 0,
+                      ),
+                      labelPadding: const EdgeInsets.only(right: 6),
                     ),
                   ),
                 ),

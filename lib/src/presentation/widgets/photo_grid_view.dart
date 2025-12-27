@@ -675,8 +675,6 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                         ),
                         actions: !_isMultiSelect
                             ? [
-                                if (widget.actionFromParent != null)
-                                  widget.actionFromParent!,
                                 IconButton(
                                   icon: Icon(
                                     _isPinterestLayout
@@ -793,6 +791,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                         onToggleLogic: () {
                           setState(() => _filterAndMode = !_filterAndMode);
                         },
+                        extraAction: widget.actionFromParent,
                       )
                     : const SizedBox.shrink(),
               ),
@@ -886,6 +885,7 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                 onToggleLogic: () {
                   setState(() => _filterAndMode = !_filterAndMode);
                 },
+                extraAction: widget.actionFromParent,
               ),
             ),
           ),
