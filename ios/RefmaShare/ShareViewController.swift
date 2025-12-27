@@ -13,6 +13,8 @@ struct SharedTag {
     let id: String
     let name: String
     let colorValue: Int
+    let categoryId: String?
+    let categoryName: String?
 }
 
 final class ShareItem {
@@ -37,12 +39,12 @@ final class TagChipButton: UIButton {
         self.tagModel = tag
         super.init(frame: .zero)
         setTitle(tag.name, for: .normal)
-        titleLabel?.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        titleLabel?.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         setTitleColor(.white, for: .normal)
         backgroundColor = TagChipButton.colorFromFlutter(tag.colorValue)
             .withAlphaComponent(selected ? 1.0 : 0.4)
         layer.cornerRadius = 12
-        contentEdgeInsets = UIEdgeInsets(top: 4, left: 10, bottom: 4, right: 10)
+        contentEdgeInsets = UIEdgeInsets(top: 6, left: 10, bottom: 6, right: 10)
         translatesAutoresizingMaskIntoConstraints = false
     }
 
@@ -77,6 +79,172 @@ final class SelectedTagChip: UIButton {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+}
+
+final class TagChipWrapCell: UICollectionViewCell {
+    static let reuseId = "TagChipWrapCell"
+
+    private let chipButton = TagChipButton(
+        tag: SharedTag(id: "", name: "", colorValue: 0, categoryId: nil, categoryName: nil),
+        selected: false
+    )
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        contentView.addSubview(chipButton)
+        chipButton.isUserInteractionEnabled = false
+        chipButton.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            chipButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            chipButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            chipButton.topAnchor.constraint(equalTo: contentView.topAnchor),
+            chipButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func configure(tag: SharedTag, selected: Bool) {
+        chipButton.setTitle(tag.name, for: .normal)
+        chipButton.backgroundColor = TagChipButton.colorFromFlutter(tag.colorValue)
+            .withAlphaComponent(selected ? 1.0 : 0.4)
+    }
+}
+
+final class TagCategoryHeaderView: UICollectionReusableView {
+    static let reuseId = "TagCategoryHeaderView"
+
+    let label = UILabel()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .secondaryLabel
+        addSubview(label)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor),
+            label.topAnchor.constraint(equalTo: topAnchor),
+            label.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+final class GroupedTagsView: UIView, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+    private let collectionView: UICollectionView
+    private var sections: [(String, [SharedTag])] = []
+    private var selectedIds: Set<String> = []
+
+    var onTapTag: ((SharedTag) -> Void)?
+
+    override init(frame: CGRect) {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumInteritemSpacing = 8
+        layout.minimumLineSpacing = 8
+        layout.sectionInset = UIEdgeInsets(top: 6, left: 0, bottom: 14, right: 0)
+        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+        layout.headerReferenceSize = CGSize(width: 1, height: 18)
+        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        super.init(frame: frame)
+        setup()
+    }
+
+    required init?(coder: NSCoder) {
+        let layout = UICollectionViewFlowLayout()
+        layout.scrollDirection = .vertical
+        layout.minimumInteritemSpacing = 8
+        layout.minimumLineSpacing = 8
+        layout.sectionInset = UIEdgeInsets(top: 6, left: 0, bottom: 14, right: 0)
+        layout.estimatedItemSize = UICollectionViewFlowLayout.automaticSize
+        layout.headerReferenceSize = CGSize(width: 1, height: 18)
+        collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
+        super.init(coder: coder)
+        setup()
+    }
+
+    private func setup() {
+        translatesAutoresizingMaskIntoConstraints = false
+        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        collectionView.backgroundColor = .clear
+        collectionView.dataSource = self
+        collectionView.delegate = self
+        collectionView.register(TagChipWrapCell.self, forCellWithReuseIdentifier: TagChipWrapCell.reuseId)
+        collectionView.register(TagCategoryHeaderView.self,
+                                forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
+                                withReuseIdentifier: TagCategoryHeaderView.reuseId)
+
+        addSubview(collectionView)
+        NSLayoutConstraint.activate([
+            collectionView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            collectionView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            collectionView.topAnchor.constraint(equalTo: topAnchor),
+            collectionView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    func update(tags: [SharedTag], selectedIds: Set<String>) {
+        self.selectedIds = selectedIds
+        let grouped = Dictionary(grouping: tags) { tag -> String in
+            return tag.categoryName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? tag.categoryName!
+                : "Other"
+        }
+        let sortedCategories = grouped.keys.sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
+        sections = sortedCategories.compactMap { key in
+            guard let tags = grouped[key] else { return nil }
+            return (key, tags)
+        }
+        collectionView.reloadData()
+    }
+
+    func numberOfSections(in collectionView: UICollectionView) -> Int {
+        return sections.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
+        return sections[section].1.count
+    }
+
+    func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: TagChipWrapCell.reuseId, for: indexPath) as? TagChipWrapCell else {
+            return UICollectionViewCell()
+        }
+        let tag = sections[indexPath.section].1[indexPath.item]
+        cell.configure(tag: tag, selected: selectedIds.contains(tag.id))
+        return cell
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        let tag = sections[indexPath.section].1[indexPath.item]
+        onTapTag?(tag)
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        viewForSupplementaryElementOfKind kind: String,
+                        at indexPath: IndexPath) -> UICollectionReusableView {
+        guard kind == UICollectionView.elementKindSectionHeader,
+              let header = collectionView.dequeueReusableSupplementaryView(
+                ofKind: kind,
+                withReuseIdentifier: TagCategoryHeaderView.reuseId,
+                for: indexPath
+              ) as? TagCategoryHeaderView else {
+            return UICollectionReusableView()
+        }
+        header.label.text = sections[indexPath.section].0
+        return header
     }
 }
 
@@ -127,11 +295,11 @@ final class ShareItemCell: UITableViewCell {
         NSLayoutConstraint.activate([
             thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             thumbImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            thumbImageView.widthAnchor.constraint(equalToConstant: 56),
-            thumbImageView.heightAnchor.constraint(equalToConstant: 56),
+            thumbImageView.widthAnchor.constraint(equalToConstant: 84),
+            thumbImageView.heightAnchor.constraint(equalToConstant: 84),
 
             compressSwitch.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            compressSwitch.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
+            compressSwitch.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 22),
 
             compressLabel.trailingAnchor.constraint(equalTo: compressSwitch.leadingAnchor, constant: -8),
             compressLabel.centerYAnchor.constraint(equalTo: compressSwitch.centerYAnchor),
@@ -212,11 +380,32 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
     private var globalTagIds: Set<String> = []
 
     private let headerBlock = UIView()
+    private let compressAllContainer = UIView()
     private let itemsTableView = UITableView(frame: .zero, style: .insetGrouped)
+    private let wrapTagsContainer = UIView()
+    private let wrapTagsLabel = UILabel()
+    private let wrapTagsView = GroupedTagsView()
     private let compressAllSwitch = UISwitch()
     private let addButton = UIButton(type: .system)
     private let tagsScrollView = UIScrollView()
     private let tagsStack = UIStackView()
+    private let tagsToggleButton = UIButton(type: .system)
+
+    private let tagsOverlayView = UIView()
+    private let tagsOverlayPanel = UIView()
+    private let tagsOverlayHeader = UIView()
+    private let tagsOverlayTitle = UILabel()
+    private let tagsOverlayCloseButton = UIButton(type: .system)
+    private let tagsOverlayViewContent = GroupedTagsView()
+
+    private var tagsTopToCompressConstraint: NSLayoutConstraint?
+    private var tagsTopToHeaderConstraint: NSLayoutConstraint?
+    private var itemsTableTopToHeaderConstraint: NSLayoutConstraint?
+    private var itemsTableTopToSafeConstraint: NSLayoutConstraint?
+    private var itemsTableBottomToWrapConstraint: NSLayoutConstraint?
+    private var itemsTableBottomToAddConstraint: NSLayoutConstraint?
+    private var wrapTagsHeightConstraint: NSLayoutConstraint?
+    private var itemsTableFixedHeightConstraint: NSLayoutConstraint?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -314,6 +503,8 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         view.backgroundColor = .systemGroupedBackground
 
         headerBlock.translatesAutoresizingMaskIntoConstraints = false
+        compressAllContainer.translatesAutoresizingMaskIntoConstraints = false
+
         let headerLabel = UILabel()
         headerLabel.translatesAutoresizingMaskIntoConstraints = false
         headerLabel.text = "Compress all"
@@ -330,6 +521,11 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         tagsLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
         tagsLabel.textColor = .secondaryLabel
 
+        tagsToggleButton.translatesAutoresizingMaskIntoConstraints = false
+        tagsToggleButton.setImage(UIImage(systemName: "square.grid.2x2"), for: .normal)
+        tagsToggleButton.tintColor = .secondaryLabel
+        tagsToggleButton.addTarget(self, action: #selector(handleShowAllTags), for: .touchUpInside)
+
         tagsScrollView.translatesAutoresizingMaskIntoConstraints = false
         tagsScrollView.showsHorizontalScrollIndicator = false
 
@@ -339,20 +535,35 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         tagsStack.alignment = .center
 
         tagsScrollView.addSubview(tagsStack)
-        headerBlock.addSubview(headerLabel)
-        headerBlock.addSubview(compressAllSwitch)
+        compressAllContainer.addSubview(headerLabel)
+        compressAllContainer.addSubview(compressAllSwitch)
+        headerBlock.addSubview(compressAllContainer)
         headerBlock.addSubview(tagsLabel)
+        headerBlock.addSubview(tagsToggleButton)
         headerBlock.addSubview(tagsScrollView)
 
-        NSLayoutConstraint.activate([
-            headerLabel.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor, constant: 16),
-            headerLabel.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 12),
+        tagsTopToCompressConstraint = tagsLabel.topAnchor.constraint(equalTo: compressAllContainer.bottomAnchor, constant: 10)
+        tagsTopToHeaderConstraint = tagsLabel.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 12)
+        tagsTopToCompressConstraint?.isActive = true
 
-            compressAllSwitch.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor, constant: -16),
-            compressAllSwitch.centerYAnchor.constraint(equalTo: headerLabel.centerYAnchor),
+        NSLayoutConstraint.activate([
+            compressAllContainer.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor, constant: 16),
+            compressAllContainer.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor, constant: -16),
+            compressAllContainer.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 12),
+
+            headerLabel.leadingAnchor.constraint(equalTo: compressAllContainer.leadingAnchor),
+            headerLabel.topAnchor.constraint(equalTo: compressAllContainer.topAnchor),
+            headerLabel.bottomAnchor.constraint(equalTo: compressAllContainer.bottomAnchor),
+
+            compressAllSwitch.trailingAnchor.constraint(equalTo: compressAllContainer.trailingAnchor),
+            compressAllSwitch.centerYAnchor.constraint(equalTo: compressAllContainer.centerYAnchor),
 
             tagsLabel.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor, constant: 16),
-            tagsLabel.topAnchor.constraint(equalTo: headerLabel.bottomAnchor, constant: 10),
+
+            tagsToggleButton.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor, constant: -16),
+            tagsToggleButton.centerYAnchor.constraint(equalTo: tagsLabel.centerYAnchor),
+            tagsToggleButton.widthAnchor.constraint(equalToConstant: 28),
+            tagsToggleButton.heightAnchor.constraint(equalToConstant: 28),
 
             tagsScrollView.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor),
             tagsScrollView.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor),
@@ -377,6 +588,19 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         itemsTableView.backgroundColor = .clear
         itemsTableView.register(ShareItemCell.self, forCellReuseIdentifier: ShareItemCell.reuseId)
 
+        wrapTagsContainer.translatesAutoresizingMaskIntoConstraints = false
+        wrapTagsContainer.backgroundColor = .secondarySystemBackground
+        wrapTagsContainer.layer.cornerRadius = 12
+        wrapTagsContainer.layer.masksToBounds = true
+
+        wrapTagsLabel.translatesAutoresizingMaskIntoConstraints = false
+        wrapTagsLabel.text = "All tags"
+        wrapTagsLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        wrapTagsLabel.textColor = .secondaryLabel
+
+        wrapTagsContainer.addSubview(wrapTagsLabel)
+        wrapTagsContainer.addSubview(wrapTagsView)
+
         addButton.translatesAutoresizingMaskIntoConstraints = false
         addButton.setTitle("Add photo", for: .normal)
         addButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
@@ -387,22 +611,105 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
 
         view.addSubview(headerBlock)
         view.addSubview(itemsTableView)
+        view.addSubview(wrapTagsContainer)
         view.addSubview(addButton)
+        setupTagsOverlay()
+
+        itemsTableTopToHeaderConstraint = itemsTableView.topAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: 8)
+        itemsTableTopToSafeConstraint = itemsTableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8)
+        itemsTableBottomToWrapConstraint = itemsTableView.bottomAnchor.constraint(equalTo: wrapTagsContainer.topAnchor, constant: -8)
+        itemsTableBottomToAddConstraint = itemsTableView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8)
+        wrapTagsHeightConstraint = wrapTagsContainer.heightAnchor.constraint(equalToConstant: 0)
+        itemsTableFixedHeightConstraint = itemsTableView.heightAnchor.constraint(equalToConstant: 170)
+
+        itemsTableTopToHeaderConstraint?.isActive = true
+        itemsTableBottomToWrapConstraint?.isActive = true
 
         NSLayoutConstraint.activate([
             headerBlock.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             headerBlock.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerBlock.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            itemsTableView.topAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: 8),
             itemsTableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             itemsTableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            itemsTableView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8),
+
+            wrapTagsContainer.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            wrapTagsContainer.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            wrapTagsContainer.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8),
+
+            wrapTagsLabel.leadingAnchor.constraint(equalTo: wrapTagsContainer.leadingAnchor, constant: 12),
+            wrapTagsLabel.topAnchor.constraint(equalTo: wrapTagsContainer.topAnchor, constant: 8),
+
+            wrapTagsView.leadingAnchor.constraint(equalTo: wrapTagsContainer.leadingAnchor, constant: 12),
+            wrapTagsView.trailingAnchor.constraint(equalTo: wrapTagsContainer.trailingAnchor, constant: -12),
+            wrapTagsView.topAnchor.constraint(equalTo: wrapTagsLabel.bottomAnchor, constant: 8),
+            wrapTagsView.bottomAnchor.constraint(equalTo: wrapTagsContainer.bottomAnchor, constant: -8),
 
             addButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             addButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             addButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
             addButton.heightAnchor.constraint(equalToConstant: 44)
+        ])
+    }
+
+    private func setupTagsOverlay() {
+        tagsOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        tagsOverlayView.backgroundColor = .clear
+        tagsOverlayView.isHidden = true
+
+        tagsOverlayPanel.translatesAutoresizingMaskIntoConstraints = false
+        tagsOverlayPanel.backgroundColor = .systemGroupedBackground
+        tagsOverlayPanel.layer.cornerRadius = 16
+        tagsOverlayPanel.layer.masksToBounds = true
+
+        tagsOverlayHeader.translatesAutoresizingMaskIntoConstraints = false
+
+        tagsOverlayTitle.translatesAutoresizingMaskIntoConstraints = false
+        tagsOverlayTitle.text = "Tags"
+        tagsOverlayTitle.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        tagsOverlayTitle.textColor = .label
+        tagsOverlayTitle.textAlignment = .center
+
+        tagsOverlayCloseButton.translatesAutoresizingMaskIntoConstraints = false
+        tagsOverlayCloseButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        tagsOverlayCloseButton.tintColor = .secondaryLabel
+        tagsOverlayCloseButton.addTarget(self, action: #selector(handleCloseAllTags), for: .touchUpInside)
+
+        tagsOverlayHeader.addSubview(tagsOverlayTitle)
+        tagsOverlayHeader.addSubview(tagsOverlayCloseButton)
+        tagsOverlayPanel.addSubview(tagsOverlayHeader)
+        tagsOverlayPanel.addSubview(tagsOverlayViewContent)
+        tagsOverlayView.addSubview(tagsOverlayPanel)
+        view.addSubview(tagsOverlayView)
+
+        NSLayoutConstraint.activate([
+            tagsOverlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            tagsOverlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tagsOverlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tagsOverlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            tagsOverlayPanel.topAnchor.constraint(equalTo: tagsOverlayView.safeAreaLayoutGuide.topAnchor, constant: 30),
+            tagsOverlayPanel.leadingAnchor.constraint(equalTo: tagsOverlayView.leadingAnchor, constant: 10),
+            tagsOverlayPanel.trailingAnchor.constraint(equalTo: tagsOverlayView.trailingAnchor, constant: -10),
+            tagsOverlayPanel.bottomAnchor.constraint(equalTo: tagsOverlayView.bottomAnchor, constant: -30),
+
+            tagsOverlayHeader.topAnchor.constraint(equalTo: tagsOverlayPanel.topAnchor),
+            tagsOverlayHeader.leadingAnchor.constraint(equalTo: tagsOverlayPanel.leadingAnchor),
+            tagsOverlayHeader.trailingAnchor.constraint(equalTo: tagsOverlayPanel.trailingAnchor),
+            tagsOverlayHeader.heightAnchor.constraint(equalToConstant: 52),
+
+            tagsOverlayTitle.centerXAnchor.constraint(equalTo: tagsOverlayHeader.centerXAnchor),
+            tagsOverlayTitle.centerYAnchor.constraint(equalTo: tagsOverlayHeader.centerYAnchor),
+
+            tagsOverlayCloseButton.trailingAnchor.constraint(equalTo: tagsOverlayHeader.trailingAnchor, constant: -16),
+            tagsOverlayCloseButton.centerYAnchor.constraint(equalTo: tagsOverlayHeader.centerYAnchor),
+            tagsOverlayCloseButton.widthAnchor.constraint(equalToConstant: 28),
+            tagsOverlayCloseButton.heightAnchor.constraint(equalToConstant: 28),
+
+            tagsOverlayViewContent.leadingAnchor.constraint(equalTo: tagsOverlayPanel.leadingAnchor, constant: 16),
+            tagsOverlayViewContent.trailingAnchor.constraint(equalTo: tagsOverlayPanel.trailingAnchor, constant: -16),
+            tagsOverlayViewContent.topAnchor.constraint(equalTo: tagsOverlayHeader.bottomAnchor),
+            tagsOverlayViewContent.bottomAnchor.constraint(equalTo: tagsOverlayPanel.bottomAnchor)
         ])
     }
 
@@ -412,6 +719,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
               let data = json.data(using: .utf8) else {
             sharedTags = []
             reloadTagChips()
+            updateGroupedTagViews()
             return
         }
 
@@ -422,13 +730,22 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     guard let id = item["id"] as? String,
                           let name = item["name"] as? String else { return nil }
                     let colorValue = (item["colorValue"] as? Int) ?? 0xFF777777
-                    return SharedTag(id: id, name: name, colorValue: colorValue)
+                    let categoryId = item["tagCategoryId"] as? String
+                    let categoryName = item["tagCategoryName"] as? String
+                    return SharedTag(
+                        id: id,
+                        name: name,
+                        colorValue: colorValue,
+                        categoryId: categoryId,
+                        categoryName: categoryName
+                    )
                 }
             }
         } catch {
             sharedTags = []
         }
         reloadTagChips()
+        updateGroupedTagViews()
     }
 
     private func reloadTagChips() {
@@ -443,6 +760,19 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             chip.addTarget(self, action: #selector(handleGlobalTagTap(_:)), for: .touchUpInside)
             tagsStack.addArrangedSubview(chip)
         }
+    }
+
+    private func updateGroupedTagViews() {
+        wrapTagsView.onTapTag = { [weak self] tag in
+            guard let self = self else { return }
+            self.toggleGlobalTag(tag)
+            self.reloadTagChips()
+            self.updateGroupedTagViews()
+            self.itemsTableView.reloadData()
+        }
+        tagsOverlayViewContent.onTapTag = wrapTagsView.onTapTag
+        wrapTagsView.update(tags: sharedTags, selectedIds: globalTagIds)
+        tagsOverlayViewContent.update(tags: sharedTags, selectedIds: globalTagIds)
     }
 
     private func loadShareItems() {
@@ -460,6 +790,8 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
 
         shareItems = collected
         updateCompressAllSwitch()
+        updateLayoutForItems()
+        updateAddButtonTitle()
         itemsTableView.reloadData()
 
         for (index, item) in shareItems.enumerated() {
@@ -488,6 +820,31 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         compressAllSwitch.isOn = allOn
     }
 
+    private func updateLayoutForItems() {
+        let hasMultiple = shareItems.count > 1
+        let showCompressAll = shareItems.count > 1
+        compressAllContainer.isHidden = !showCompressAll
+            tagsTopToCompressConstraint?.isActive = showCompressAll
+            tagsTopToHeaderConstraint?.isActive = !showCompressAll
+
+        headerBlock.isHidden = !hasMultiple
+        wrapTagsContainer.isHidden = hasMultiple
+
+        itemsTableTopToHeaderConstraint?.isActive = hasMultiple
+        itemsTableTopToSafeConstraint?.isActive = !hasMultiple
+
+        itemsTableBottomToWrapConstraint?.isActive = !hasMultiple
+        itemsTableBottomToAddConstraint?.isActive = hasMultiple
+
+        wrapTagsHeightConstraint?.isActive = hasMultiple
+        itemsTableFixedHeightConstraint?.isActive = !hasMultiple
+    }
+
+    private func updateAddButtonTitle() {
+        let title = shareItems.count > 1 ? "Add photos" : "Add photo"
+        addButton.setTitle(title, for: .normal)
+    }
+
     private func compressSetting(for provider: NSItemProvider) -> Bool {
         for item in shareItems where item.provider === provider {
             return item.compress
@@ -502,15 +859,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         return Array(globalTagIds)
     }
 
-    @objc private func handleCompressAll() {
-        for item in shareItems {
-            item.compress = compressAllSwitch.isOn
-        }
-        itemsTableView.reloadData()
-    }
-
-    @objc private func handleGlobalTagTap(_ sender: TagChipButton) {
-        let tag = sender.tagModel
+    private func toggleGlobalTag(_ tag: SharedTag) {
         if globalTagIds.contains(tag.id) {
             globalTagIds.remove(tag.id)
             for item in shareItems {
@@ -522,8 +871,30 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                 item.selectedTagIds.insert(tag.id)
             }
         }
-        reloadTagChips()
+    }
+
+    @objc private func handleCompressAll() {
+        for item in shareItems {
+            item.compress = compressAllSwitch.isOn
+        }
         itemsTableView.reloadData()
+    }
+
+    @objc private func handleGlobalTagTap(_ sender: TagChipButton) {
+        let tag = sender.tagModel
+        toggleGlobalTag(tag)
+        reloadTagChips()
+        updateGroupedTagViews()
+        itemsTableView.reloadData()
+    }
+
+    @objc private func handleShowAllTags() {
+        tagsOverlayView.isHidden = false
+        view.bringSubviewToFront(tagsOverlayView)
+    }
+
+    @objc private func handleCloseAllTags() {
+        tagsOverlayView.isHidden = true
     }
 
     @objc private func handleAdd() {
@@ -689,9 +1060,12 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     result.intersection(next.selectedTagIds)
                 }
                 self.reloadTagChips()
+                self.updateGroupedTagViews()
                 self.itemsTableView.reloadRows(at: [indexPath], with: .none)
             }
         )
         return cell
     }
+
+    // MARK: -
 }

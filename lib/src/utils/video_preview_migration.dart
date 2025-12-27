@@ -14,7 +14,10 @@ class VideoPreviewMigration {
   /// - ТОЛЬКО видео
   /// - Удаляет СТАРЫЕ превью
   /// - Генерирует новые через FFmpeg
-  static Future<void> run(Box<Photo> photoBox) async {
+  static Future<int> run(
+    Box<Photo> photoBox, {
+    void Function(int current, int total)? onProgress,
+  }) async {
     debugPrint('🟡 VideoPreviewMigration (FORCE) started');
 
     final appDir = await getApplicationDocumentsDirectory();
@@ -23,9 +26,17 @@ class VideoPreviewMigration {
       photosDir.createSync(recursive: true);
     }
 
+    var total = 0;
+    for (final photo in photoBox.values) {
+      if (photo.mediaType == 'video') {
+        total++;
+      }
+    }
+
     int regenerated = 0;
     int skipped = 0;
     int deleted = 0;
+    int processed = 0;
 
     for (final photo in photoBox.values) {
       // ❗️ТРОГАЕМ ТОЛЬКО ВИДЕО
@@ -83,12 +94,18 @@ class VideoPreviewMigration {
       } catch (e, st) {
         debugPrint('❌ Error processing ${photo.fileName}: $e\n$st');
       }
+
+      processed++;
+      if (onProgress != null) {
+        onProgress(processed, total);
+      }
     }
 
     debugPrint(
       '🟢 VideoPreviewMigration finished '
       '(regenerated=$regenerated, deleted=$deleted, skipped=$skipped)',
     );
+    return regenerated;
   }
 
   // ---------- FFmpeg ----------

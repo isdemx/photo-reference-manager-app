@@ -4,6 +4,7 @@ import 'package:hive/hive.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
 import 'package:photographers_reference_app/src/domain/repositories/tag_category_repository.dart';
+import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
 
 class TagCategoryRepositoryImpl implements TagCategoryRepository {
   final Box<TagCategory> categoryBox;
@@ -14,6 +15,7 @@ class TagCategoryRepositoryImpl implements TagCategoryRepository {
   @override
   Future<void> addTagCategory(TagCategory category) async {
     await categoryBox.put(category.id, category);
+    await _syncSharedTags();
   }
 
   @override
@@ -47,11 +49,13 @@ class TagCategoryRepositoryImpl implements TagCategoryRepository {
 
     // 3) Нормализуем sortOrder (плотные индексы 0..n-1)
     await _normalizeSortOrder();
+    await _syncSharedTags();
   }
 
   @override
   Future<void> updateTagCategory(TagCategory category) async {
     await categoryBox.put(category.id, category);
+    await _syncSharedTags();
   }
 
   @override
@@ -63,6 +67,7 @@ class TagCategoryRepositoryImpl implements TagCategoryRepository {
         await categoryBox.put(id, c.copyWith(sortOrder: i));
       }
     }
+    await _syncSharedTags();
   }
 
   @override
@@ -76,6 +81,7 @@ class TagCategoryRepositoryImpl implements TagCategoryRepository {
       );
       await categoryBox.put(def.id, def);
     }
+    await _syncSharedTags();
   }
 
   Future<void> _normalizeSortOrder() async {
@@ -90,5 +96,9 @@ class TagCategoryRepositoryImpl implements TagCategoryRepository {
         await categoryBox.put(c.id, c.copyWith(sortOrder: i));
       }
     }
+  }
+
+  Future<void> _syncSharedTags() async {
+    await SharedTagsSyncService().syncTags(tagBox.values.toList());
   }
 }

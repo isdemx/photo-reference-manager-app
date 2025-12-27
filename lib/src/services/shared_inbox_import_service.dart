@@ -13,11 +13,33 @@ class SharedInboxImportService {
   static const MethodChannel _channel =
       MethodChannel('refma/shared_import');
 
-  Future<int> importIfAvailable(PhotoRepositoryImpl repo) async {
-    if (kIsWeb || !Platform.isIOS) return 0;
+  Future<List<Map<String, dynamic>>> loadManifest() async {
+    if (kIsWeb || !Platform.isIOS) return const [];
 
     final raw = await _channel.invokeMethod<List<dynamic>>('getManifest');
-    if (raw == null || raw.isEmpty) return 0;
+    if (raw == null || raw.isEmpty) return const [];
+
+    final items = <Map<String, dynamic>>[];
+    for (final item in raw) {
+      if (item is Map) {
+        items.add(Map<String, dynamic>.from(item));
+      }
+    }
+    return items;
+  }
+
+  Future<int> importIfAvailable(PhotoRepositoryImpl repo) async {
+    final manifest = await loadManifest();
+    if (manifest.isEmpty) return 0;
+    return importManifest(manifest, repo);
+  }
+
+  Future<int> importManifest(
+    List<Map<String, dynamic>> manifest,
+    PhotoRepositoryImpl repo, {
+    void Function(int current)? onProgress,
+  }) async {
+    if (kIsWeb || !Platform.isIOS) return 0;
 
     final appDir = await getApplicationDocumentsDirectory();
     final photosDir = Directory(p.join(appDir.path, 'photos'));
@@ -30,12 +52,22 @@ class SharedInboxImportService {
 
     const defaultCompressSizeKb = 300;
 
-    for (final item in raw) {
-      if (item is! Map) continue;
+    onProgress?.call(0);
+    var processed = 0;
+
+    for (final item in manifest) {
       final srcPath = item['filePath'] as String?;
-      if (srcPath == null || srcPath.isEmpty) continue;
+      if (srcPath == null || srcPath.isEmpty) {
+        processed++;
+        onProgress?.call(processed);
+        continue;
+      }
       final srcFile = File(srcPath);
-      if (!await srcFile.exists()) continue;
+      if (!await srcFile.exists()) {
+        processed++;
+        onProgress?.call(processed);
+        continue;
+      }
 
       final mediaType = (item['mediaType'] as String?) ??
           _inferMediaType(p.extension(srcPath));
@@ -60,6 +92,8 @@ class SharedInboxImportService {
       try {
         await srcFile.copy(destPath);
       } catch (_) {
+        processed++;
+        onProgress?.call(processed);
         continue;
       }
 
@@ -95,6 +129,8 @@ class SharedInboxImportService {
 
       importedPaths.add(srcPath);
       imported++;
+      processed++;
+      onProgress?.call(processed);
     }
 
     if (importedPaths.isNotEmpty) {

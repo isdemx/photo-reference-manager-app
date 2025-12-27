@@ -45,12 +45,11 @@ import 'package:photographers_reference_app/src/presentation/screens/photo_viewe
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/migration_overlay_host.dart';
 
-import 'package:photographers_reference_app/src/services/shared_inbox_import_service.dart';
 import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
-import 'package:photographers_reference_app/src/utils/video_preview_migration.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _ratingPromptScheduled = false;
@@ -89,26 +88,12 @@ void main(List<String> args) async {
     final collageBox = await Hive.openBox<Collage>('collages');
     final tagCategoryBox = await Hive.openBox<TagCategory>('tag_categories');
 
-    // 4) Миграция: перезапись всех превью видео
-    // await VideoPreviewMigration.run(photoBox);
-
     final tagRepository = TagRepositoryImpl(tagBox);
     await tagRepository.initializeDefaultTags();
     await TagCategoryRepositoryImpl(tagCategoryBox, tagBox).initializeDefaultTagCategory();
     await SharedTagsSyncService().syncTags(await tagRepository.getTags());
     await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
     await PhotoPathHelper().initialize();
-    if (Platform.isIOS) {
-      try {
-        await SharedInboxImportService().importIfAvailable(
-          PhotoRepositoryImpl(photoBox),
-        );
-      } catch (e, st) {
-        // Avoid crashing app on startup if share import fails.
-        // ignore: avoid_print
-        print('[SharedInboxImport] $e\n$st');
-      }
-    }
 
     // 5) Запуск приложения
     runApp(MyApp(
@@ -163,12 +148,6 @@ Map<String, dynamic> _safeDecode(String s) {
   } catch (_) {
     return {};
   }
-}
-
-// --------------------- MIGRATIONS ---------------------
-
-Future<void> migrateTagBox(Box<Tag> tagBox, Box<Photo> photoBox) async {
-  // оставь здесь свою реализацию миграции тегов
 }
 
 // --------------------- APP ---------------------
@@ -250,7 +229,8 @@ class MyApp extends StatelessWidget {
                 }
               });
             }
-            return child ?? const SizedBox.shrink();
+            final content = child ?? const SizedBox.shrink();
+            return MigrationOverlayHost(child: content);
           },
 
           // Стартовый стек — сразу, без чёрного кадра
