@@ -81,8 +81,14 @@ class _AppLockHostState extends State<AppLockHost>
   Future<void> _authenticate() async {
     if (_authInProgress) return;
     _authInProgress = true;
-    final ok = await _authService.authenticate();
-    _authInProgress = false;
+    bool ok = false;
+    try {
+      ok = await _authService.authenticate();
+    } catch (_) {
+      ok = false;
+    } finally {
+      _authInProgress = false;
+    }
     if (!mounted) return;
     setState(() {
       _locked = !ok;
