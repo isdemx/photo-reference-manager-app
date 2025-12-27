@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:photographers_reference_app/src/services/biometric_auth_service.dart';
 import 'package:photographers_reference_app/src/services/biometric_settings_service.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 
 import 'package:photographers_reference_app/backup.service.dart';
 
@@ -202,6 +203,35 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           ),
                         ),
                       ),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.star_rate_rounded,
+                        color: Colors.white70,
+                      ),
+                      title: const Text(
+                        'Rate the app',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: const Text(
+                        'Leave a quick rating in the App Store',
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      onTap: () {
+                        final rootContext =
+                            Navigator.of(context, rootNavigator: true).context;
+                        Navigator.of(context).pop();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          RatingPromptHandler.showRatingDialog(rootContext);
+                        });
+                      },
+                    ),
                     const Divider(color: Colors.white10, height: 1),
                     const SizedBox(height: 12),
                     Text(

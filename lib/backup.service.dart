@@ -250,7 +250,7 @@ class BackupService {
         title: const Text('Restore from backup?'),
         content: const Text(
           'Restoring will replace your current database and photos. '
-          'This cannot be undone. Make sure you trust the backup file.',
+          'This cannot be undone. We strongly recommend creating a backup before proceeding.',
         ),
         actions: [
           TextButton(
