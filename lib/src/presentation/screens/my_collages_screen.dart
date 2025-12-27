@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
@@ -17,11 +19,58 @@ class MyCollagesScreen extends StatefulWidget {
 
 class _MyCollagesScreenState extends State<MyCollagesScreen> {
   final _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
+  String? _supportDirPath;
 
   // Ширина превью (вся карточка тянется по высоте за счёт пропорции картинки).
   double _tileWidth = 160;
   static const double _minTileWidth = 120;
   static const double _maxTileWidth = 360;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSupportDir();
+  }
+
+  Future<void> _loadSupportDir() async {
+    final dir = await getApplicationSupportDirectory();
+    if (!mounted) return;
+    setState(() => _supportDirPath = dir.path);
+  }
+
+  String? _resolvePreviewPath(String collageId, String? previewPath) {
+    if (previewPath != null &&
+        previewPath.isNotEmpty &&
+        File(previewPath).existsSync()) {
+      return previewPath;
+    }
+    if (_supportDirPath == null) return null;
+
+    final fallback = p.join(
+      _supportDirPath!,
+      'collages',
+      'previews',
+      'collage_$collageId.png',
+    );
+    if (File(fallback).existsSync()) {
+      return fallback;
+    }
+
+    if (previewPath != null && previewPath.isNotEmpty) {
+      final base = p.basename(previewPath);
+      final byName = p.join(
+        _supportDirPath!,
+        'collages',
+        'previews',
+        base,
+      );
+      if (File(byName).existsSync()) {
+        return byName;
+      }
+    }
+
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -84,15 +133,18 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
                                             ? 'Updated: ${_safeFormat(c.dateUpdated)}'
                                             : 'Created: ${_safeFormat(c.dateCreated)}';
 
-                                        final hasPreview = c.previewPath !=
-                                                null &&
-                                            c.previewPath!.isNotEmpty &&
-                                            File(c.previewPath!).existsSync();
+                                        final resolvedPreviewPath =
+                                            _resolvePreviewPath(
+                                          c.id,
+                                          c.previewPath,
+                                        );
+                                        final hasPreview =
+                                            resolvedPreviewPath != null;
 
                                         Widget imageChild;
                                         if (hasPreview) {
                                           imageChild = Image.file(
-                                            File(c.previewPath!),
+                                            File(resolvedPreviewPath!),
                                             width: _tileWidth,
                                             fit: BoxFit
                                                 .cover, // картинка целиком (по ширине она сама просчитает высоту)

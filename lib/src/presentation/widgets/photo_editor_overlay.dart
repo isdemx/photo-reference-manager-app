@@ -5,6 +5,9 @@ import 'package:extended_image/extended_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:photographers_reference_app/src/data/utils/compress_photo_isolate.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
@@ -56,8 +59,90 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
   bool _saving = false;
   String _savingText = 'Processing…';
+  bool _compressOnSave = false;
+  bool _compressing = false;
+  int? _currentSizeBytes;
+  int? _compressedPreviewBytes;
 
   static const double _bottomBarHeight = 72.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentSize();
+  }
+
+  Future<void> _loadCurrentSize() async {
+    final String path = widget.photo.isStoredInApp
+        ? PhotoPathHelper().getFullPath(widget.photo.fileName)
+        : widget.photo.path;
+
+    final file = File(path);
+    if (await file.exists()) {
+      if (!mounted) return;
+      setState(() => _currentSizeBytes = file.lengthSync());
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    final kb = bytes / 1024;
+    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    final mb = kb / 1024;
+    return '${mb.toStringAsFixed(2)} MB';
+  }
+
+  Future<Uint8List> _compressBytesLikeUpload(
+    Uint8List bytes, {
+    int compressSizeKb = 300,
+  }) async {
+    final tempDir = await getTemporaryDirectory();
+    final tempPath = p.join(
+      tempDir.path,
+      'refma_edit_${DateTime.now().microsecondsSinceEpoch}.jpg',
+    );
+    final tempFile = File(tempPath);
+    try {
+      await tempFile.writeAsBytes(bytes, flush: true);
+      await compute(
+        compressPhotoIsolate,
+        {'filePath': tempFile.path, 'compressSizeKb': compressSizeKb},
+      );
+      final compressed = await tempFile.readAsBytes();
+      return Uint8List.fromList(compressed);
+    } finally {
+      if (await tempFile.exists()) {
+        await tempFile.delete();
+      }
+    }
+  }
+
+  Future<void> _prepareCompression() async {
+    if (_compressing) return;
+    setState(() => _compressing = true);
+
+    try {
+      final String path = widget.photo.isStoredInApp
+          ? PhotoPathHelper().getFullPath(widget.photo.fileName)
+          : widget.photo.path;
+      final bytes = await File(path).readAsBytes();
+      final compressed = await _compressBytesLikeUpload(bytes);
+      if (!mounted) return;
+      setState(() {
+        _compressOnSave = true;
+        _compressedPreviewBytes = compressed.length;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _compressOnSave = false;
+        _compressedPreviewBytes = null;
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() => _compressing = false);
+    }
+  }
 
   Future<void> _save(bool overwrite) async {
     if (_saving) return;
@@ -100,7 +185,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         'quality': 95,
       };
 
-      final Uint8List outBytes = await compute(cropEncodeJpgIsolate, job);
+      Uint8List outBytes = await compute(cropEncodeJpgIsolate, job);
 
       if (outBytes.isEmpty) {
         if (!mounted) return;
@@ -109,6 +194,10 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
           const SnackBar(content: Text('Failed to decode image')),
         );
         return;
+      }
+
+      if (_compressOnSave) {
+        outBytes = await _compressBytesLikeUpload(outBytes);
       }
 
       widget.onSave(outBytes, overwrite);
@@ -182,6 +271,47 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                   ),
                 ),
               ),
+              if (_currentSizeBytes != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'Size: ${_formatBytes(_currentSizeBytes!)}'
+                        '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                      const Spacer(),
+                      if (_currentSizeBytes! > 300 * 1024)
+                        ElevatedButton(
+                          onPressed: _compressing ? null : _prepareCompression,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _compressOnSave
+                                ? Colors.green.shade600
+                                : Colors.blueGrey.shade700,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                          child: Text(
+                            _compressOnSave
+                                ? 'Compressed'
+                                : _compressing
+                                    ? 'Compressing...'
+                                    : 'Compress',
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               SafeArea(
                 top: false,
                 child: SizedBox(

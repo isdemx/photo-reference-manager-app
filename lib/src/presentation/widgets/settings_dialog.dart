@@ -3,6 +3,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:photographers_reference_app/src/services/biometric_auth_service.dart';
 import 'package:photographers_reference_app/src/services/biometric_settings_service.dart';
+import 'package:photographers_reference_app/src/services/storage_diagnostics_service.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 
 import 'package:photographers_reference_app/backup.service.dart';
@@ -25,11 +26,14 @@ class _SettingsDialogState extends State<SettingsDialog> {
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
   bool _loading = true;
+  bool _cacheLoading = true;
+  int _cacheSizeBytes = 0;
 
   @override
   void initState() {
     super.initState();
     _loadBiometrics();
+    _loadCacheSize();
   }
 
   Future<void> _loadBiometrics() async {
@@ -59,6 +63,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
     await _settings.setEnabled(enabled);
     if (!mounted) return;
     setState(() => _biometricEnabled = enabled);
+  }
+
+  Future<void> _loadCacheSize() async {
+    final size = await StorageDiagnosticsService.getCacheSizeBytes();
+    if (!mounted) return;
+    setState(() {
+      _cacheSizeBytes = size;
+      _cacheLoading = false;
+    });
   }
 
   @override
@@ -165,6 +178,42 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         WidgetsBinding.instance.addPostFrameCallback((_) {
                           BackupService.restoreFromBackup(rootContext);
                         });
+                      },
+                    ),
+                    const Divider(color: Colors.white10, height: 1),
+                    ListTile(
+                      leading: const Icon(
+                        Iconsax.trash,
+                        color: Colors.white70,
+                      ),
+                      title: const Text(
+                        'Clear cache',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Text(
+                        _cacheLoading
+                            ? 'Calculating cache size...'
+                            : 'Current cache: ${StorageDiagnosticsService.formatBytes(_cacheSizeBytes)}',
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                      onTap: () async {
+                        setState(() => _cacheLoading = true);
+                        await StorageDiagnosticsService.clearCache();
+                        await StorageDiagnosticsService.logStorage();
+                        await _loadCacheSize();
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Cache cleared'),
+                          ),
+                        );
                       },
                     ),
                     const Divider(color: Colors.white10, height: 1),
