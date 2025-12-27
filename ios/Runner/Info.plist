@@ -61,5 +61,7 @@
 		</array>
 		<key>NSCameraUsageDescription</key>
 		<string>Access camera</string>
+		<key>NSFaceIDUsageDescription</key>
+		<string>Allow Face ID to unlock the app.</string>
 	</dict>
 </plist>

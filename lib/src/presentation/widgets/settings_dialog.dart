@@ -1,16 +1,64 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:photographers_reference_app/src/services/biometric_auth_service.dart';
+import 'package:photographers_reference_app/src/services/biometric_settings_service.dart';
 
 import 'package:photographers_reference_app/backup.service.dart';
 
-class SettingsDialog extends StatelessWidget {
+class SettingsDialog extends StatefulWidget {
   const SettingsDialog({
     super.key,
     required this.appVersion,
   });
 
   final String? appVersion;
+
+  @override
+  State<SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<SettingsDialog> {
+  final _authService = BiometricAuthService();
+  final _settings = BiometricSettingsService.instance;
+  bool _biometricAvailable = false;
+  bool _biometricEnabled = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometrics();
+  }
+
+  Future<void> _loadBiometrics() async {
+    await _settings.load();
+    final available = await _authService.isAvailable();
+    if (!mounted) return;
+    setState(() {
+      _biometricAvailable = available;
+      _biometricEnabled = _settings.enabledNotifier.value;
+      _loading = false;
+    });
+  }
+
+  Future<void> _toggleBiometric(bool enabled) async {
+    if (!_biometricAvailable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Biometrics not available on this device')),
+      );
+      return;
+    }
+    final ok = await _authService.authenticate();
+    if (!ok) {
+      if (!mounted) return;
+      setState(() => _biometricEnabled = true);
+      return;
+    }
+    await _settings.setEnabled(enabled);
+    if (!mounted) return;
+    setState(() => _biometricEnabled = enabled);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -47,7 +95,7 @@ class SettingsDialog extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Refma: version ${appVersion ?? '-'}',
+                'Refma: version ${widget.appVersion ?? '-'}',
                 style: const TextStyle(
                   color: Colors.white70,
                   fontSize: 13,
@@ -118,6 +166,42 @@ class SettingsDialog extends StatelessWidget {
                         });
                       },
                     ),
+                    const Divider(color: Colors.white10, height: 1),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Center(
+                          child: SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      )
+                    else
+                      SwitchListTile(
+                        value: _biometricEnabled,
+                        onChanged: _biometricAvailable ? _toggleBiometric : null,
+                        activeColor: const Color.fromARGB(255, 35, 107, 166),
+                        contentPadding:
+                            const EdgeInsets.symmetric(horizontal: 4),
+                        title: const Text(
+                          'Biometric lock',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: Text(
+                          _biometricAvailable
+                              ? 'Require Face ID / Touch ID to unlock the app'
+                              : 'Biometrics not available on this device',
+                          style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
                     const Divider(color: Colors.white10, height: 1),
                     const SizedBox(height: 12),
                     Text(

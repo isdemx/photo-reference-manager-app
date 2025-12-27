@@ -46,6 +46,7 @@ import 'package:photographers_reference_app/src/presentation/screens/tag_screen.
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/migration_overlay_host.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/app_lock_host.dart';
 
 import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
@@ -230,7 +231,9 @@ class MyApp extends StatelessWidget {
               });
             }
             final content = child ?? const SizedBox.shrink();
-            return MigrationOverlayHost(child: content);
+            return AppLockHost(
+              child: MigrationOverlayHost(child: content),
+            );
           },
 
           // Стартовый стек — сразу, без чёрного кадра
