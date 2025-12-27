@@ -155,13 +155,12 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                   mode: ExtendedImageMode.editor,
                   extendedImageEditorKey: _editorKey,
                   initEditorConfigHandler: (_) => EditorConfig(
-                    // ✅ УБИРАЕМ “подлёт/зум”: запрещаем масштабирование редактора
-                    maxScale: 1.0,
+                    // ✅ Разрешаем нормальное перемещение и зум кропа на iOS
+                    maxScale: 5.0,
 
-                    // ✅ Убираем ощущение “анимации” при перетаскивании crop:
-                    // (если этих полей нет в твоей версии — скажешь, я подстрою под твой API)
-                    speed: 0.0,
-                    animationDuration: Duration.zero,
+                    // ✅ Сохраняем отзывчивость без залипания
+                    speed: 1.0,
+                    animationDuration: const Duration(milliseconds: 200),
 
                     // ✅ Резерв под нижний бар (чтобы снизу было чем тянуть)
                     cropRectPadding: EdgeInsets.fromLTRB(

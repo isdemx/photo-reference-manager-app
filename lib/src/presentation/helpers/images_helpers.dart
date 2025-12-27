@@ -78,7 +78,15 @@ class ImagesHelpers {
 
     final PhotoShareHelper shareHelper = PhotoShareHelper();
     try {
-      final shared = await shareHelper.shareMultiplePhotos(photos);
+      final box = context.findRenderObject() as RenderBox?;
+      final size = box?.size ?? const Size(1, 1);
+      final origin = box?.localToGlobal(Offset.zero) ?? Offset.zero;
+      final rect = Rect.fromLTWH(origin.dx, origin.dy, size.width, size.height);
+
+      final shared = await shareHelper.shareMultiplePhotos(
+        photos,
+        sharePositionOrigin: rect,
+      );
       if (shared) {
         CustomSnackBar.showSuccess(context, 'Shared successfully');
         return true;

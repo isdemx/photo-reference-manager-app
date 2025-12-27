@@ -18,6 +18,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/video_view.
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -83,6 +84,15 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     if (mb < 1024) return '${mb.toStringAsFixed(1)} MB';
     final gb = mb / 1024;
     return '${gb.toStringAsFixed(2)} GB';
+  }
+
+  String _extensionLabel(Photo photo) {
+    final ext = p.extension(photo.path).replaceFirst('.', '').toLowerCase();
+    return ext;
+  }
+
+  bool _isGifPath(String path) {
+    return p.extension(path).toLowerCase() == '.gif';
   }
 
   String _fileSizeLabel(Photo photo) {
@@ -492,7 +502,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     title: Text(
                       '${_currentIndex + 1}/${widget.photos.length}, '
                       '${formatDate(currentPhoto.dateAdded)}'
-                      '${sizeLabel.isEmpty ? '' : ', $sizeLabel'}',
+                      '${sizeLabel.isEmpty ? '' : ', $sizeLabel'}'
+                      '${_extensionLabel(currentPhoto).isEmpty ? '' : ', ${_extensionLabel(currentPhoto)}'}',
                       style: const TextStyle(fontSize: 14.0),
                     ),
                     actions: [
@@ -667,6 +678,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           );
         } else {
           final fullPath = _resolvePhotoPath(photo);
+          final isGif = _isGifPath(fullPath);
 
           return PhotoViewGalleryPageOptions.customChild(
             minScale: PhotoViewComputedScale.contained,
@@ -685,22 +697,32 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 transform: _isFlipped
                     ? Matrix4.rotationY(3.14159)
                     : Matrix4.identity(),
-                child: PhotoView(
-                  imageProvider: FileImage(File(fullPath)),
-                  gaplessPlayback: true,
-                  scaleStateController: _scaleStateController,
-                  loadingBuilder: (context, progress) =>
-                      const Center(child: null),
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(
-                        Icons.broken_image,
-                        size: 50,
-                        color: Color.fromARGB(255, 171, 244, 54),
+                child: isGif
+                    ? InteractiveViewer(
+                        minScale: 1.0,
+                        maxScale: 4.0,
+                        child: Image.file(
+                          File(fullPath),
+                          gaplessPlayback: true,
+                          fit: BoxFit.contain,
+                        ),
+                      )
+                    : PhotoView(
+                        imageProvider: FileImage(File(fullPath)),
+                        gaplessPlayback: true,
+                        scaleStateController: _scaleStateController,
+                        loadingBuilder: (context, progress) =>
+                            const Center(child: null),
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Center(
+                            child: Icon(
+                              Icons.broken_image,
+                              size: 50,
+                              color: Color.fromARGB(255, 171, 244, 54),
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ),
           );
