@@ -23,12 +23,14 @@ final class ShareItem {
     var thumbnail: UIImage?
     var compress: Bool
     var selectedTagIds: Set<String>
+    var isExpanded: Bool
 
     init(provider: NSItemProvider, typeIdentifier: String, compress: Bool) {
         self.provider = provider
         self.typeIdentifier = typeIdentifier
         self.compress = compress
         self.selectedTagIds = []
+        self.isExpanded = false
     }
 }
 
@@ -252,6 +254,8 @@ final class ShareItemCell: UITableViewCell {
     static let reuseId = "ShareItemCell"
 
     private let thumbImageView = UIImageView()
+    private var thumbWidthConstraint: NSLayoutConstraint?
+    private var thumbHeightConstraint: NSLayoutConstraint?
     private let compressLabel = UILabel()
     private let compressSwitch = UISwitch()
     private let selectedTagsScrollView = UIScrollView()
@@ -292,11 +296,14 @@ final class ShareItemCell: UITableViewCell {
         contentView.addSubview(compressSwitch)
         contentView.addSubview(selectedTagsScrollView)
 
+        thumbWidthConstraint = thumbImageView.widthAnchor.constraint(equalToConstant: 126)
+        thumbHeightConstraint = thumbImageView.heightAnchor.constraint(equalToConstant: 126)
+
         NSLayoutConstraint.activate([
             thumbImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             thumbImageView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            thumbImageView.widthAnchor.constraint(equalToConstant: 84),
-            thumbImageView.heightAnchor.constraint(equalToConstant: 84),
+            thumbWidthConstraint!,
+            thumbHeightConstraint!,
 
             compressSwitch.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             compressSwitch.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 22),
@@ -330,6 +337,7 @@ final class ShareItemCell: UITableViewCell {
     func configure(
         thumbnail: UIImage?,
         compress: Bool,
+        isExpanded: Bool,
         selectedTags: [SharedTag],
         onToggleCompress: @escaping (Bool) -> Void,
         onRemoveTag: @escaping (SharedTag) -> Void
@@ -338,6 +346,9 @@ final class ShareItemCell: UITableViewCell {
         compressSwitch.isOn = compress
         self.onToggleCompress = onToggleCompress
         self.onRemoveTag = onRemoveTag
+        let size: CGFloat = isExpanded ? 189 : 126
+        thumbWidthConstraint?.constant = size
+        thumbHeightConstraint?.constant = size
 
         selectedTagsStack.arrangedSubviews.forEach { view in
             selectedTagsStack.removeArrangedSubview(view)
@@ -542,14 +553,14 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         headerBlock.addSubview(tagsToggleButton)
         headerBlock.addSubview(tagsScrollView)
 
-        tagsTopToCompressConstraint = tagsLabel.topAnchor.constraint(equalTo: compressAllContainer.bottomAnchor, constant: 10)
-        tagsTopToHeaderConstraint = tagsLabel.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 12)
+        tagsTopToCompressConstraint = tagsLabel.topAnchor.constraint(equalTo: compressAllContainer.bottomAnchor, constant: 38)
+        tagsTopToHeaderConstraint = tagsLabel.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 22)
         tagsTopToCompressConstraint?.isActive = true
 
         NSLayoutConstraint.activate([
             compressAllContainer.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor, constant: 16),
             compressAllContainer.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor, constant: -16),
-            compressAllContainer.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 12),
+            compressAllContainer.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 32),
 
             headerLabel.leadingAnchor.constraint(equalTo: compressAllContainer.leadingAnchor),
             headerLabel.topAnchor.constraint(equalTo: compressAllContainer.topAnchor),
@@ -567,7 +578,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
 
             tagsScrollView.leadingAnchor.constraint(equalTo: headerBlock.leadingAnchor),
             tagsScrollView.trailingAnchor.constraint(equalTo: headerBlock.trailingAnchor),
-            tagsScrollView.topAnchor.constraint(equalTo: tagsLabel.bottomAnchor, constant: 6),
+            tagsScrollView.topAnchor.constraint(equalTo: tagsLabel.bottomAnchor, constant: 12),
             tagsScrollView.heightAnchor.constraint(equalToConstant: 34),
             tagsScrollView.bottomAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: -12),
 
@@ -620,7 +631,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         itemsTableBottomToWrapConstraint = itemsTableView.bottomAnchor.constraint(equalTo: wrapTagsContainer.topAnchor, constant: -8)
         itemsTableBottomToAddConstraint = itemsTableView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8)
         wrapTagsHeightConstraint = wrapTagsContainer.heightAnchor.constraint(equalToConstant: 0)
-        itemsTableFixedHeightConstraint = itemsTableView.heightAnchor.constraint(equalToConstant: 170)
+        itemsTableFixedHeightConstraint = itemsTableView.heightAnchor.constraint(equalToConstant: 220)
 
         itemsTableTopToHeaderConstraint?.isActive = true
         itemsTableBottomToWrapConstraint?.isActive = true
@@ -808,11 +819,38 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                 image = UIImage(contentsOfFile: url.path)
             }
 
+            if image == nil {
+                let typeImage = kUTTypeImage as String
+                if item.provider.hasItemConformingToTypeIdentifier(typeImage) {
+                    item.provider.loadItem(forTypeIdentifier: typeImage, options: nil) { data, _ in
+                        let fallback = self.imageFromItem(data)
+                        DispatchQueue.main.async {
+                            item.thumbnail = fallback
+                            self.itemsTableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+                        }
+                    }
+                    return
+                }
+            }
+
             DispatchQueue.main.async {
                 item.thumbnail = image
                 self.itemsTableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
             }
         }
+    }
+
+    private func imageFromItem(_ item: NSSecureCoding?) -> UIImage? {
+        if let uiImage = item as? UIImage {
+            return uiImage
+        }
+        if let url = item as? URL {
+            return UIImage(contentsOfFile: url.path)
+        }
+        if let data = item as? Data {
+            return UIImage(data: data)
+        }
+        return nil
     }
 
     private func updateCompressAllSwitch() {
@@ -1047,6 +1085,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         cell.configure(
             thumbnail: item.thumbnail,
             compress: item.compress,
+            isExpanded: item.isExpanded,
             selectedTags: selectedTags,
             onToggleCompress: { [weak self] isOn in
                 guard let self = self else { return }
@@ -1065,6 +1104,15 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             }
         )
         return cell
+    }
+
+    // MARK: UITableViewDelegate
+
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        shareItems[indexPath.row].isExpanded.toggle()
+        tableView.beginUpdates()
+        tableView.reloadRows(at: [indexPath], with: .none)
+        tableView.endUpdates()
     }
 
     // MARK: -
