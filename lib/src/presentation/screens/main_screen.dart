@@ -5,7 +5,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import 'package:photographers_reference_app/backup.service.dart';
 import 'package:photographers_reference_app/src/mini-apps/color_harmony_game.dart';
 import 'package:photographers_reference_app/src/mini-apps/hang_photos_game_screen.dart';
 import 'package:photographers_reference_app/src/mini-apps/photo_magnet_game_screen.dart';
@@ -16,6 +15,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/categories_
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/app_drop_target.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/category_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -61,134 +61,7 @@ class _MainScreenState extends State<MainScreen> {
       barrierDismissible: true,
       barrierColor: Colors.black.withOpacity(0.7),
       builder: (dialogCtx) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          insetPadding: EdgeInsets.zero,
-          child: SafeArea(
-            child: Container(
-              width: double.infinity,
-              height: double.infinity,
-              padding: const EdgeInsets.all(16),
-              color: const Color.fromARGB(255, 10, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Верхняя панель настроек
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'Settings',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Close',
-                        icon: const Icon(Icons.close, color: Colors.white),
-                        onPressed: () => Navigator.of(dialogCtx).pop(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  // Версия приложения
-                  Text(
-                    'Refma: version ${_appVersion ?? '-'}',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  const Divider(color: Colors.white12, height: 1),
-                  const SizedBox(height: 8),
-
-                  // Список настроек
-                  Expanded(
-                    child: ListView(
-                      children: [
-                        ListTile(
-                          leading: const Icon(
-                            Iconsax.export_3,
-                            color: Colors.white70,
-                          ),
-                          title: const Text(
-                            'Create a backup',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                            ),
-                          ),
-                          subtitle: const Text(
-                            'Save locally all the data and database',
-                            style: TextStyle(
-                              color: Colors.white54,
-                              fontSize: 12,
-                            ),
-                          ),
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 4),
-                          onTap: () {
-                            Navigator.of(dialogCtx).pop();
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              BackupService.promptAndRun(context);
-                            });
-                          },
-                        ),
-                        const Divider(color: Colors.white10, height: 1),
-
-                        // // --- Новый пункт: Check file sizes ---
-                        // ListTile(
-                        //   leading: const Icon(
-                        //     Icons.storage,
-                        //     color: Colors.white70,
-                        //   ),
-                        //   title: const Text(
-                        //     'Check file sizes',
-                        //     style: TextStyle(
-                        //       color: Colors.white,
-                        //       fontSize: 15,
-                        //     ),
-                        //   ),
-                        //   subtitle: const Text(
-                        //     'View all app files sorted by size',
-                        //     style: TextStyle(
-                        //       color: Colors.white54,
-                        //       fontSize: 12,
-                        //     ),
-                        //   ),
-                        //   contentPadding:
-                        //       const EdgeInsets.symmetric(horizontal: 4),
-                        //   onTap: () {
-                        //     // Закрываем диалог настроек.
-                        //     Navigator.of(dialogCtx).pop();
-
-                        //     // Открываем экран анализа после закрытия диалога.
-                        //     WidgetsBinding.instance.addPostFrameCallback((_) {
-                        //       Navigator.of(context).push(
-                        //         MaterialPageRoute(
-                        //           builder: (_) => const StorageDebugScreen(),
-                        //         ),
-                        //       );
-                        //     });
-                        //   },
-                        // ),
-                        // const Divider(color: Colors.white10, height: 1),
-
-                        // здесь потом можно добавлять новые пункты настроек
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
+        return SettingsDialog(appVersion: _appVersion);
       },
     );
   }

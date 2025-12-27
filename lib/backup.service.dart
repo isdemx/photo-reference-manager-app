@@ -5,6 +5,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:hive/hive.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:archive/archive.dart' as archive;
 
 class BackupService {
   /// Собираем ZIP-файл.
@@ -239,5 +241,192 @@ class BackupService {
       1,
       1,
     );
+  }
+
+  static Future<void> restoreFromBackup(BuildContext context) async {
+    final agreed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restore from backup?'),
+        content: const Text(
+          'Restoring will replace your current database and photos. '
+          'This cannot be undone. Make sure you trust the backup file.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (agreed != true) {
+      return;
+    }
+
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Select backup file',
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+    );
+
+    if (result == null || result.files.single.path == null) {
+      return;
+    }
+
+    final backupFile = File(result.files.single.path!);
+    if (!await backupFile.exists()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Backup file not found')),
+      );
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return const AlertDialog(
+          title: Text('Restoring backup...'),
+          content: SizedBox(
+            height: 48,
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        );
+      },
+    );
+
+    try {
+      await Hive.close();
+
+      final tmp = await getTemporaryDirectory();
+      final restoreDir = Directory(p.join(tmp.path, 'backup_restore'));
+      if (await restoreDir.exists()) {
+        await restoreDir.delete(recursive: true);
+      }
+      await restoreDir.create(recursive: true);
+
+      final fallbackDir = Directory(p.join(tmp.path, 'backup_fallback'));
+      if (await fallbackDir.exists()) {
+        await fallbackDir.delete(recursive: true);
+      }
+      await fallbackDir.create(recursive: true);
+
+      final bytes = await backupFile.readAsBytes();
+      final zip = archive.ZipDecoder().decodeBytes(bytes);
+      await _extractArchive(zip, restoreDir.path);
+
+      final root = _resolveRestoreRoot(restoreDir);
+      final docs = await getApplicationDocumentsDirectory();
+
+      await _backupExistingTargets(docs, fallbackDir);
+      await _deleteExistingBackupTargets(docs);
+      await _copyRestorePayload(root, docs);
+
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Restore completed. Please restart the app.'),
+          duration: Duration(seconds: 6),
+        ),
+      );
+    } catch (e) {
+      try {
+        final docs = await getApplicationDocumentsDirectory();
+        final fallbackDir = Directory(p.join(
+          (await getTemporaryDirectory()).path,
+          'backup_fallback',
+        ));
+        if (await fallbackDir.exists()) {
+          await _deleteExistingBackupTargets(docs);
+          await _copyRestorePayload(fallbackDir, docs);
+        }
+      } catch (_) {}
+      if (Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not restore backup')),
+      );
+    }
+  }
+
+  static Future<void> _extractArchive(archive.Archive zip, String destPath) async {
+    for (final file in zip) {
+      final outPath = p.join(destPath, file.name);
+      if (file.isFile) {
+        final outFile = File(outPath);
+        await outFile.create(recursive: true);
+        await outFile.writeAsBytes(file.content as List<int>, flush: true);
+      } else {
+        await Directory(outPath).create(recursive: true);
+      }
+    }
+  }
+
+  static Directory _resolveRestoreRoot(Directory dir) {
+    final entries = dir.listSync(followLinks: false);
+    final dirs = entries.whereType<Directory>().toList();
+    final files = entries.whereType<File>().toList();
+    if (files.isEmpty && dirs.length == 1) {
+      return dirs.first;
+    }
+    return dir;
+  }
+
+  static Future<void> _deleteExistingBackupTargets(Directory docs) async {
+    final entries = docs.listSync();
+    for (final entry in entries) {
+      if (entry is File) {
+        final name = p.basename(entry.path);
+        if (name.endsWith('.hive') || name.endsWith('.lock')) {
+          await entry.delete();
+        }
+      } else if (entry is Directory) {
+        if (p.basename(entry.path) == 'photos') {
+          await entry.delete(recursive: true);
+        }
+      }
+    }
+  }
+
+  static Future<void> _copyRestorePayload(Directory from, Directory docs) async {
+    final entries = from.listSync();
+    for (final entry in entries) {
+      if (entry is File) {
+        final name = p.basename(entry.path);
+        if (name.endsWith('.hive') || name.endsWith('.lock')) {
+          await entry.copy(p.join(docs.path, name));
+        }
+      } else if (entry is Directory) {
+        if (p.basename(entry.path) == 'photos') {
+          await _copyDir(entry, Directory(p.join(docs.path, 'photos')));
+        }
+      }
+    }
+  }
+
+  static Future<void> _backupExistingTargets(Directory docs, Directory fallbackDir) async {
+    final entries = docs.listSync();
+    for (final entry in entries) {
+      if (entry is File) {
+        final name = p.basename(entry.path);
+        if (name.endsWith('.hive') || name.endsWith('.lock')) {
+          await entry.copy(p.join(fallbackDir.path, name));
+        }
+      } else if (entry is Directory) {
+        if (p.basename(entry.path) == 'photos') {
+          await _copyDir(entry, Directory(p.join(fallbackDir.path, 'photos')));
+        }
+      }
+    }
   }
 }
