@@ -349,6 +349,7 @@ class CollagePersistService {
     required int backgroundColorValue,
     required List<CollagePhotoState> items,
     required Map<String, VideoUi> videoStates,
+    required bool isPrivate,
   }) async {
     final now = DateTime.now();
 
@@ -402,6 +403,7 @@ class CollagePersistService {
         dateCreated: now,
         dateUpdated: now,
         previewPath: previewPath.isEmpty ? null : previewPath,
+        isPrivate: isPrivate,
       );
 
       context.read<CollageBloc>().add(AddCollage(newCollage));
@@ -423,6 +425,7 @@ class CollagePersistService {
         dateCreated: existing.dateCreated,
         dateUpdated: now,
         previewPath: previewPath.isEmpty ? existing.previewPath : previewPath,
+        isPrivate: isPrivate,
       );
 
       context.read<CollageBloc>().add(UpdateCollage(updated));
@@ -614,6 +617,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   // --- UI ---
   Color _backgroundColor = Colors.black;
+  bool _isPrivate = false;
   bool _isFullscreen = false;
   bool _wasMaximizedBeforeFullscreen = false;
 
@@ -631,6 +635,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   @override
   void initState() {
     super.initState();
+
+    _isPrivate = widget.initialCollage?.isPrivate ?? false;
 
     _controller = CollageController(
       items: _items,
@@ -830,6 +836,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   void _initCollageFromExisting(Collage collage) {
     _backgroundColor = Color(collage.backgroundColorValue);
+    _isPrivate = collage.isPrivate ?? false;
 
     _items.clear();
     _videoStates.clear();
@@ -1253,6 +1260,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return FractionallySizedBox(
@@ -1367,6 +1375,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       backgroundColorValue: _backgroundColor.value,
       items: _items,
       videoStates: _videoStates,
+      isPrivate: _isPrivate,
     );
 
     if (!mounted) return;
@@ -1985,6 +1994,20 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         icon: const Icon(Iconsax.save_2, color: Colors.white, shadows: iconShadow),
         tooltip: 'Save collage',
         onPressed: _onSaveCollageToDb,
+      ),
+      IconButton(
+        style: IconButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+        ),
+        icon: Icon(
+          _isPrivate ? Icons.lock : Icons.lock_open,
+          color: _isPrivate ? Colors.amber : Colors.white,
+          shadows: iconShadow,
+        ),
+        tooltip: _isPrivate ? 'Private collage' : 'Public collage',
+        onPressed: () => setState(() => _isPrivate = !_isPrivate),
       ),
       IconButton(
         style: IconButton.styleFrom(

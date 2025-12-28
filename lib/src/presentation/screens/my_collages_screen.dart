@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 
 class MyCollagesScreen extends StatefulWidget {
@@ -91,10 +92,14 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
                 );
               } else if (photoState is PhotoLoaded) {
                 final allPhotos = photoState.photos;
+                final showPrivate =
+                    context.watch<SessionBloc>().state.showPrivate;
 
                 // Безопасная сортировка: берём dateUpdated ?? dateCreated ?? veryOld
                 final veryOld = DateTime.fromMillisecondsSinceEpoch(0);
-                final collages = state.collages.toList()
+                final collages = state.collages
+                    .where((c) => showPrivate || c.isPrivate != true)
+                    .toList()
                   ..sort((a, b) {
                     final aDate = (a.dateUpdated ?? a.dateCreated) ?? veryOld;
                     final bDate = (b.dateUpdated ?? b.dateCreated) ?? veryOld;

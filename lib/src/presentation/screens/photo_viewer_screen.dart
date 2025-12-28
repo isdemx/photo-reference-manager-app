@@ -79,7 +79,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     final kb = bytes / 1024;
-    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB';
+    if (kb < 1024) return '${kb.toStringAsFixed(0)} KB';
     final mb = kb / 1024;
     if (mb < 1024) return '${mb.toStringAsFixed(1)} MB';
     final gb = mb / 1024;
@@ -500,10 +500,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             appBar: _showActions
                 ? AppBar(
                     title: Text(
-                      '${_currentIndex + 1}/${widget.photos.length}, '
+                      '${_currentIndex + 1}/${widget.photos.length} • '
                       '${formatDate(currentPhoto.dateAdded)}'
-                      '${sizeLabel.isEmpty ? '' : ', $sizeLabel'}'
-                      '${_extensionLabel(currentPhoto).isEmpty ? '' : ', ${_extensionLabel(currentPhoto)}'}',
+                      '${sizeLabel.isEmpty ? '' : ' • $sizeLabel'}'
+                      '${_extensionLabel(currentPhoto).isEmpty ? '' : ' • ${_extensionLabel(currentPhoto).toUpperCase()}'}',
                       style: const TextStyle(fontSize: 14.0),
                     ),
                     actions: [

@@ -146,10 +146,12 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               color: Colors.white10,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              _filtersOpen ? 'Hide' : 'Show',
-                              style: const TextStyle(
-                                  color: Colors.white70, fontSize: 11),
+                            child: Icon(
+                              _filtersOpen
+                                  ? Icons.keyboard_arrow_up
+                                  : Icons.keyboard_arrow_down,
+                              color: Colors.white70,
+                              size: 16,
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -706,11 +708,14 @@ class _TagQuickButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(6),
         onTap: onTap,
-        child: Row(
+        child: Padding(
+          padding: const EdgeInsets.all(6),
+          child: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
             Icon(Iconsax.tag, size: 10, color: Colors.white),
           ],
+          ),
         ),
       ),
     );

@@ -435,10 +435,10 @@ class TagsHelpers {
                                                           color: Colors.white,
                                                         ),
                                                       ),
-                                                      const SizedBox(height: 8),
+                                                      const SizedBox(height: 6),
                                                       Wrap(
-                                                        spacing: 8,
-                                                        runSpacing: 8,
+                                                        spacing: 4,
+                                                        runSpacing: 1,
                                                         children: s.tags.map((tag) {
                                                           final allHave = photos.every(
                                                             (p) => p.tagIds
@@ -465,10 +465,12 @@ class TagsHelpers {
                                                           }
 
                                                           return ChoiceChip(
+                                                            shape:
+                                                                const StadiumBorder(),
                                                             avatar: icon != null
                                                                 ? Icon(
                                                                     icon,
-                                                                    size: 16,
+                                                                    size: 14,
                                                                     color: Colors.white,
                                                                   )
                                                                 : null,
@@ -485,6 +487,12 @@ class TagsHelpers {
                                                                 Color(tag.colorValue),
                                                             labelStyle: const TextStyle(
                                                               color: Colors.white,
+                                                              fontSize: 12,
+                                                            ),
+                                                            padding:
+                                                                const EdgeInsets.symmetric(
+                                                              horizontal: 8,
+                                                              vertical: 2,
                                                             ),
                                                             onSelected: (selected) {
                                                               final photoBloc =
@@ -716,30 +724,17 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
           },
           child: TextField(
             controller: widget.controller,
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
             decoration: InputDecoration(
               hintText: 'Tag name',
               hintStyle: const TextStyle(color: Colors.white54),
+              isDense: true,
               enabledBorder: const OutlineInputBorder(
                 borderSide: BorderSide(color: Colors.white24),
               ),
               focusedBorder: const OutlineInputBorder(
                 borderSide: BorderSide(color: Colors.white),
               ),
-              suffixIcon: hasCategories
-                  ? IconButton(
-                      tooltip:
-                          _showCategory ? 'Hide category' : 'Show category',
-                      icon: Icon(
-                        _showCategory
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        color: Colors.white70,
-                      ),
-                      onPressed: () =>
-                          _toggleCategoryVisibility(!_showCategory),
-                    )
-                  : null,
             ),
             onSubmitted: (_) => _handleAddPressed(),
           ),
@@ -764,6 +759,7 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                             decoration: const InputDecoration(
                               labelText: 'Category (optional)',
                               labelStyle: TextStyle(color: Colors.white70),
+                              isDense: true,
                               enabledBorder: OutlineInputBorder(
                                 borderSide: BorderSide(color: Colors.white24),
                               ),
@@ -798,14 +794,14 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
+                            horizontal: 10,
+                            vertical: 8,
                           ),
                           backgroundColor: Colors.white10,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
+                            borderRadius: BorderRadius.circular(10),
                             side: const BorderSide(
                               color: Colors.white24,
                             ),
@@ -814,11 +810,11 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                         onPressed: _handleAddPressed,
                         icon: const Icon(
                           Iconsax.add,
-                          size: 18,
+                          size: 16,
                         ),
                         label: const Text(
                           'Add',
-                          style: TextStyle(fontSize: 14),
+                          style: TextStyle(fontSize: 12),
                         ),
                       ),
                     ],

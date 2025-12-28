@@ -38,8 +38,8 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       videoStartFrac: fields[18] as double?,
       videoEndFrac: fields[19] as double?,
       videoSpeed: fields[20] as double?,
-      contrast: (fields[21] as double?) ?? 1.0,
-      opacity: (fields[22] as double?) ?? 1.0,
+      contrast: (fields[21] as num?)?.toDouble() ?? 1.0,
+      opacity: (fields[22] as num?)?.toDouble() ?? 1.0,
     );
   }
 
@@ -124,13 +124,14 @@ class CollageAdapter extends TypeAdapter<Collage> {
       dateCreated: fields[4] as DateTime?,
       dateUpdated: fields[5] as DateTime?,
       previewPath: fields[6] as String?,
+      isPrivate: fields[7] as bool?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Collage obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -144,7 +145,9 @@ class CollageAdapter extends TypeAdapter<Collage> {
       ..writeByte(5)
       ..write(obj.dateUpdated)
       ..writeByte(6)
-      ..write(obj.previewPath);
+      ..write(obj.previewPath)
+      ..writeByte(7)
+      ..write(obj.isPrivate);
   }
 
   @override
