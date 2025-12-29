@@ -22,7 +22,7 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       fileName: fields[8] as String,
       folderIds: (fields[2] as List).cast<String>(),
       tagIds: (fields[3] as List).cast<String>(),
-      comment: fields[4] as String,
+      comment: fields[4] as String?,
       dateAdded: fields[5] as DateTime,
       sortOrder: fields[6] as int,
       mediaType: fields[10] as String,

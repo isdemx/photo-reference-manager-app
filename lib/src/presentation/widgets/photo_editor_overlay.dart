@@ -41,7 +41,7 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
 
 class PhotoEditorOverlay extends StatefulWidget {
   final Photo photo;
-  final void Function(Uint8List bytes, bool overwrite) onSave;
+  final void Function(Uint8List bytes, bool overwrite, String comment) onSave;
 
   const PhotoEditorOverlay({
     super.key,
@@ -56,6 +56,7 @@ class PhotoEditorOverlay extends StatefulWidget {
 class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   final GlobalKey<ExtendedImageEditorState> _editorKey =
       GlobalKey<ExtendedImageEditorState>();
+  late final TextEditingController _commentController;
 
   bool _saving = false;
   String _savingText = 'Processing…';
@@ -69,7 +70,15 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   @override
   void initState() {
     super.initState();
+    _commentController =
+        TextEditingController(text: widget.photo.comment ?? '');
     _loadCurrentSize();
+  }
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCurrentSize() async {
@@ -200,7 +209,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         outBytes = await _compressBytesLikeUpload(outBytes);
       }
 
-      widget.onSave(outBytes, overwrite);
+      widget.onSave(outBytes, overwrite, _commentController.text.trim());
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -312,6 +321,31 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                     ],
                   ),
                 ),
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: TextField(
+                  controller: _commentController,
+                  maxLines: 3,
+                  minLines: 2,
+                  textInputAction: TextInputAction.newline,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Comment',
+                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                    filled: true,
+                    fillColor: Colors.white12,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 10,
+                    ),
+                  ),
+                ),
+              ),
               SafeArea(
                 top: false,
                 child: SizedBox(

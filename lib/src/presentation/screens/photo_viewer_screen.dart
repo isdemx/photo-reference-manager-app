@@ -377,11 +377,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           return PhotoEditorOverlay(
             key: ValueKey('editor_${photo.id}_${_nonce(photo)}'),
             photo: photo,
-            onSave: (Uint8List bytes, bool overwrite) async {
+            onSave: (Uint8List bytes, bool overwrite, String comment) async {
               if (overwrite) {
-                await _overwriteCurrentPhoto(photo, bytes);
+                await _overwriteCurrentPhoto(photo, bytes, comment);
               } else {
-                await _saveAsNewPhoto(photo, bytes);
+                await _saveAsNewPhoto(photo, bytes, comment);
               }
 
               if (mounted) setState(() {});
@@ -394,7 +394,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     );
   }
 
-  Future<void> _overwriteCurrentPhoto(Photo photo, Uint8List bytes) async {
+  Future<void> _overwriteCurrentPhoto(
+    Photo photo,
+    Uint8List bytes,
+    String comment,
+  ) async {
     final String fullPath = _resolvePhotoPath(photo);
 
     await File(fullPath).writeAsBytes(bytes, flush: true);
@@ -409,12 +413,24 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       _bumpNonce(photo);
     });
 
+    final updatedPhoto = photo.copyWith(comment: comment);
+
     if (mounted) {
-      context.read<PhotoBloc>().add(UpdatePhoto(photo));
+      context.read<PhotoBloc>().add(UpdatePhoto(updatedPhoto));
+    }
+
+    if (mounted) {
+      setState(() {
+        widget.photos[_currentIndex] = updatedPhoto;
+      });
     }
   }
 
-  Future<void> _saveAsNewPhoto(Photo source, Uint8List bytes) async {
+  Future<void> _saveAsNewPhoto(
+    Photo source,
+    Uint8List bytes,
+    String comment,
+  ) async {
     final id = const Uuid().v4();
     final newFileName = 'crop_$id.jpg';
 
@@ -432,6 +448,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       videoPreview: null,
       videoDuration: null,
       isStoredInApp: true,
+      comment: comment,
     );
 
     if (mounted) {
@@ -453,6 +470,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final currentPhoto = widget.photos[_currentIndex];
     final isSelected = _selectedPhotos.contains(currentPhoto);
     final sizeLabel = _fileSizeLabel(currentPhoto);
+    final commentText = (currentPhoto.comment ?? '').trim();
 
     return Shortcuts(
       shortcuts: {
@@ -566,6 +584,45 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                           _galleryBottomPadding(widget.photos[_currentIndex]),
                     ),
                     child: _buildPhotoGallery(),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: _showActions ? 200 : 24,
+                    child: IgnorePointer(
+                      ignoring: true,
+                      child: Opacity(
+                        opacity: commentText.isEmpty ? 0.0 : 1.0,
+                        child: FractionallySizedBox(
+                          widthFactor: 0.7,
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              commentText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black54,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                   if (!Platform.isMacOS && _showActions)
                     Positioned(

@@ -9,7 +9,6 @@ class RatingPromptHandler {
   static const _hasRatedKey = 'hasRated';
 
   static Future<bool> shouldShowPrompt() async {
-    print('shouldShowPrompt');
     final prefs = await SharedPreferences.getInstance();
     final alreadyRated = prefs.getBool(_hasRatedKey) ?? false;
     print('shouldShowPrompt alreadyRated = $alreadyRated');

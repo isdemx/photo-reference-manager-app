@@ -18,10 +18,6 @@ class FolderRepositoryImpl implements FolderRepository {
   Future<List<Folder>> getFolders() async {
     final folders = folderBox.values.toList();
 
-    for (var folder in folders) {
-      print('Folder name: ${folder.name}, isPrivate: ${folder.isPrivate}');
-    }
-
     return folders;
   }
 

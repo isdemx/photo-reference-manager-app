@@ -82,6 +82,7 @@ class SharedInboxImportService {
         }
       }
       final originalName = (item['originalName'] as String?) ?? 'shared';
+      final comment = (item['comment'] as String?) ?? '';
       final targetName = _resolveUniqueName(
         photosDir.path,
         originalName,
@@ -104,7 +105,7 @@ class SharedInboxImportService {
         mediaType: mediaType,
         dateAdded: DateTime.now(),
         folderIds: [],
-        comment: '',
+        comment: comment,
         tagIds: tagIds,
         sortOrder: 0,
         isStoredInApp: true,

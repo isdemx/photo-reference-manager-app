@@ -19,7 +19,7 @@ class Photo extends HiveObject {
   final List<String> tagIds;
 
   @HiveField(4)
-  final String comment;
+  final String? comment;
 
   @HiveField(5)
   final DateTime dateAdded;
@@ -51,7 +51,7 @@ class Photo extends HiveObject {
     required this.fileName,
     required this.folderIds,
     required this.tagIds,
-    required this.comment,
+    this.comment,
     required this.dateAdded,
     required this.sortOrder,
     required this.mediaType,
@@ -108,7 +108,7 @@ class Photo extends HiveObject {
       fileName: json['fileName'],
       folderIds: List<String>.from(json['folderIds'] ?? []),
       tagIds: List<String>.from(json['tagIds'] ?? []),
-      comment: json['comment'],
+      comment: json['comment'] as String?,
       dateAdded: DateTime.parse(json['dateAdded']),
       sortOrder: json['sortOrder'],
       mediaType: json['mediaType'],

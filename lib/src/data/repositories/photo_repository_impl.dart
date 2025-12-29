@@ -108,7 +108,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
 
   @override
   Future<void> updatePhoto(Photo photo) async {
-    await photo.save();
+    await photoBox.put(photo.id, photo);
   }
 
   @override
