@@ -350,6 +350,9 @@ class CollagePersistService {
     required List<CollagePhotoState> items,
     required Map<String, VideoUi> videoStates,
     required bool isPrivate,
+    required double canvasOffsetX,
+    required double canvasOffsetY,
+    required double canvasScale,
   }) async {
     final now = DateTime.now();
 
@@ -404,6 +407,9 @@ class CollagePersistService {
         dateUpdated: now,
         previewPath: previewPath.isEmpty ? null : previewPath,
         isPrivate: isPrivate,
+        canvasOffsetX: canvasOffsetX,
+        canvasOffsetY: canvasOffsetY,
+        canvasScale: canvasScale,
       );
 
       context.read<CollageBloc>().add(AddCollage(newCollage));
@@ -426,6 +432,9 @@ class CollagePersistService {
         dateUpdated: now,
         previewPath: previewPath.isEmpty ? existing.previewPath : previewPath,
         isPrivate: isPrivate,
+        canvasOffsetX: canvasOffsetX,
+        canvasOffsetY: canvasOffsetY,
+        canvasScale: canvasScale,
       );
 
       context.read<CollageBloc>().add(UpdateCollage(updated));
@@ -624,6 +633,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   bool _showTutorial = false;
   bool _showForInitDeleteIcon = true;
   bool _hasAutoFitted = false;
+  bool _pendingInitialLayout = false;
 
   // hover state for video
   final Map<String, bool> _controlsHover = <String, bool>{};
@@ -684,12 +694,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _maxZIndex = 0;
     _activeItemIndex = null;
     _controller.maxZIndex = 0;
+    _pendingInitialLayout = false;
     setState(() {});
   }
 
   void _initCollageFromSelectedPhotos() {
     _items.clear();
     _videoStates.clear();
+    _pendingInitialLayout = true;
 
     final filtered = widget.photos.where(
       (p) => p.mediaType == 'image' || p.mediaType == 'video',
@@ -702,30 +714,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         _videoStates[s.id] = VideoUi();
       }
     }
+  }
 
-    final canvasWidth = MediaQuery.of(context).size.width;
-    final canvasHeight = MediaQuery.of(context).size.height;
+  void _applyInitialLayoutForSelectedPhotos() {
+    if (_items.isEmpty) return;
 
     if (_items.length == 1) {
       final item = _items.first;
-
-      final photoAspect = item.baseWidth / item.baseHeight;
-      final screenAspect = canvasWidth / canvasHeight;
-
-      double scale;
-      if (photoAspect > screenAspect) {
-        scale = canvasWidth / item.baseWidth;
-      } else {
-        scale = canvasHeight / item.baseHeight;
-      }
-
-      final newWidth = item.baseWidth * scale;
-      final newHeight = item.baseHeight * scale;
-
-      item.offset =
-          Offset((canvasWidth - newWidth) / 2, (canvasHeight - newHeight) / 2);
-      item.scale = scale;
-
+      _fitAndCenterFirstItem(item);
       _activeItemIndex = 0;
     } else {
       for (int i = 0; i < _items.length; i++) {
@@ -772,12 +768,27 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               Offset(center.dx * (1 - scale), center.dy * (1 - scale));
           _setTransform(
               TransformMath.matrixFromOffsetScale(translation, scale));
+        } else if (widget.initialCollage?.canvasOffsetX != null &&
+            widget.initialCollage?.canvasOffsetY != null &&
+            widget.initialCollage?.canvasScale != null) {
+          final savedScale = widget.initialCollage!.canvasScale!
+              .clamp(_minCollageScale, _maxCollageScale);
+          final translation = Offset(
+            widget.initialCollage!.canvasOffsetX!,
+            widget.initialCollage!.canvasOffsetY!,
+          );
+          _setTransform(
+              TransformMath.matrixFromOffsetScale(translation, savedScale));
         } else if (saved != null) {
           final clamped = saved.clamp(_minCollageScale, _maxCollageScale);
           final translation =
               TransformMath.getTranslation(_transformationController.value);
           _setTransform(
               TransformMath.matrixFromOffsetScale(translation, clamped));
+        }
+        if (_pendingInitialLayout) {
+          _pendingInitialLayout = false;
+          _applyInitialLayoutForSelectedPhotos();
         }
         _updateDeleteRect();
         _hasAutoFitted = true;
@@ -845,6 +856,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _initCollageFromExisting(Collage collage) {
     _backgroundColor = Color(collage.backgroundColorValue);
     _isPrivate = collage.isPrivate ?? false;
+    _pendingInitialLayout = false;
 
     _items.clear();
     _videoStates.clear();
@@ -1382,6 +1394,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       items: _items,
       videoStates: _videoStates,
       isPrivate: _isPrivate,
+      canvasOffsetX:
+          TransformMath.getTranslation(_transformationController.value).dx,
+      canvasOffsetY:
+          TransformMath.getTranslation(_transformationController.value).dy,
+      canvasScale: TransformMath.getScale(_transformationController.value),
     );
 
     if (!mounted) return;

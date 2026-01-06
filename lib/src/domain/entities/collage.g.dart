@@ -125,13 +125,16 @@ class CollageAdapter extends TypeAdapter<Collage> {
       dateUpdated: fields[5] as DateTime?,
       previewPath: fields[6] as String?,
       isPrivate: fields[7] as bool?,
+      canvasOffsetX: fields[8] as double?,
+      canvasOffsetY: fields[9] as double?,
+      canvasScale: fields[10] as double?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Collage obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -147,7 +150,13 @@ class CollageAdapter extends TypeAdapter<Collage> {
       ..writeByte(6)
       ..write(obj.previewPath)
       ..writeByte(7)
-      ..write(obj.isPrivate);
+      ..write(obj.isPrivate)
+      ..writeByte(8)
+      ..write(obj.canvasOffsetX)
+      ..writeByte(9)
+      ..write(obj.canvasOffsetY)
+      ..writeByte(10)
+      ..write(obj.canvasScale);
   }
 
   @override

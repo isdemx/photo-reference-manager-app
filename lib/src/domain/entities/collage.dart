@@ -183,6 +183,15 @@ class Collage extends HiveObject {
   @HiveField(7)
   bool? isPrivate;
 
+  @HiveField(8)
+  double? canvasOffsetX;
+
+  @HiveField(9)
+  double? canvasOffsetY;
+
+  @HiveField(10)
+  double? canvasScale;
+
   Collage(
       {required this.id,
       required this.title,
@@ -191,7 +200,10 @@ class Collage extends HiveObject {
       required this.dateCreated,
       required this.dateUpdated,
       this.previewPath,
-      this.isPrivate});
+      this.isPrivate,
+      this.canvasOffsetX,
+      this.canvasOffsetY,
+      this.canvasScale});
 
   factory Collage.fromJson(Map<String, dynamic> json) => Collage(
         id: json['id'],
@@ -208,6 +220,9 @@ class Collage extends HiveObject {
             : null,
         previewPath: json['previewPath'],
         isPrivate: json['isPrivate'] as bool?,
+        canvasOffsetX: (json['canvasOffsetX'] as num?)?.toDouble(),
+        canvasOffsetY: (json['canvasOffsetY'] as num?)?.toDouble(),
+        canvasScale: (json['canvasScale'] as num?)?.toDouble(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -219,5 +234,8 @@ class Collage extends HiveObject {
         'dateUpdated': dateUpdated?.toIso8601String(),
         'previewPath': previewPath,
         'isPrivate': isPrivate,
+        'canvasOffsetX': canvasOffsetX,
+        'canvasOffsetY': canvasOffsetY,
+        'canvasScale': canvasScale,
       };
 }
