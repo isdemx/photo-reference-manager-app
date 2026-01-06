@@ -52,6 +52,8 @@ class PhotoSaveHelper {
         geoLocation: null,
         videoPreview: null,
         videoDuration: null,
+        videoWidth: null,
+        videoHeight: null,
       );
 
       // 5) Добавляем в базу (сразу), чтобы объект был в Hive.
@@ -64,6 +66,10 @@ class PhotoSaveHelper {
         if (videoResult != null) {
           newPhoto.videoPreview = videoResult['videoPreview'] as String?;
           newPhoto.videoDuration = videoResult['videoDuration'] as String?;
+          newPhoto.videoWidth =
+              (videoResult['videoWidth'] as num?)?.toDouble();
+          newPhoto.videoHeight =
+              (videoResult['videoHeight'] as num?)?.toDouble();
           await repo.updatePhoto(newPhoto);
         } else {
           debugPrint('[PhotoSaveHelper] video thumbnail generation returned null');

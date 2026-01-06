@@ -164,6 +164,9 @@ class _UploadScreenState extends State<UploadScreen> {
             // videoResult['videoPreview'] — строка пути
             photo.videoPreview = videoResult['videoPreview'];
             photo.videoDuration = videoResult['videoDuration'];
+            photo.videoWidth = (videoResult['videoWidth'] as num?)?.toDouble();
+            photo.videoHeight =
+                (videoResult['videoHeight'] as num?)?.toDouble();
 
             /// 4. Обновляем в Hive
             await photoRepository.updatePhoto(photo);

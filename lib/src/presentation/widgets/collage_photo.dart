@@ -22,6 +22,7 @@ import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 // --- твои доменные/проектные импорты ---
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
@@ -33,8 +34,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/collage_sav
 import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 
-import 'package:photographers_reference_app/src/presentation/widgets/collage/action_icon_widget.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/collage/mini_slider_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_surface_widget.dart';
@@ -764,7 +764,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         final saved = await _prefs.loadCollageScale();
         if (!mounted) return;
-        if (saved != null) {
+        if (widget.initialCollage == null) {
+          final size = _currentCanvasSize();
+          final scale = 2.1;
+          final center = Offset(size.width / 2, size.height / 2);
+          final translation =
+              Offset(center.dx * (1 - scale), center.dy * (1 - scale));
+          _setTransform(
+              TransformMath.matrixFromOffsetScale(translation, scale));
+        } else if (saved != null) {
           final clamped = saved.clamp(_minCollageScale, _maxCollageScale);
           final translation =
               TransformMath.getTranslation(_transformationController.value);
@@ -969,25 +977,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   CollagePhotoState _createCollagePhotoState(Photo photo) {
-    const double targetShortSide = 150;
-
-    double baseW = targetShortSide;
-    double baseH = targetShortSide;
-
-    final fullPath = _resolvePhotoPath(photo);
-    final file = File(fullPath);
-
-    if (photo.mediaType == 'image') {
-      if (file.existsSync()) {
-        final decoded = img.decodeImage(file.readAsBytesSync());
-        if (decoded != null && decoded.width > 0) {
-          baseH = decoded.height * (baseW / decoded.width);
-        }
-      }
-    } else if (photo.mediaType == 'video') {
-      baseH = targetShortSide;
-      baseW = targetShortSide * 16 / 9;
-    }
+    final naturalSize = _getNaturalSizeForPhoto(photo);
+    final baseW = naturalSize.width;
+    final baseH = naturalSize.height;
 
     return CollagePhotoState(
       id: const Uuid().v4(),
@@ -1305,7 +1297,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     setState(() {
       final item = _createCollagePhotoState(result.photo);
-      final offset = _cascadeOffsetForIndex(_items.length, item);
+      if (_items.isEmpty) {
+        _fitAndCenterFirstItem(item);
+      } else {
+        item.scale = item.scale * 0.5;
+      }
+      final offset = _items.isEmpty
+          ? item.offset
+          : _cascadeOffsetForIndex(_items.length, item);
       _controller.addState(item, initialOffset: offset);
       item.pickContextId = result.contextId;
       item.pickContextIndex = result.indexInContext;
@@ -1317,7 +1316,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _registerPhoto(photo);
     setState(() {
       final item = _createCollagePhotoState(photo);
-      final offset = _cascadeOffsetForIndex(_items.length, item);
+      if (_items.isEmpty) {
+        _fitAndCenterFirstItem(item);
+      } else {
+        item.scale = item.scale * 0.5;
+      }
+      final offset = _items.isEmpty
+          ? item.offset
+          : _cascadeOffsetForIndex(_items.length, item);
       _controller.addState(item, initialOffset: offset);
       _maxZIndex = _controller.maxZIndex;
     });
@@ -1434,6 +1440,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   void _applyPhotoSwitch(CollagePhotoState item, Photo newPhoto) {
     final wasVideo = item.photo.mediaType == 'video';
+    final oldW = item.baseWidth * item.scale;
+    final oldH = item.baseHeight * item.scale;
+    final oldCenter = item.offset + Offset(oldW / 2, oldH / 2);
     if (wasVideo && newPhoto.mediaType != 'video') {
       final ui = _videoStates[item.id];
       ui?.disposeControllerIfAny();
@@ -1448,42 +1457,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     item.cropRect = const Rect.fromLTWH(0, 0, 1, 1);
     item.photo = newPhoto;
 
-    if (_items.length == 1) {
-      final canvasWidth = MediaQuery.of(context).size.width;
-      final canvasHeight = MediaQuery.of(context).size.height;
+    final canvasSize = _currentCanvasSize();
+    final maxScreenSide = math.min(canvasSize.width, canvasSize.height);
+    final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
+    final maxAllowedCanvasSide = maxScreenSide / screenScale;
 
-      final photoAspect = naturalWidth / naturalHeight;
-      final screenAspect = canvasWidth / canvasHeight;
+    final targetMaxSide =
+        math.min(math.max(oldW, oldH), maxAllowedCanvasSide);
+    final naturalMax = math.max(naturalWidth, naturalHeight);
+    final scale =
+        naturalMax == 0 ? 1.0 : (targetMaxSide / naturalMax).clamp(0.001, 1000);
 
-      double scale;
-      if (photoAspect > screenAspect) {
-        scale = canvasWidth / naturalWidth;
-      } else {
-        scale = canvasHeight / naturalHeight;
-      }
-
-      item.baseWidth = naturalWidth * scale;
-      item.baseHeight = naturalHeight * scale;
-
-      item.offset = Offset(
-        (canvasWidth - item.baseWidth) / 2,
-        (canvasHeight - item.baseHeight) / 2,
-      );
-
-      item.scale = 1.0;
-    } else {
-      final oldOffset = item.offset;
-      final oldHeight = item.baseHeight;
-
-      final newAspect = naturalWidth / naturalHeight;
-      final newWidth = oldHeight * newAspect;
-
-      item.baseWidth = newWidth;
-      item.baseHeight = oldHeight;
-
-      item.offset = oldOffset;
-      item.scale = 1.0;
-    }
+    item.baseWidth = naturalWidth * scale;
+    item.baseHeight = naturalHeight * scale;
+    item.scale = 1.0;
+    item.offset =
+        oldCenter - Offset(item.baseWidth / 2, item.baseHeight / 2);
+    _clampItemOffset(item);
 
     // Если заменили на видео — гарантируем VideoUi
     _controller.ensureVideoStateFor(item);
@@ -1494,15 +1484,83 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return MediaQuery.of(context).size;
   }
 
+  Offset _screenToCanvas(Offset screen) {
+    final inv = Matrix4.inverted(_transformationController.value);
+    final v = Vector3(screen.dx, screen.dy, 0);
+    final out = inv.transform3(v);
+    return Offset(out.x, out.y);
+  }
+
+  Offset _canvasToScreen(Offset canvas) {
+    final v = Vector3(canvas.dx, canvas.dy, 0);
+    final out = _transformationController.value.transform3(v);
+    return Offset(out.x, out.y);
+  }
+
+  void _clampItemOffset(CollagePhotoState item) {
+    const double padding = 24.0;
+    final size = _currentCanvasSize();
+    if (size.width <= 0 || size.height <= 0) return;
+
+    final w = item.baseWidth * item.scale;
+    final h = item.baseHeight * item.scale;
+
+    final minX = padding;
+    final maxX = size.width - w - padding;
+    final minY = padding;
+    final maxY = size.height - h - padding;
+
+    double nextX;
+    if (maxX < minX) {
+      nextX = (size.width - w) / 2;
+    } else {
+      nextX = item.offset.dx.clamp(minX, maxX);
+    }
+
+    double nextY;
+    if (maxY < minY) {
+      nextY = (size.height - h) / 2;
+    } else {
+      nextY = item.offset.dy.clamp(minY, maxY);
+    }
+
+    item.offset = Offset(nextX, nextY);
+  }
+
   Offset _cascadeOffsetForIndex(int index, CollagePhotoState item) {
     const cascadeOffset = 50.0;
+    const padding = 20.0;
     final size = _currentCanvasSize();
-    final maxX = math.max(1.0, size.width - item.baseWidth);
-    final maxY = math.max(1.0, size.height - item.baseHeight);
-    return Offset(
-      (index * cascadeOffset) % maxX,
-      (index * cascadeOffset) % maxY,
+    final screenScale = _collageScale;
+    final w = item.baseWidth * item.scale * screenScale;
+    final h = item.baseHeight * item.scale * screenScale;
+
+    final maxX = math.max(padding, size.width - w - padding);
+    final maxY = math.max(padding, size.height - h - padding);
+    final screenOffset = Offset(
+      padding + (index * cascadeOffset) % (maxX - padding + 1),
+      padding + (index * cascadeOffset) % (maxY - padding + 1),
     );
+
+    return _screenToCanvas(screenOffset);
+  }
+
+  void _fitAndCenterFirstItem(CollagePhotoState item) {
+    final size = _currentCanvasSize();
+    final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
+    final scaleW = size.width / (item.baseWidth * screenScale);
+    final scaleH = size.height / (item.baseHeight * screenScale);
+    final scale = math.min(scaleW, scaleH);
+
+    final screenW = item.baseWidth * scale * screenScale;
+    final screenH = item.baseHeight * scale * screenScale;
+    final screenOffset = Offset(
+      (size.width - screenW) / 2,
+      (size.height - screenH) / 2,
+    );
+
+    item.scale = scale;
+    item.offset = _screenToCanvas(screenOffset);
   }
 
   bool _shouldSkipDroppedFile(File file) {
@@ -1530,10 +1588,38 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     const double targetShortSide = 150;
 
     if (photo.mediaType == 'video') {
+      final vw = photo.videoWidth;
+      final vh = photo.videoHeight;
+      debugPrint('[Collage] video size meta: ${vw}x$vh');
+      if (vw != null && vh != null && vw > 0 && vh > 0) {
+        final shortSide = math.min(vw, vh);
+        final scale = targetShortSide / shortSide;
+        return Size(vw * scale, vh * scale);
+      }
+      if (photo.videoPreview != null && photo.videoPreview!.isNotEmpty) {
+        final previewPath =
+            PhotoPathHelper().getFullPath(photo.videoPreview!);
+        final previewFile = File(previewPath);
+        if (previewFile.existsSync()) {
+          final decoded = img.decodeImage(previewFile.readAsBytesSync());
+          if (decoded != null && decoded.width > 0 && decoded.height > 0) {
+            debugPrint(
+              '[Collage] video preview size: ${decoded.width}x${decoded.height}',
+            );
+            final shortSide = math.min(decoded.width, decoded.height);
+            final scale = targetShortSide / shortSide;
+            return Size(
+              decoded.width * scale,
+              decoded.height * scale,
+            );
+          }
+        }
+      }
+      debugPrint('[Collage] video size fallback to 16:9');
       return const Size(targetShortSide * 16 / 9, targetShortSide);
     }
 
-    final fullPath = PhotoPathHelper().getFullPath(photo.fileName);
+    final fullPath = _resolvePhotoPath(photo);
     final file = File(fullPath);
     if (file.existsSync()) {
       final decoded = img.decodeImage(file.readAsBytesSync());
@@ -1676,6 +1762,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       builder: (context, constraints) {
                         _canvasViewportSize =
                             Size(constraints.maxWidth, constraints.maxHeight);
+                        final canvasSize = _canvasViewportSize;
 
                         return Listener(
                           behavior: HitTestBehavior.opaque,
@@ -1718,8 +1805,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                   child: RepaintBoundary(
                                     key: _collageKey,
                                     child: SizedBox(
-                                      width: 5000,
-                                      height: 5000,
+                                      width: canvasSize.width,
+                                      height: canvasSize.height,
                                       child: Stack(
                                         clipBehavior: Clip.none,
                                         children: [
@@ -1816,7 +1903,34 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   left: 12,
                   right: 12,
                   bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: _buildEditPanel(editingPhoto),
+                  child: PhotoAdjustmentsPanel(
+                    onRotateLeft: () =>
+                        setState(() => editingPhoto.rotation -= math.pi / 2),
+                    onRotateRight: () =>
+                        setState(() => editingPhoto.rotation += math.pi / 2),
+                    onFlipX: () =>
+                        setState(() => editingPhoto.flipX = !editingPhoto.flipX),
+                    onFlipY: null,
+                    onDone: () =>
+                        setState(() => editingPhoto.isEditing = false),
+                    brightness: editingPhoto.brightness,
+                    saturation: editingPhoto.saturation,
+                    temp: editingPhoto.temp,
+                    hue: editingPhoto.hue,
+                    contrast: editingPhoto.contrast,
+                    opacity: editingPhoto.opacity,
+                    onBrightnessChanged: (v) =>
+                        setState(() => editingPhoto.brightness = v),
+                    onSaturationChanged: (v) =>
+                        setState(() => editingPhoto.saturation = v),
+                    onTempChanged: (v) =>
+                        setState(() => editingPhoto.temp = v),
+                    onHueChanged: (v) => setState(() => editingPhoto.hue = v),
+                    onContrastChanged: (v) =>
+                        setState(() => editingPhoto.contrast = v),
+                    onOpacityChanged: (v) =>
+                        setState(() => editingPhoto.opacity = v),
+                  ),
                 )
               else if (_draggingIndex == null) ...[
                 if (Platform.isMacOS)
@@ -2149,180 +2263,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  Widget _buildEditPanel(CollagePhotoState item) {
-    return Material(
-      color: Colors.black.withOpacity(0.6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Row(
-          children: [
-            ActionIcon(
-              icon: Icons.rotate_left,
-              tooltip: 'Rotate -90°',
-              onPressed: () => setState(() => item.rotation -= math.pi / 2),
-            ),
-            const SizedBox(width: 6),
-            ActionIcon(
-              icon: Icons.rotate_right,
-              tooltip: 'Rotate +90°',
-              onPressed: () => setState(() => item.rotation += math.pi / 2),
-            ),
-            ActionIcon(
-              icon: Icons.flip,
-              tooltip: 'Flip horizontal',
-              onPressed: () => setState(() => item.flipX = !item.flipX),
-            ),
-            const VerticalDivider(
-                color: Colors.white24,
-                thickness: 1,
-                width: 16,
-                indent: 6,
-                endIndent: 6),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final columns = c.maxWidth > 900 ? 3 : 2;
-
-                  final sliders = [
-                    MiniSlider(
-                      label: 'Brt',
-                      value: item.brightness,
-                      min: 0.0,
-                      max: 4.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      onChanged: (v) => setState(() => item.brightness = v),
-                    ),
-                    MiniSlider(
-                      label: 'Sat',
-                      value: item.saturation,
-                      min: 0.0,
-                      max: 2.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      onChanged: (v) => setState(() => item.saturation = v),
-                    ),
-                    MiniSlider(
-                      label: 'Tmp',
-                      value: item.temp,
-                      min: -5.0,
-                      max: 5.0,
-                      divisions: 20,
-                      centerValue: 0.0,
-                      onChanged: (v) => setState(() => item.temp = v),
-                    ),
-                    MiniSlider(
-                      label: 'Hue',
-                      value: item.hue,
-                      min: -math.pi / 4,
-                      max: math.pi / 4,
-                      divisions: 20,
-                      centerValue: 0.0,
-                      format: (v) =>
-                          '${(v * 180 / math.pi).toStringAsFixed(0)}°',
-                      onChanged: (v) => setState(() => item.hue = v),
-                    ),
-                    MiniSlider(
-                      label: 'Cnt',
-                      value: item.contrast,
-                      min: 0.0,
-                      max: 2.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      format: (v) => '${v.toStringAsFixed(2)}x',
-                      onChanged: (v) => setState(() => item.contrast = v),
-                    ),
-                    MiniSlider(
-                      label: 'Op',
-                      value: item.opacity,
-                      min: 0.0,
-                      max: 1.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      format: (v) => '${(v * 100).round()}%',
-                      onChanged: (v) => setState(() => item.opacity = v),
-                    ),
-                  ];
-
-                  if (columns == 2) {
-                    return Wrap(
-                      spacing: 12,
-                      runSpacing: 6,
-                      children: sliders
-                          .map((w) =>
-                              SizedBox(width: c.maxWidth / 2 - 12, child: w))
-                          .toList(),
-                    );
-                  }
-
-                  final colW = (c.maxWidth - 24) / 3;
-                  return Row(
-                    children: [
-                      SizedBox(
-                        width: colW,
-                        child: Column(
-                          children: [
-                            sliders[0],
-                            const SizedBox(height: 6),
-                            sliders[1],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: colW,
-                        child: Column(
-                          children: [
-                            sliders[2],
-                            const SizedBox(height: 6),
-                            sliders[3],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: colW,
-                        child: Column(
-                          children: [
-                            sliders[4],
-                            const SizedBox(height: 6),
-                            sliders[5],
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            const VerticalDivider(
-                color: Colors.white24,
-                thickness: 1,
-                width: 16,
-                indent: 6,
-                endIndent: 6),
-            SizedBox(
-              height: 32,
-              child: ElevatedButton(
-                onPressed: () => setState(() => item.isEditing = false),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  backgroundColor: Colors.white10,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text('OK',
-                    style: TextStyle(fontSize: 13, letterSpacing: 0.2)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // ----------------------------
   // Item building
   // ----------------------------
@@ -2390,6 +2330,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   final base = item.baseScaleOnGesture ?? item.scale;
                   final nextScale = base * details.scale;
                   item.scale = math.max(0.001, nextScale);
+                  _clampItemOffset(item);
                   return;
                 }
 
@@ -2401,6 +2342,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   item.internalOffset += details.focalPointDelta;
                 } else {
                   item.offset += details.focalPointDelta;
+                  _clampItemOffset(item);
                 }
 
                 final pointer = details.focalPoint;
@@ -2420,6 +2362,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 _deleteHover = false;
                 _isItemScaleGestureActive = false;
                 item.baseScaleOnGesture = null;
+                _clampItemOffset(item);
               });
             },
             child: Transform(

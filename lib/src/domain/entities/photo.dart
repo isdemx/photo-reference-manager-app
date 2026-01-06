@@ -45,6 +45,12 @@ class Photo extends HiveObject {
   @HiveField(12)
   String? videoDuration;
 
+  @HiveField(13)
+  double? videoWidth;
+
+  @HiveField(14)
+  double? videoHeight;
+
   Photo({
     required this.id,
     required this.path,
@@ -57,6 +63,8 @@ class Photo extends HiveObject {
     required this.mediaType,
     this.videoPreview,
     this.videoDuration,
+    this.videoWidth,
+    this.videoHeight,
     this.isStoredInApp = false,
     this.geoLocation,
   });
@@ -81,6 +89,8 @@ class Photo extends HiveObject {
     String? mediaType,
     String? videoPreview,
     String? videoDuration,
+    double? videoWidth,
+    double? videoHeight,
     bool? isStoredInApp,
     Map<String, double>? geoLocation,
   }) {
@@ -96,6 +106,8 @@ class Photo extends HiveObject {
       mediaType: mediaType ?? this.mediaType,
       videoPreview: videoPreview ?? this.videoPreview,
       videoDuration: videoDuration ?? this.videoDuration,
+      videoWidth: videoWidth ?? this.videoWidth,
+      videoHeight: videoHeight ?? this.videoHeight,
       isStoredInApp: isStoredInApp ?? this.isStoredInApp,
       geoLocation: geoLocation ?? this.geoLocation,
     );
@@ -114,6 +126,8 @@ class Photo extends HiveObject {
       mediaType: json['mediaType'],
       videoPreview: json['videoPreview'],
       videoDuration: json['videoDuration'],
+      videoWidth: (json['videoWidth'] as num?)?.toDouble(),
+      videoHeight: (json['videoHeight'] as num?)?.toDouble(),
       isStoredInApp: json['isStoredInApp'] ?? false,
       geoLocation: json['geoLocation'] != null
           ? Map<String, double>.from(json['geoLocation'])
@@ -134,6 +148,8 @@ class Photo extends HiveObject {
       'mediaType': mediaType,
       'videoPreview': videoPreview,
       'videoDuration': videoDuration,
+      'videoWidth': videoWidth,
+      'videoHeight': videoHeight,
       'isStoredInApp': isStoredInApp,
       'geoLocation': geoLocation,
     };

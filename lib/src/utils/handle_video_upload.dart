@@ -43,21 +43,24 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
       print('[Thumb] Error: итоговый thumbnail не существует: $finalThumbnailPath');
       return null;
     }
-    final size = await outFile.length();
-    if (size == 0) {
+    final fileSize = await outFile.length();
+    if (fileSize == 0) {
       print('[Thumb] Error: thumbnail файл 0 байт: $finalThumbnailPath');
       return null;
     }
 
-    // 2) Длительность (оставляем через video_player)
+    // 2) Длительность и размер (video_player)
     final c = VideoPlayerController.file(File(video.path));
     await c.initialize();
     final duration = c.value.duration;
+    final videoSize = c.value.size;
     await c.dispose();
 
     return {
       'videoPreview': thumbnailFileName,
       'videoDuration': formatDuration(duration),
+      'videoWidth': videoSize.width,
+      'videoHeight': videoSize.height,
     };
   } catch (e, st) {
     print('Ошибка при генерации миниатюры видео: $e\n$st');

@@ -28,6 +28,8 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       mediaType: fields[10] as String,
       videoPreview: fields[11] as String?,
       videoDuration: fields[12] as String?,
+      videoWidth: fields[13] as double?,
+      videoHeight: fields[14] as double?,
       isStoredInApp: fields[7] as bool,
       geoLocation: (fields[9] as Map?)?.cast<String, double>(),
     );
@@ -36,7 +38,7 @@ class PhotoAdapter extends TypeAdapter<Photo> {
   @override
   void write(BinaryWriter writer, Photo obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -62,7 +64,11 @@ class PhotoAdapter extends TypeAdapter<Photo> {
       ..writeByte(11)
       ..write(obj.videoPreview)
       ..writeByte(12)
-      ..write(obj.videoDuration);
+      ..write(obj.videoDuration)
+      ..writeByte(13)
+      ..write(obj.videoWidth)
+      ..writeByte(14)
+      ..write(obj.videoHeight);
   }
 
   @override

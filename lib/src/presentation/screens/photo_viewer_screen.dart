@@ -367,8 +367,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Future<void> _openEditor(Photo photo) async {
-    if (!photo.isImage) return;
-
     await Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
@@ -385,6 +383,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               }
 
               if (mounted) setState(() {});
+            },
+            onAddNewPhoto: (newPhoto) {
+              if (!mounted) return;
+              setState(() {
+                widget.photos.insert(_currentIndex + 1, newPhoto);
+              });
             },
           );
         },

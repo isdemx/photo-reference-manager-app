@@ -211,6 +211,8 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
             mediaType: 'video',
             videoPreview: null,
             videoDuration: null,
+            videoWidth: null,
+            videoHeight: null,
           );
 
           // ✅ 1) Генерим превью и длительность сразу
@@ -218,6 +220,10 @@ class _VideoGeneratorWidgetState extends State<VideoGeneratorWidget> {
           if (videoResult != null) {
             newVideo.videoPreview = videoResult['videoPreview'] as String?;
             newVideo.videoDuration = videoResult['videoDuration'] as String?;
+            newVideo.videoWidth =
+                (videoResult['videoWidth'] as num?)?.toDouble();
+            newVideo.videoHeight =
+                (videoResult['videoHeight'] as num?)?.toDouble();
           } else {
             print(
                 'Warning: превью не сгенерировалось, сохраним видео без превью');

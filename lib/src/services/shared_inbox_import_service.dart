@@ -112,6 +112,8 @@ class SharedInboxImportService {
         geoLocation: null,
         videoPreview: null,
         videoDuration: null,
+        videoWidth: null,
+        videoHeight: null,
       );
 
       final compressSizeKb = (mediaType == 'image' && shouldCompress)
@@ -124,6 +126,10 @@ class SharedInboxImportService {
         if (videoResult != null) {
           photo.videoPreview = videoResult['videoPreview'] as String?;
           photo.videoDuration = videoResult['videoDuration'] as String?;
+          photo.videoWidth =
+              (videoResult['videoWidth'] as num?)?.toDouble();
+          photo.videoHeight =
+              (videoResult['videoHeight'] as num?)?.toDouble();
           await repo.updatePhoto(photo);
         }
       }
