@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:image/image.dart' as img;
+import 'package:image_editor/image_editor.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/data/utils/compress_photo_isolate.dart';
@@ -54,6 +55,7 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
   final double hueDeg = job['hueDeg'] as double? ?? 0.0;
   final double contrast = job['contrast'] as double? ?? 1.0;
   final double opacity = job['opacity'] as double? ?? 1.0;
+  final String format = (job['format'] as String? ?? 'jpg').toLowerCase();
 
   final image = img.decodeImage(bytes);
   if (image == null) return Uint8List(0);
@@ -81,13 +83,17 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
     working = img.flipVertical(working);
   }
 
-  working = img.adjustColor(
-    working,
-    brightness: brightness,
-    saturation: saturation,
-    contrast: contrast,
-    hue: hueDeg,
-  );
+  final bool needsColorAdjustments =
+      brightness != 1.0 || saturation != 1.0 || contrast != 1.0 || hueDeg != 0.0;
+  if (needsColorAdjustments) {
+    working = img.adjustColor(
+      working,
+      brightness: brightness,
+      saturation: saturation,
+      contrast: contrast,
+      hue: hueDeg,
+    );
+  }
 
   if (temp != 0.0 || opacity != 1.0) {
     final double tempDelta = 2.0 * temp;
@@ -103,16 +109,54 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
       }
 
       if (op != 1.0) {
-        r = (r * op).clamp(0.0, 255.0);
-        g = (g * op).clamp(0.0, 255.0);
-        b = (b * op).clamp(0.0, 255.0);
+        // JPEG не поддерживает альфа, поэтому компонуем на белый фон.
+        r = (r * op + 255.0 * (1.0 - op)).clamp(0.0, 255.0);
+        g = (g * op + 255.0 * (1.0 - op)).clamp(0.0, 255.0);
+        b = (b * op + 255.0 * (1.0 - op)).clamp(0.0, 255.0);
       }
 
       p.setRgb(r, g, b);
     }
   }
 
+  if (format == 'png') {
+    final encoded = img.encodePng(working);
+    return Uint8List.fromList(encoded);
+  }
+
   final encoded = img.encodeJpg(working, quality: quality);
+  return Uint8List.fromList(encoded);
+}
+
+Uint8List compressToMaxBytesIsolate(Map<String, dynamic> job) {
+  final Uint8List bytes = job['bytes'] as Uint8List;
+  final int maxBytes = job['maxBytes'] as int? ?? 0;
+  final int minQuality = job['minQuality'] as int? ?? 40;
+  if (maxBytes <= 0 || bytes.isEmpty) return bytes;
+
+  final image = img.decodeImage(bytes);
+  if (image == null) return bytes;
+
+  img.Image working = image;
+  int quality = 95;
+  List<int> encoded = img.encodeJpg(working, quality: quality);
+
+  while (encoded.length > maxBytes && quality > minQuality) {
+    quality -= 5;
+    encoded = img.encodeJpg(working, quality: quality);
+  }
+
+  // If still too large, downscale gradually.
+  while (encoded.length > maxBytes &&
+      working.width > 200 &&
+      working.height > 200) {
+    final nextW = (working.width * 0.9).round().clamp(1, working.width);
+    final nextH = (working.height * 0.9).round().clamp(1, working.height);
+    if (nextW == working.width && nextH == working.height) break;
+    working = img.copyResize(working, width: nextW, height: nextH);
+    encoded = img.encodeJpg(working, quality: quality);
+  }
+
   return Uint8List.fromList(encoded);
 }
 
@@ -176,6 +220,10 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     if (await file.exists()) {
       if (!mounted) return;
       setState(() => _currentSizeBytes = file.lengthSync());
+      debugPrint(
+          '[EditSave] original file: $path size=${file.lengthSync()} bytes');
+    } else {
+      debugPrint('[EditSave] original file missing: $path');
     }
   }
 
@@ -191,6 +239,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     Uint8List bytes, {
     int compressSizeKb = 300,
   }) async {
+    debugPrint(
+        '[EditSave] compressBytesLikeUpload: in=${bytes.length} bytes, target=${compressSizeKb}KB');
     final tempDir = await getTemporaryDirectory();
     final tempPath = p.join(
       tempDir.path,
@@ -204,6 +254,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         {'filePath': tempFile.path, 'compressSizeKb': compressSizeKb},
       );
       final compressed = await tempFile.readAsBytes();
+      debugPrint(
+          '[EditSave] compressBytesLikeUpload: out=${compressed.length} bytes');
       return Uint8List.fromList(compressed);
     } finally {
       if (await tempFile.exists()) {
@@ -212,15 +264,111 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     }
   }
 
+  Future<Uint8List> _getEditorBytesOrFile() async {
+    final editorState = _editorKey.currentState;
+    if (editorState != null) {
+      final ui.Image? uiImage = editorState.image;
+      if (uiImage != null) {
+        final byteData = await uiImage.toByteData(
+          format: ui.ImageByteFormat.png,
+        );
+        if (byteData != null) {
+          return byteData.buffer.asUint8List();
+        }
+      }
+    }
+
+    final String path = widget.photo.isStoredInApp
+        ? PhotoPathHelper().getFullPath(widget.photo.fileName)
+        : widget.photo.path;
+    return File(path).readAsBytes();
+  }
+
+  Future<Uint8List> _ensureNotLargerThanOriginal(
+    Uint8List bytes,
+    int maxBytes,
+  ) async {
+    debugPrint(
+        '[EditSave] ensureNotLargerThanOriginal: in=${bytes.length}, max=$maxBytes');
+    if (maxBytes <= 0 || bytes.length <= maxBytes) return bytes;
+    final compressed = await compute(
+      compressToMaxBytesIsolate,
+      {'bytes': bytes, 'maxBytes': maxBytes},
+    );
+    debugPrint(
+        '[EditSave] ensureNotLargerThanOriginal: out=${compressed.length}');
+    return compressed.length <= bytes.length ? compressed : bytes;
+  }
+
+  Future<Uint8List?> _cropWithNativeLibrary({
+    required ExtendedImageEditorState state,
+    required Rect cropRect,
+    required bool needCrop,
+    required double rotationDeg,
+    required bool flipX,
+    required bool flipY,
+    required String format,
+  }) async {
+    debugPrint(
+        '[EditSave] nativeCrop: needCrop=$needCrop rot=$rotationDeg flipX=$flipX flipY=$flipY rect=$cropRect');
+    if (!needCrop &&
+        rotationDeg.abs() < 0.1 &&
+        !flipX &&
+        !flipY) {
+      return null;
+    }
+
+    final ImageEditorOption option = ImageEditorOption();
+
+    if (rotationDeg.abs() >= 0.1) {
+      option.addOption(RotateOption(rotationDeg.round()));
+    }
+
+    if (flipX || flipY) {
+      option.addOption(FlipOption(horizontal: flipX, vertical: flipY));
+    }
+
+    if (needCrop) {
+      Rect rect = cropRect;
+      final provider = state.widget.extendedImageState.imageProvider;
+      if (provider is ExtendedResizeImage && state.image != null) {
+        final ui.ImmutableBuffer buffer =
+            await ui.ImmutableBuffer.fromUint8List(state.rawImageData);
+        final ui.ImageDescriptor descriptor =
+            await ui.ImageDescriptor.encoded(buffer);
+        final double widthRatio = descriptor.width / state.image!.width;
+        final double heightRatio = descriptor.height / state.image!.height;
+        rect = Rect.fromLTRB(
+          rect.left * widthRatio,
+          rect.top * heightRatio,
+          rect.right * widthRatio,
+          rect.bottom * heightRatio,
+        );
+      }
+      option.addOption(ClipOption.fromRect(rect));
+    }
+
+    if (format == 'png') {
+      option.outputFormat = const OutputFormat.png(100);
+    } else {
+      option.outputFormat = const OutputFormat.jpeg(100);
+    }
+
+    final Uint8List? result = await ImageEditor.editImage(
+      image: state.rawImageData,
+      imageEditorOption: option,
+    );
+    debugPrint(
+        '[EditSave] nativeCrop: out=${result?.length ?? 0} bytes');
+    return result;
+  }
+
   Future<void> _prepareCompression() async {
     if (_compressing) return;
     setState(() => _compressing = true);
 
     try {
-      final String path = widget.photo.isStoredInApp
-          ? PhotoPathHelper().getFullPath(widget.photo.fileName)
-          : widget.photo.path;
-      final bytes = await File(path).readAsBytes();
+      final bytes = await _getEditorBytesOrFile();
       final compressed = await _compressBytesLikeUpload(bytes);
       if (!mounted) return;
       setState(() {
@@ -394,6 +542,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     });
 
     try {
+      debugPrint('[EditSave] start overwrite=$overwrite');
       final editorState = _editorKey.currentState;
       if (editorState == null) {
         if (!mounted) return;
@@ -411,19 +560,53 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       final String path = widget.photo.isStoredInApp
           ? PhotoPathHelper().getFullPath(widget.photo.fileName)
           : widget.photo.path;
+      final int originalFileSize =
+          File(path).existsSync() ? File(path).lengthSync() : 0;
+      final String ext = p.extension(path).toLowerCase();
+      final String format = ext == '.png' ? 'png' : 'jpg';
+      debugPrint(
+          '[EditSave] file=$path ext=$ext format=$format originalSize=$originalFileSize');
 
-      Uint8List originBytes;
+      // Всегда используем исходный файл, чтобы не терять качество и избежать
+      // артефактов от рендеринга preview-изображения.
+      final Uint8List originBytes = await File(path).readAsBytes();
+      debugPrint('[EditSave] originBytes=${originBytes.length}');
+
       final ui.Image? uiImage = editorState.image;
+      final editAction = editorState.editAction;
+      final bool needCrop = editAction?.needCrop ?? false;
       if (uiImage != null) {
-        final byteData =
-            await uiImage.toByteData(format: ui.ImageByteFormat.png);
-        if (byteData != null) {
-          originBytes = byteData.buffer.asUint8List();
-        } else {
-          originBytes = await File(path).readAsBytes();
-        }
-      } else {
-        originBytes = await File(path).readAsBytes();
+        debugPrint(
+            '[EditSave] uiImageSize=${uiImage.width}x${uiImage.height}');
+      }
+      final bool noTransform =
+          _rotation == 0.0 &&
+          !_flipX &&
+          !_flipY &&
+          _brightness == 1.0 &&
+          _saturation == 1.0 &&
+          _contrast == 1.0 &&
+          _temp == 0.0 &&
+          _hue == 0.0 &&
+          _opacity == 1.0 &&
+          !_compressOnSave;
+      debugPrint(
+          '[EditSave] noTransform=$noTransform needCrop=$needCrop compressOnSave=$_compressOnSave');
+
+      final bool noCrop = uiImage != null
+          ? (cropRect.left <= 0.5 &&
+              cropRect.top <= 0.5 &&
+              (cropRect.width - uiImage.width).abs() <= 1.0 &&
+              (cropRect.height - uiImage.height).abs() <= 1.0)
+          : false;
+      debugPrint('[EditSave] cropRect=$cropRect noCrop=$noCrop');
+
+      if (noTransform && noCrop) {
+        debugPrint('[EditSave] fast path: save original bytes');
+        widget.onSave(originBytes, overwrite, _commentController.text.trim());
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        return;
       }
 
       final int x = cropRect.left.round();
@@ -437,7 +620,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         'y': y,
         'w': w,
         'h': h,
-        'quality': 95,
+        'quality': 100,
+        'format': format,
         'rotationDeg': _rotation * 180 / math.pi,
         'flipX': _flipX,
         'flipY': _flipY,
@@ -448,8 +632,44 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         'contrast': _contrast,
         'opacity': _opacity,
       };
+      debugPrint(
+          '[EditSave] job=bytes:${originBytes.length} x:$x y:$y w:$w h:$h '
+          'quality:100 format:$format rotationDeg:${_rotation * 180 / math.pi} '
+          'flipX:$_flipX flipY:$_flipY brightness:$_brightness '
+          'saturation:$_saturation temp:$_temp hueDeg:${_hue * 180 / math.pi} '
+          'contrast:$_contrast opacity:$_opacity');
 
-      Uint8List outBytes = await compute(cropEncodeJpgIsolate, job);
+      final bool hasColorAdjustments =
+          _brightness != 1.0 ||
+          _saturation != 1.0 ||
+          _contrast != 1.0 ||
+          _temp != 0.0 ||
+          _hue != 0.0 ||
+          _opacity != 1.0;
+      debugPrint('[EditSave] hasColorAdjustments=$hasColorAdjustments');
+
+      Uint8List outBytes;
+      if (!hasColorAdjustments) {
+        final Uint8List? nativeCropped = await _cropWithNativeLibrary(
+          state: editorState,
+          cropRect: cropRect,
+          needCrop: needCrop,
+          rotationDeg: _rotation * 180 / math.pi,
+          flipX: _flipX,
+          flipY: _flipY,
+          format: format,
+        );
+        if (nativeCropped != null && nativeCropped.isNotEmpty) {
+          outBytes = nativeCropped;
+          debugPrint('[EditSave] using nativeCrop bytes=${outBytes.length}');
+        } else {
+          outBytes = await compute(cropEncodeJpgIsolate, job);
+          debugPrint('[EditSave] using image crop bytes=${outBytes.length}');
+        }
+      } else {
+        outBytes = await compute(cropEncodeJpgIsolate, job);
+        debugPrint('[EditSave] using image crop bytes=${outBytes.length}');
+      }
 
       if (outBytes.isEmpty) {
         if (!mounted) return;
@@ -462,9 +682,19 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
       if (_compressOnSave) {
         outBytes = await _compressBytesLikeUpload(outBytes);
+        debugPrint('[EditSave] after compressOnSave bytes=${outBytes.length}');
+      }
+
+      if (originalFileSize > 0 && format != 'png') {
+        outBytes = await _ensureNotLargerThanOriginal(
+          outBytes,
+          originalFileSize,
+        );
+        debugPrint('[EditSave] after sizeCap bytes=${outBytes.length}');
       }
 
       widget.onSave(outBytes, overwrite, _commentController.text.trim());
+      debugPrint('[EditSave] done bytes=${outBytes.length}');
 
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -523,6 +753,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                               File(path),
                               fit: BoxFit.contain,
                               mode: ExtendedImageMode.editor,
+                              cacheRawData: true,
                               extendedImageEditorKey: _editorKey,
                               initEditorConfigHandler: (_) => EditorConfig(
                                 maxScale: 5.0,
@@ -557,7 +788,6 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                         setState(() => _rotation += math.pi / 2),
                     onFlipX: () => setState(() => _flipX = !_flipX),
                     onFlipY: () => setState(() => _flipY = !_flipY),
-                    onDone: () {},
                     brightness: _brightness,
                     saturation: _saturation,
                     temp: _temp,

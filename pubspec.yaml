@@ -75,6 +75,7 @@ dependencies:
   flutter_archive: ^6.0.3
   image_size_getter: ^2.1.2
   flutter_image_compress: ^2.3.0
+  image_editor: ^1.5.1
   path: ^1.9.0
   desktop_multi_window: 0.2.1
   window_manager: ^0.5.1
@@ -152,4 +153,3 @@ flutter_native_splash:
 
   color: "#000000"
   image: assets/refma-icon-180.png
-

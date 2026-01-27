@@ -623,6 +623,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   List<double> _originalScales = <double>[];
 
   bool _isItemScaleGestureActive = false;
+  bool _isTrackpadPanZoomActive = false;
 
   // --- UI ---
   Color _backgroundColor = Colors.black;
@@ -1104,6 +1105,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (!Platform.isMacOS) return;
     try {
       if (next) {
+        WakelockPlus.enable();
         _wasMaximizedBeforeFullscreen = await windowManager.isMaximized();
         await windowManager.setTitleBarStyle(
           TitleBarStyle.hidden,
@@ -1111,6 +1113,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         );
         await windowManager.maximize();
       } else {
+        WakelockPlus.disable();
         await windowManager.setTitleBarStyle(
           TitleBarStyle.normal,
           windowButtonVisibility: true,
@@ -1283,12 +1286,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 child: PhotoPickerWidget(
                   onPhotoSelected: (result) {
                     Navigator.pop(context);
-                    _addPickedToCollage(result);
+                    _addPickedToCollage(result, cascadeIndex: 0);
                   },
                   onMultiSelectDone: (List<PhotoPickResult> list) {
                     Navigator.pop(context);
-                    for (final result in list) {
-                      _addPickedToCollage(result);
+                    for (int i = 0; i < list.length; i++) {
+                      _addPickedToCollage(list[i], cascadeIndex: i);
                     }
                   },
                 ),
@@ -1300,7 +1303,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  void _addPickedToCollage(PhotoPickResult result) {
+  void _addPickedToCollage(
+    PhotoPickResult result, {
+    required int cascadeIndex,
+  }) {
     _registerPhoto(result.photo);
     _pickContexts.putIfAbsent(
       result.contextId,
@@ -1316,7 +1322,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       }
       final offset = _items.isEmpty
           ? item.offset
-          : _cascadeOffsetForIndex(_items.length, item);
+          : _cascadeOffsetForIndex(cascadeIndex, item);
       _controller.addState(item, initialOffset: offset);
       item.pickContextId = result.contextId;
       item.pickContextIndex = result.indexInContext;
@@ -1324,7 +1330,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
-  void _addPhotoToCollage(Photo photo) {
+  void _addPhotoToCollage(
+    Photo photo, {
+    required int cascadeIndex,
+  }) {
     _registerPhoto(photo);
     setState(() {
       final item = _createCollagePhotoState(photo);
@@ -1335,7 +1344,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       }
       final offset = _items.isEmpty
           ? item.offset
-          : _cascadeOffsetForIndex(_items.length, item);
+          : _cascadeOffsetForIndex(cascadeIndex, item);
       _controller.addState(item, initialOffset: offset);
       _maxZIndex = _controller.maxZIndex;
     });
@@ -1740,7 +1749,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       },
       child: DropTarget(
         onDragDone: (details) async {
-          for (final xfile in details.files) {
+          for (int i = 0; i < details.files.length; i++) {
+            final xfile = details.files[i];
             final file = File(xfile.path);
             if (!file.existsSync()) {
               continue;
@@ -1765,7 +1775,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
             if (!mounted) return;
             setState(() {
-              _addPhotoToCollage(newPhoto);
+              _addPhotoToCollage(newPhoto, cascadeIndex: i);
             });
           }
         },
@@ -1783,8 +1793,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
                         return Listener(
                           behavior: HitTestBehavior.opaque,
+                          onPointerPanZoomStart: (_) {
+                            _isTrackpadPanZoomActive = true;
+                          },
                           onPointerPanZoomUpdate: (e) {
-                            if (_isItemScaleGestureActive) return;
+                            if (_isItemScaleGestureActive &&
+                                !_isTrackpadPanZoomActive) {
+                              return;
+                            }
+                            _isTrackpadPanZoomActive = true;
                             if (e.panDelta != Offset.zero) {
                               final next = _transformationController.value
                                   .clone()
@@ -1793,6 +1810,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                             }
                           },
                           onPointerPanZoomEnd: (_) {
+                            _isTrackpadPanZoomActive = false;
                             _saveCollageScale(_collageScale);
                           },
                           child: GestureDetector(

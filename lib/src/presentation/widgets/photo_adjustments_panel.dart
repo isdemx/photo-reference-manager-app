@@ -9,7 +9,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
   final VoidCallback onRotateRight;
   final VoidCallback onFlipX;
   final VoidCallback? onFlipY;
-  final VoidCallback onDone;
+  final VoidCallback? onDone;
 
   final double brightness;
   final double saturation;
@@ -31,7 +31,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
     required this.onRotateRight,
     required this.onFlipX,
     this.onFlipY,
-    required this.onDone,
+    this.onDone,
     required this.brightness,
     required this.saturation,
     required this.temp,
@@ -202,31 +202,33 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                 },
               ),
             ),
-            const VerticalDivider(
-              color: Colors.white24,
-              thickness: 1,
-              width: 16,
-              indent: 6,
-              endIndent: 6,
-            ),
-            SizedBox(
-              height: 32,
-              child: ElevatedButton(
-                onPressed: onDone,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  backgroundColor: Colors.white10,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
-                ),
-                child: const Text(
-                  'OK',
-                  style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+            if (onDone != null) ...[
+              const VerticalDivider(
+                color: Colors.white24,
+                thickness: 1,
+                width: 16,
+                indent: 6,
+                endIndent: 6,
+              ),
+              SizedBox(
+                height: 32,
+                child: ElevatedButton(
+                  onPressed: onDone,
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    backgroundColor: Colors.white10,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

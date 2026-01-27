@@ -153,6 +153,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         if (mounted) setState(() => isInitScrolling = false);
       });
     });
+
+    if (Platform.isMacOS) {
+      try {
+        WakelockPlus.enable();
+      } catch (_) {
+        // ignore
+      }
+    }
   }
 
   @override
@@ -320,12 +328,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   void _toggleActions() {
     setState(() {
       _showActions = !_showActions;
-      if (_showActions) {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        WakelockPlus.disable();
-      } else {
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-        WakelockPlus.enable();
+      if (!Platform.isMacOS) {
+        if (_showActions) {
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+          WakelockPlus.disable();
+        } else {
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+          WakelockPlus.enable();
+        }
       }
     });
 

@@ -488,6 +488,30 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "image_editor",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_editor-1.6.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "image_editor_common",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_editor_common-1.2.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "image_editor_ohos",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_editor_ohos-0.0.9",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
+      "name": "image_editor_platform_interface",
+      "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_editor_platform_interface-1.1.0",
+      "packageUri": "lib/",
+      "languageVersion": "2.12"
+    },
+    {
       "name": "image_picker",
       "rootUri": "file:///Users/sergeykudryashov/.pub-cache/hosted/pub.dev/image_picker-1.1.2",
       "packageUri": "lib/",

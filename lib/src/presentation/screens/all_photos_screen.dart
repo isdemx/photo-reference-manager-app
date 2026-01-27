@@ -59,8 +59,8 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                         final tag = tagIndex[tagId];
                         if (tag == null) {
                           // тег был удалён — безопасно пропускаем
-                          debugPrint(
-                              '⚠️ Missing tagId $tagId for photo ${photo.id}');
+                          // debugPrint(
+                          //     '⚠️ Missing tagId $tagId for photo ${photo.id}');
                           return true;
                         }
                         return tag.name != 'Not Ref';

@@ -76,7 +76,10 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
   final Set<String> _selectedTagIds = {};
 
   /// Логика тегов: false = ИЛИ (union), true = И (intersection)
-  bool _tagLogicAnd = false;
+  bool _tagLogicAnd = true;
+
+  /// По умолчанию скрываем фото/теги с "Not Ref"
+  bool _showNotRef = false;
 
   bool _multiSelect = false;
   final List<Photo> _selectedPhotos = [];
@@ -111,6 +114,15 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                     .toList();
                 final tags =
                     {for (var t in tagState.tags) t.id: t}.values.toList();
+                final notRefTagIds = tags
+                    .where((t) => t.name == 'Not Ref')
+                    .map((t) => t.id)
+                    .toSet();
+                final visibleTags = _showNotRef
+                    ? tags
+                    : tags
+                        .where((t) => t.name != 'Not Ref')
+                        .toList(growable: false);
 
                 final tagCatState = context.watch<TagCategoryBloc>().state;
                 final List<TagCategory> categories =
@@ -119,7 +131,10 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                         : <TagCategory>[];
 
                 // фильтруем фотографии
-                final photos = _applyFilters(photoState.photos);
+                final photos = _applyFilters(
+                  photoState.photos,
+                  notRefTagIds: notRefTagIds,
+                );
 
                 return Scaffold(
                   appBar: AppBar(
@@ -188,6 +203,45 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               ],
                             ),
                           ),
+                          RawChip(
+                            label: const Text('Not Ref'),
+                            selected: _showNotRef,
+                            showCheckmark: false,
+                            avatar: _showNotRef
+                                ? const Padding(
+                                    padding: EdgeInsets.only(left: 2, right: 2),
+                                    child: Icon(
+                                      Icons.check,
+                                      size: 12,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : null,
+                            onSelected: (_) {
+                              setState(() {
+                                _showNotRef = !_showNotRef;
+                              });
+                            },
+                            selectedColor: Colors.red.shade600,
+                            backgroundColor: Colors.red.shade300,
+                            labelStyle: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                            ),
+                            visualDensity: const VisualDensity(
+                              horizontal: -2,
+                              vertical: -2,
+                            ),
+                            shape: const StadiumBorder(),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 0,
+                            ),
+                            labelPadding: const EdgeInsets.only(right: 6),
+                          ),
                           TextButton.icon(
                             onPressed: () =>
                                 setState(() => _selectedTagIds.clear()),
@@ -255,7 +309,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
                                 child: _FilterPanel(
                                   folders: folders,
-                                  allTags: tags,
+                                  allTags: visibleTags,
                                   folderId: _folderId,
                                   categories: categories,
                                   onFolderChanged: (v) =>
@@ -423,8 +477,19 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
   }
 
   // ---------------------------------------------------------------------------
-  List<Photo> _applyFilters(List<Photo> source) {
+  List<Photo> _applyFilters(
+    List<Photo> source, {
+    required Set<String> notRefTagIds,
+  }) {
     var photos = source;
+
+    // 0) По умолчанию скрываем "Not Ref"
+    if (!_showNotRef && notRefTagIds.isNotEmpty) {
+      photos = photos.where((p) {
+        if (p.tagIds.isEmpty) return true;
+        return p.tagIds.every((id) => !notRefTagIds.contains(id));
+      }).toList(growable: false);
+    }
 
     // 1) Папка
     if (_folderId != null) {
