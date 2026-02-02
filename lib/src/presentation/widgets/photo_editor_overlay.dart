@@ -177,6 +177,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   double _trimStartFrac = 0.0;
   double _trimEndFrac = 1.0;
   double _videoPositionFrac = 0.0;
+  double _videoVolume = 0.0;
   DateTime _lastVideoTick = DateTime.fromMillisecondsSinceEpoch(0);
 
   double _rotation = 0.0;
@@ -406,6 +407,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     _videoInit = controller.initialize().then((_) async {
       if (!mounted) return;
       await controller.setLooping(true);
+      await controller.setVolume(_videoVolume);
       await controller.play();
       _videoPositionFrac = 0.0;
       controller.addListener(_handleVideoTick);
@@ -897,12 +899,17 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                         _trimEndFrac = end;
                       });
                     },
-                    volume: 1.0,
+                    volume: _videoVolume,
                     speed: 1.0,
                     showLoopRange: true,
-                    showVolume: false,
+                    showVolume: true,
                     showSpeed: false,
                     totalDuration: _videoController?.value.duration,
+                    onChangeVolume: (v) {
+                      final c = _videoController;
+                      setState(() => _videoVolume = v);
+                      c?.setVolume(_videoVolume);
+                    },
                   ),
                 ),
               SafeArea(

@@ -101,9 +101,17 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
         );
       }
 
-      // ✅ Накладываем duration (если есть) — справа снизу
-      if (widget.photo.videoDuration != null &&
-          widget.photo.videoDuration!.isNotEmpty) {
+      // ✅ Накладываем duration/size (если есть) — справа снизу
+      final hasDuration = widget.photo.videoDuration != null &&
+          widget.photo.videoDuration!.isNotEmpty;
+      final hasSize =
+          widget.fileSizeLabel != null && widget.fileSizeLabel!.isNotEmpty;
+      if (hasDuration || hasSize) {
+        final label = hasDuration && hasSize
+            ? '${widget.photo.videoDuration!} • ${widget.fileSizeLabel!}'
+            : hasDuration
+                ? widget.photo.videoDuration!
+                : widget.fileSizeLabel!;
         imageWidget = Stack(
           fit: StackFit.expand,
           children: [
@@ -119,7 +127,7 @@ class _PhotoThumbnailState extends State<PhotoThumbnail> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  widget.photo.videoDuration!,
+                  label,
                   style: const TextStyle(
                     fontSize: 11,
                     color: Colors.white,
