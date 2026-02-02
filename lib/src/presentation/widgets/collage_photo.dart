@@ -3,6 +3,7 @@
 // helpers/*, services/*, controller/*, widget/*
 
 import 'dart:io';
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -593,12 +594,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   // --- Transform ---
   final TransformationController _transformationController =
       TransformationController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _ignoreTransformUpdates = false;
 
   double _collageScale = 1.0;
   static const double _minCollageScale = 0.9;
   static const double _maxCollageScale = 60.0;
   static const double _canvasSizeMultiplier = 10.0;
+  static const int _maxViewZones = 10;
+  static const List<Color> _viewZonePalette = [
+    Colors.redAccent,
+    Colors.orangeAccent,
+    Colors.amber,
+    Colors.greenAccent,
+    Colors.cyanAccent,
+    Colors.blueAccent,
+    Colors.indigoAccent,
+    Colors.purpleAccent,
+    Colors.pinkAccent,
+    Colors.tealAccent,
+  ];
 
   // --- Items state ---
   late final Map<String, VideoUi> _videoStates = <String, VideoUi>{};
@@ -611,6 +626,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   int _maxZIndex = 0;
   int? _activeItemIndex;
+  int? _activeViewZoneIndex;
+  final List<_ViewZone?> _viewZones =
+      List<_ViewZone?>.filled(_maxViewZones, null, growable: true);
+  final List<Color> _viewZoneColors =
+      List<Color>.generate(_maxViewZones, (i) => _viewZonePalette[i]);
+  bool _showViewZoneOverlay = false;
+  int? _draggingViewZoneIndex;
+  Offset? _viewZoneDragLastScreen;
+  int? _resizingViewZoneIndex;
+  Offset? _viewZoneResizeStartScreenPos;
+  Rect? _viewZoneResizeStartScreenRect;
+  Offset? _viewZoneResizeAnchorTopLeft;
+  double? _viewZoneResizeStartScale;
+  Matrix4? _preViewZoneMatrix;
+  PersistentBottomSheetController? _viewZoneSheetController;
+  bool _skipViewZoneRestore = false;
+  int? _pendingViewZoneIndex;
 
   // --- Delete drag target ---
   Rect _deleteRect = Rect.zero;
@@ -625,6 +657,59 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   bool _isItemScaleGestureActive = false;
   bool _isTrackpadPanZoomActive = false;
+  bool _fullscreenBottomHoverLeft = false;
+  bool _fullscreenBottomHoverRight = false;
+  Timer? _arrowRepeatDelay;
+  Timer? _arrowRepeatTick;
+  LogicalKeyboardKey? _heldArrowKey;
+
+  void _exitEditingMode({bool keepActiveSelection = true}) {
+    setState(() {
+      _controller.clearEditing();
+      _isItemScaleGestureActive = false;
+      _draggingIndex = null;
+      _deleteHover = false;
+      _tapDrag.clearAll();
+      for (final key in _controlsHover.keys) {
+        _controlsHover[key] = false;
+      }
+      if (!keepActiveSelection) {
+        _activeItemIndex = null;
+      }
+    });
+  }
+
+  void _scheduleDeleteRectUpdate() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _updateDeleteRect();
+    });
+  }
+
+  void _startArrowRepeat(LogicalKeyboardKey key) {
+    if (_heldArrowKey == key && _arrowRepeatTick != null) return;
+    _heldArrowKey = key;
+    _arrowRepeatDelay?.cancel();
+    _arrowRepeatTick?.cancel();
+    _arrowRepeatDelay = Timer(const Duration(milliseconds: 250), () {
+      _arrowRepeatTick =
+          Timer.periodic(const Duration(milliseconds: 200), (_) {
+        if (_heldArrowKey == LogicalKeyboardKey.arrowRight) {
+          _switchPhotoInActiveContainer(next: true);
+        } else if (_heldArrowKey == LogicalKeyboardKey.arrowLeft) {
+          _switchPhotoInActiveContainer(next: false);
+        }
+      });
+    });
+  }
+
+  void _cancelArrowRepeat() {
+    _heldArrowKey = null;
+    _arrowRepeatDelay?.cancel();
+    _arrowRepeatTick?.cancel();
+    _arrowRepeatDelay = null;
+    _arrowRepeatTick = null;
+  }
 
   // --- UI ---
   Color _backgroundColor = Colors.black;
@@ -662,11 +747,31 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _initTutorialFlag();
       _updateDeleteRect();
+      _ensureViewZoneState();
       if (!mounted) return;
       setState(() {
         _showForInitDeleteIcon = false;
       });
     });
+  }
+
+  void _ensureViewZoneState() {
+    _ensureViewZoneListSize();
+    _ensureViewZoneColors();
+  }
+
+  void _ensureViewZoneListSize() {
+    if (_viewZones.length >= _maxViewZones) return;
+    for (int i = _viewZones.length; i < _maxViewZones; i++) {
+      _viewZones.add(null);
+    }
+  }
+
+  void _ensureViewZoneColors() {
+    if (_viewZoneColors.length >= _maxViewZones) return;
+    for (int i = _viewZoneColors.length; i < _maxViewZones; i++) {
+      _viewZoneColors.add(_viewZonePalette[i % _viewZonePalette.length]);
+    }
   }
 
   Future<void> _initTutorialFlag() async {
@@ -792,6 +897,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           _pendingInitialLayout = false;
           _applyInitialLayoutForSelectedPhotos();
         }
+        _ensureDefaultViewZone();
         _updateDeleteRect();
         _hasAutoFitted = true;
       });
@@ -1522,6 +1628,52 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  double _containScaleForCanvas() {
+    final viewport = _viewportSize();
+    final canvas = _currentCanvasSize();
+    if (viewport.width <= 0 ||
+        viewport.height <= 0 ||
+        canvas.width <= 0 ||
+        canvas.height <= 0) {
+      debugPrint(
+        '[ViewZones] fitCanvas skipped viewport=$viewport canvas=$canvas',
+      );
+      return _minCollageScale;
+    }
+
+    return math.min(
+      viewport.width / canvas.width,
+      viewport.height / canvas.height,
+    );
+  }
+
+  Matrix4 _fitCanvasToViewportMatrix() {
+    final viewport = _viewportSize();
+    final canvas = _currentCanvasSize();
+    if (viewport.width <= 0 ||
+        viewport.height <= 0 ||
+        canvas.width <= 0 ||
+        canvas.height <= 0) {
+      debugPrint(
+        '[ViewZones] fitCanvas skipped viewport=$viewport canvas=$canvas',
+      );
+      return _transformationController.value.clone();
+    }
+
+    final containScale = _containScaleForCanvas();
+    final scale = math.max(containScale, _minCollageScale);
+    final clamped = scale.clamp(0.001, _maxCollageScale);
+    final offset = Offset(
+      (viewport.width - canvas.width * clamped) / 2,
+      (viewport.height - canvas.height * clamped) / 2,
+    );
+    debugPrint(
+      '[ViewZones] fitCanvas viewport=$viewport canvas=$canvas '
+      'contain=$containScale scale=$scale clamped=$clamped offset=$offset',
+    );
+    return TransformMath.matrixFromOffsetScale(offset, clamped);
+  }
+
   Offset _screenToCanvas(Offset screen) {
     final inv = Matrix4.inverted(_transformationController.value);
     final v = Vector3(screen.dx, screen.dy, 0);
@@ -1708,14 +1860,28 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: (node, event) {
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
-
-        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
-          _switchPhotoInActiveContainer(next: true);
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+            event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          if (event is KeyUpEvent) {
+            _cancelArrowRepeat();
+            return KeyEventResult.handled;
+          }
+          if (event is KeyDownEvent) {
+            final next = event.logicalKey == LogicalKeyboardKey.arrowRight;
+            _switchPhotoInActiveContainer(next: next);
+            _startArrowRepeat(event.logicalKey);
+            return KeyEventResult.handled;
+          }
+          if (event is KeyRepeatEvent) {
+            _startArrowRepeat(event.logicalKey);
+            return KeyEventResult.handled;
+          }
           return KeyEventResult.handled;
         }
-        if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-          _switchPhotoInActiveContainer(next: false);
+
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+        if (_handleViewZoneHotkeys(event)) {
           return KeyEventResult.handled;
         }
 
@@ -1726,7 +1892,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               _activeItemIndex! < _items.length) {
             final item = _items[_activeItemIndex!];
             if (item.isEditing) {
-              setState(() => item.isEditing = false);
+              _exitEditingMode();
               return KeyEventResult.handled;
             }
           }
@@ -1792,6 +1958,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           }
         },
         child: Scaffold(
+          key: _scaffoldKey,
           body: Stack(
             children: [
               Column(
@@ -1828,9 +1995,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
-                              setState(() {
-                                _controller.clearEditing();
-                              });
+                              _exitEditingMode();
                             },
                             child: Stack(
                               children: [
@@ -1862,6 +2027,32 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                                   color: _backgroundColor)),
                                           for (final item in sorted)
                                             _buildPhotoItem(item),
+                                          if (_showViewZoneOverlay)
+                                            Positioned.fill(
+                                              child: CustomPaint(
+                                                painter: _ViewZonesPainter(
+                                                  zones: _viewZones,
+                                                  colors: _viewZoneColors,
+                                                  viewportSize: _viewportSize(),
+                                                  strokeWidth: math.max(
+                                                    1.0,
+                                                    2 / (_collageScale == 0
+                                                        ? 1
+                                                        : _collageScale),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          if (_showViewZoneOverlay)
+                                            Positioned.fill(
+                                              child: GestureDetector(
+                                                behavior:
+                                                    HitTestBehavior.translucent,
+                                                onTap: _exitViewZoneOverlay,
+                                              ),
+                                            ),
+                                          if (_showViewZoneOverlay)
+                                            ..._buildViewZoneHandles(),
                                         ],
                                       ),
                                     ),
@@ -1959,7 +2150,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         setState(() => editingPhoto.flipX = !editingPhoto.flipX),
                     onFlipY: null,
                     onDone: () =>
-                        setState(() => editingPhoto.isEditing = false),
+                        _exitEditingMode(),
                     brightness: editingPhoto.brightness,
                     saturation: editingPhoto.saturation,
                     temp: editingPhoto.temp,
@@ -1980,17 +2171,81 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   ),
                 )
               else if (_draggingIndex == null) ...[
-                if (Platform.isMacOS)
+                if (_isFullscreen)
+                  ...[
+                    if (Platform.isMacOS)
+                      Positioned(
+                        left: 12,
+                        bottom: 12 + (isIOS ? bottomInset : 0.0),
+                        child: MouseRegion(
+                          onEnter: (_) {
+                            if (!_fullscreenBottomHoverLeft) {
+                              setState(() => _fullscreenBottomHoverLeft = true);
+                            }
+                          },
+                          onExit: (_) {
+                            if (_fullscreenBottomHoverLeft) {
+                              setState(() => _fullscreenBottomHoverLeft = false);
+                            }
+                          },
+                          child: AnimatedOpacity(
+                            opacity: (_fullscreenBottomHoverLeft ||
+                                    _fullscreenBottomHoverRight)
+                                ? 1.0
+                                : 0.0,
+                            duration: const Duration(milliseconds: 150),
+                            child: IgnorePointer(
+                              ignoring: !(_fullscreenBottomHoverLeft ||
+                                  _fullscreenBottomHoverRight),
+                              child: _buildFloatingZoomControl(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    Positioned(
+                      right: 12,
+                      bottom: 12 + (isIOS ? bottomInset : 0.0),
+                      child: MouseRegion(
+                        onEnter: (_) {
+                          if (!_fullscreenBottomHoverRight) {
+                            setState(() =>
+                                _fullscreenBottomHoverRight = true);
+                          }
+                        },
+                        onExit: (_) {
+                          if (_fullscreenBottomHoverRight) {
+                            setState(() =>
+                                _fullscreenBottomHoverRight = false);
+                          }
+                        },
+                        child: AnimatedOpacity(
+                          opacity: (_fullscreenBottomHoverLeft ||
+                                  _fullscreenBottomHoverRight)
+                              ? 1.0
+                              : 0.0,
+                          duration: const Duration(milliseconds: 150),
+                          child: IgnorePointer(
+                            ignoring: !(_fullscreenBottomHoverLeft ||
+                                _fullscreenBottomHoverRight),
+                            child: _buildFloatingActionButtons(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]
+                else ...[
+                  if (Platform.isMacOS)
+                    Positioned(
+                      left: 12,
+                      bottom: 12 + (isIOS ? bottomInset : 0.0),
+                      child: _buildFloatingZoomControl(),
+                    ),
                   Positioned(
-                    left: 12,
+                    right: 12,
                     bottom: 12 + (isIOS ? bottomInset : 0.0),
-                    child: _buildFloatingZoomControl(),
+                    child: _buildFloatingActionButtons(),
                   ),
-                Positioned(
-                  right: 12,
-                  bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: _buildFloatingActionButtons(),
-                ),
+                ],
               ],
               if (_isFullscreen && _draggingIndex == null)
                 Positioned(
@@ -2124,6 +2379,20 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         icon: const Icon(Iconsax.add, color: Colors.white, shadows: iconShadow),
         tooltip: 'Add photo',
         onPressed: _showAllPhotosSheet,
+      ),
+      GestureDetector(
+        onLongPress: _showViewZonePanel,
+        child: IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Icons.crop_free,
+              color: Colors.white, shadows: iconShadow),
+          tooltip: 'Add view zone (hold for list)',
+          onPressed: _addViewZone,
+        ),
       ),
       IconButton(
         style: IconButton.styleFrom(
@@ -2329,6 +2598,24 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         onPointerMove: (e) => _tapDrag.pointerMove(item.id, e.position),
         onPointerUp: (_) {
           final isTap = _tapDrag.pointerUp(item.id);
+          if (_deleteHover && _draggingIndex != null) {
+            setState(() {
+              _controller.removeAt(_draggingIndex!);
+              _draggingIndex = null;
+              _deleteHover = false;
+              _isItemScaleGestureActive = false;
+              item.baseScaleOnGesture = null;
+            });
+            return;
+          }
+          if (_isItemScaleGestureActive || _draggingIndex != null) {
+            setState(() {
+              _isItemScaleGestureActive = false;
+              _draggingIndex = null;
+              _deleteHover = false;
+              item.baseScaleOnGesture = null;
+            });
+          }
           if (isTap) {
             _bringToFront(item);
           }
@@ -2384,6 +2671,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
                 if (_draggingIndex == null) {
                   _draggingIndex = _items.indexOf(item);
+                  _scheduleDeleteRectUpdate();
                 }
 
                 if (item.isEditing) {
@@ -2412,6 +2700,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 item.baseScaleOnGesture = null;
                 _clampItemOffset(item);
               });
+              _tapDrag.clear(item.id);
             },
             child: Transform(
               transform: () {
@@ -2576,6 +2865,282 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return math.exp(logMin + (logMax - logMin) * clampedT);
   }
 
+  bool _handleViewZoneHotkeys(KeyDownEvent event) {
+    final label = event.logicalKey.keyLabel;
+    final digit = int.tryParse(label);
+    if (digit == null) return false;
+    final index = digit == 0 ? 9 : digit - 1;
+    if (index < 0 || index >= _maxViewZones) return false;
+    if (HardwareKeyboard.instance.isShiftPressed) {
+      _setZoneAtIndex(index);
+      return true;
+    }
+    if (_viewZones[index] == null) return false;
+    _applyViewZone(index);
+    return true;
+  }
+
+  void _ensureDefaultViewZone() {
+    if (_viewZones.any((z) => z != null)) return;
+    _setZoneAtIndex(0);
+  }
+
+  _ViewZone _captureCurrentViewZone() {
+    final translation =
+        TransformMath.getTranslation(_transformationController.value);
+    final scale = TransformMath.getScale(_transformationController.value);
+    return _ViewZone(translation: translation, scale: scale);
+  }
+
+  void _addViewZone() {
+    final index = _viewZones.indexWhere((z) => z == null);
+    if (index == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Maximum view zones reached')),
+      );
+      return;
+    }
+    _setZoneAtIndex(index);
+  }
+
+  void _setZoneAtIndex(int index) {
+    if (index < 0 || index >= _maxViewZones) return;
+    final zone = _captureCurrentViewZone();
+    setState(() {
+      _viewZones[index] = zone;
+      _activeViewZoneIndex = index;
+    });
+  }
+
+  void _applyViewZone(int index) {
+    if (index < 0 || index >= _viewZones.length) return;
+    final zone = _viewZones[index];
+    if (zone == null) return;
+    _setTransform(
+      TransformMath.matrixFromOffsetScale(zone.translation, zone.scale),
+    );
+    setState(() {
+      _activeViewZoneIndex = index;
+    });
+  }
+
+  void _showViewZonePanel() {
+    _ensureDefaultViewZone();
+    if (_viewZones.every((z) => z == null)) return;
+    _ensureViewZoneState();
+    _preViewZoneMatrix = _transformationController.value.clone();
+    setState(() => _showViewZoneOverlay = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_showViewZoneOverlay) return;
+      final containScale = _containScaleForCanvas();
+      final focal = _viewportSize().center(Offset.zero);
+      if (containScale >= _minCollageScale) {
+        _setTransform(_fitCanvasToViewportMatrix());
+      } else {
+        _zoomToScale(_minCollageScale, focal);
+      }
+    });
+    final state = _scaffoldKey.currentState;
+    if (state == null) return;
+    final controller = state.showBottomSheet(
+      (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, sheetSetState) {
+            return Container(
+              color: Colors.black87,
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (int i = 0; i < _maxViewZones; i++)
+                    _ViewZoneChip(
+                      index: i,
+                      isActive: i == _activeViewZoneIndex,
+                      color: _viewZoneColors[i % _viewZoneColors.length],
+                      isSet: _viewZones[i] != null,
+                      onTap: () {
+                        if (_viewZones[i] == null) return;
+                        _pendingViewZoneIndex = i;
+                        _skipViewZoneRestore = true;
+                        Navigator.of(sheetContext).pop();
+                      },
+                      onDelete: () {
+                        setState(() {
+                          _viewZones[i] = null;
+                          if (_activeViewZoneIndex == i) {
+                            _activeViewZoneIndex = null;
+                          }
+                        });
+                        sheetSetState(() {});
+                      },
+                    ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+    );
+    controller.closed.whenComplete(() {
+      if (!mounted) return;
+      setState(() {
+        _showViewZoneOverlay = false;
+        if (_skipViewZoneRestore && _pendingViewZoneIndex != null) {
+          final idx = _pendingViewZoneIndex!;
+          _skipViewZoneRestore = false;
+          _pendingViewZoneIndex = null;
+          _preViewZoneMatrix = null;
+          _applyViewZone(idx);
+        } else {
+          if (_preViewZoneMatrix != null) {
+            _setTransform(_preViewZoneMatrix!);
+          }
+          _preViewZoneMatrix = null;
+          _skipViewZoneRestore = false;
+          _pendingViewZoneIndex = null;
+        }
+        _viewZoneSheetController = null;
+      });
+    });
+    _viewZoneSheetController = controller;
+  }
+
+  void _exitViewZoneOverlay() {
+    if (!_showViewZoneOverlay) return;
+    setState(() {
+      _showViewZoneOverlay = false;
+      if (_preViewZoneMatrix != null) {
+        _setTransform(_preViewZoneMatrix!);
+      }
+      _preViewZoneMatrix = null;
+    });
+    _viewZoneSheetController?.close();
+    _viewZoneSheetController = null;
+  }
+
+  Rect _zoneCanvasRect(_ViewZone zone) {
+    final viewport = _viewportSize();
+    if (viewport.width <= 0 || viewport.height <= 0) return Rect.zero;
+    final matrix =
+        TransformMath.matrixFromOffsetScale(zone.translation, zone.scale);
+    final inv = Matrix4.inverted(matrix);
+    final topLeft = inv.transform3(Vector3(0, 0, 0));
+    final bottomRight =
+        inv.transform3(Vector3(viewport.width, viewport.height, 0));
+    return Rect.fromPoints(
+      Offset(topLeft.x, topLeft.y),
+      Offset(bottomRight.x, bottomRight.y),
+    );
+  }
+
+  Rect _zoneScreenRect(_ViewZone zone) {
+    final canvasRect = _zoneCanvasRect(zone);
+    if (canvasRect.isEmpty) return Rect.zero;
+    final topLeft = MatrixUtils.transformPoint(
+      _transformationController.value,
+      canvasRect.topLeft,
+    );
+    final bottomRight = MatrixUtils.transformPoint(
+      _transformationController.value,
+      canvasRect.bottomRight,
+    );
+    return Rect.fromPoints(topLeft, bottomRight);
+  }
+
+  void _startViewZoneDrag(int index, Offset screenPos) {
+    _draggingViewZoneIndex = index;
+    _viewZoneDragLastScreen = screenPos;
+  }
+
+  void _updateViewZoneDrag(Offset screenPos) {
+    if (_draggingViewZoneIndex == null) return;
+    final last = _viewZoneDragLastScreen;
+    if (last == null) return;
+    final deltaScreen = screenPos - last;
+    if (deltaScreen == Offset.zero) return;
+
+    final inv = Matrix4.inverted(_transformationController.value);
+    final c0 = inv.transform3(Vector3(0, 0, 0));
+    final c1 = inv.transform3(Vector3(deltaScreen.dx, deltaScreen.dy, 0));
+    final deltaCanvas = Offset(c1.x - c0.x, c1.y - c0.y);
+
+    final index = _draggingViewZoneIndex!;
+    final zone = _viewZones[index];
+    if (zone == null) return;
+    final nextTranslation = zone.translation - deltaScreen;
+
+    setState(() {
+      _viewZones[index] = _ViewZone(
+        translation: nextTranslation,
+        scale: zone.scale,
+      );
+      _viewZoneDragLastScreen = screenPos;
+    });
+  }
+
+  void _endViewZoneDrag() {
+    _draggingViewZoneIndex = null;
+    _viewZoneDragLastScreen = null;
+  }
+
+  void _startViewZoneResize(int index, Offset screenPos) {
+    final zone = _viewZones[index];
+    if (zone == null) return;
+    _resizingViewZoneIndex = index;
+    _viewZoneResizeStartScreenPos = screenPos;
+    _viewZoneResizeStartScreenRect = _zoneScreenRect(zone);
+    _viewZoneResizeAnchorTopLeft = _zoneCanvasRect(zone).topLeft;
+    _viewZoneResizeStartScale = zone.scale;
+  }
+
+  void _updateViewZoneResize(Offset screenPos) {
+    final index = _resizingViewZoneIndex;
+    final startPos = _viewZoneResizeStartScreenPos;
+    final startRect = _viewZoneResizeStartScreenRect;
+    final anchor = _viewZoneResizeAnchorTopLeft;
+    final startScale = _viewZoneResizeStartScale;
+    if (index == null ||
+        startPos == null ||
+        startRect == null ||
+        anchor == null ||
+        startScale == null) {
+      return;
+    }
+    final delta = screenPos - startPos;
+    if (delta == Offset.zero) return;
+
+    final nextWidth = math.max(40.0, startRect.width + delta.dx);
+    final nextHeight = math.max(40.0, startRect.height + delta.dy);
+    final factorW = nextWidth / startRect.width;
+    final factorH = nextHeight / startRect.height;
+    final factor = math.max(factorW, factorH);
+    if (factor <= 0) return;
+
+    final nextScale = (startScale / factor).clamp(0.001, _maxCollageScale);
+    final nextTranslation = Offset(
+      -anchor.dx * nextScale,
+      -anchor.dy * nextScale,
+    );
+
+    setState(() {
+      _viewZones[index] = _ViewZone(
+        translation: nextTranslation,
+        scale: nextScale,
+      );
+    });
+  }
+
+  void _endViewZoneResize() {
+    _resizingViewZoneIndex = null;
+    _viewZoneResizeStartScreenPos = null;
+    _viewZoneResizeStartScreenRect = null;
+    _viewZoneResizeAnchorTopLeft = null;
+    _viewZoneResizeStartScale = null;
+  }
+
   Rect _getItemScreenRect(CollagePhotoState item) {
     final w = item.baseWidth * item.scale;
     final h = item.baseHeight * item.scale;
@@ -2586,6 +3151,73 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       item.offset + Offset(w, h),
     );
     return Rect.fromPoints(topLeft, bottomRight);
+  }
+
+  List<Widget> _buildViewZoneHandles() {
+    const double handleSize = 18;
+    final widgets = <Widget>[];
+    for (int i = 0; i < _viewZones.length; i++) {
+      final zone = _viewZones[i];
+      if (zone == null) continue;
+      final rect = _zoneCanvasRect(zone);
+      if (rect.isEmpty) continue;
+      final color = _viewZoneColors.isEmpty
+          ? Colors.white
+          : _viewZoneColors[i % _viewZoneColors.length];
+      widgets.add(
+        Positioned(
+          left: rect.right - handleSize / 2,
+          top: rect.top - handleSize / 2,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onPanStart: (d) => _startViewZoneDrag(i, d.globalPosition),
+            onPanUpdate: (d) => _updateViewZoneDrag(d.globalPosition),
+            onPanEnd: (_) => _endViewZoneDrag(),
+            child: Container(
+              width: handleSize,
+              height: handleSize,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: const Icon(
+                Icons.drag_indicator,
+                size: 12,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ),
+      );
+      widgets.add(
+        Positioned(
+          left: rect.center.dx - handleSize / 2,
+          top: rect.bottom - handleSize / 2,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onPanStart: (d) => _startViewZoneResize(i, d.globalPosition),
+            onPanUpdate: (d) => _updateViewZoneResize(d.globalPosition),
+            onPanEnd: (_) => _endViewZoneResize(),
+            child: Container(
+              width: handleSize,
+              height: handleSize,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.9),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 1),
+              ),
+              child: const Icon(
+                Icons.open_in_full,
+                size: 12,
+                color: Colors.black,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    return widgets;
   }
 
   String _resolvePhotoPath(Photo photo) {
@@ -2698,6 +3330,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       WakelockPlus.disable();
     }
+    _cancelArrowRepeat();
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
     _focusNode.dispose();
@@ -2732,6 +3365,61 @@ class _CropBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _ViewZonesPainter extends CustomPainter {
+  final List<_ViewZone?> zones;
+  final List<Color> colors;
+  final Size viewportSize;
+  final double strokeWidth;
+
+  const _ViewZonesPainter({
+    required this.zones,
+    required this.colors,
+    required this.viewportSize,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (zones.isEmpty) return;
+    for (int i = 0; i < zones.length; i++) {
+      final zone = zones[i];
+      if (zone == null) continue;
+      final color = colors.isEmpty
+          ? Colors.white
+          : colors[i % colors.length];
+      final rect = _canvasRectForZone(zone, viewportSize);
+      if (rect.isEmpty) continue;
+      final paint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth;
+      canvas.drawRect(rect, paint);
+    }
+  }
+
+  Rect _canvasRectForZone(_ViewZone zone, Size viewport) {
+    if (viewport.width <= 0 || viewport.height <= 0) return Rect.zero;
+    final matrix =
+        TransformMath.matrixFromOffsetScale(zone.translation, zone.scale);
+    final inv = Matrix4.inverted(matrix);
+    final topLeft = inv.transform3(Vector3(0, 0, 0));
+    final bottomRight =
+        inv.transform3(Vector3(viewport.width, viewport.height, 0));
+    return Rect.fromPoints(
+      Offset(topLeft.x, topLeft.y),
+      Offset(bottomRight.x, bottomRight.y),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ViewZonesPainter oldDelegate) {
+    return oldDelegate.zones != zones ||
+        oldDelegate.colors != colors ||
+        oldDelegate.viewportSize != viewportSize ||
+        oldDelegate.strokeWidth != strokeWidth;
+  }
 }
 
 class _RotationSlider extends StatefulWidget {
@@ -2819,6 +3507,132 @@ class _RotationSliderState extends State<_RotationSlider> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ViewZone {
+  final Offset translation;
+  final double scale;
+
+  const _ViewZone({
+    required this.translation,
+    required this.scale,
+  });
+}
+
+class _ViewZoneChip extends StatelessWidget {
+  final int index;
+  final bool isActive;
+  final Color color;
+  final bool isSet;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _ViewZoneChip({
+    required this.index,
+    required this.isActive,
+    required this.color,
+    required this.isSet,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = index == 9 ? '0' : '${index + 1}';
+    return InkWell(
+      onTap: isSet ? onTap : null,
+      borderRadius: BorderRadius.circular(14),
+      child: Tooltip(
+        message: isSet ? '' : 'Shift+$label to add',
+        preferBelow: false,
+        waitDuration: const Duration(milliseconds: 300),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isSet
+                ? ((isActive && isSet) ? color.withOpacity(0.35) : Colors.white10)
+                : Colors.grey.shade800,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSet
+                  ? ((isActive && isSet) ? color : Colors.white24)
+                  : Colors.white12,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSet ? Colors.white : Colors.white54,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (isSet) ...[
+                const SizedBox(width: 8),
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onDelete,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child:
+                        const Icon(Icons.close, size: 12, color: Colors.white),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          foregroundDecoration: isSet
+              ? BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: color, width: 2),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _ViewZoneAddChip extends StatelessWidget {
+  final int nextIndex;
+  final VoidCallback onTap;
+
+  const _ViewZoneAddChip({
+    required this.nextIndex,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = '+${nextIndex + 1}';
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: Colors.white12,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }
