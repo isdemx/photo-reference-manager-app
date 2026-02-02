@@ -175,21 +175,25 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                       onTap: () =>
                           setState(() => _filtersOpen = !_filtersOpen),
                       child: Wrap(
-                        spacing: 8,
+                        spacing: Platform.isIOS ? 4 : 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
-                          const Icon(Icons.filter_list,
-                              color: Colors.white70, size: 18),
-                          Text(
-                            'Filters',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(color: Colors.white),
-                          ),
+                          if (!Platform.isIOS) ...[
+                            const Icon(Icons.filter_list,
+                                color: Colors.white70, size: 18),
+                            Text(
+                              'Filters',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: Colors.white),
+                            ),
+                          ],
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Platform.isIOS ? 6 : 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.white10,
                               borderRadius: BorderRadius.circular(12),
@@ -202,7 +206,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               size: 16,
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          if (!Platform.isIOS) const SizedBox(width: 8),
                           DecoratedBox(
                             decoration: BoxDecoration(
                               color: Colors.white10,
@@ -222,7 +226,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               selectedColor: Colors.white,
                               constraints: const BoxConstraints(
                                 minHeight: 24,
-                                minWidth: 36,
+                                minWidth: 30,
                               ),
                               children: const [
                                 Padding(
@@ -269,11 +273,13 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                             shape: const StadiumBorder(),
                             materialTapTargetSize:
                                 MaterialTapTargetSize.shrinkWrap,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: Platform.isIOS ? 4 : 6,
                               vertical: 0,
                             ),
-                            labelPadding: const EdgeInsets.only(right: 6),
+                            labelPadding: EdgeInsets.only(
+                              right: Platform.isIOS ? 4 : 6,
+                            ),
                           ),
                           DecoratedBox(
                             decoration: BoxDecoration(
@@ -301,7 +307,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               selectedColor: Colors.white,
                               constraints: const BoxConstraints(
                                 minHeight: 24,
-                                minWidth: 36,
+                                minWidth: 30,
                               ),
                               children: const [
                                 Padding(
@@ -315,17 +321,31 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               ],
                             ),
                           ),
-                          TextButton.icon(
-                            onPressed: () =>
-                                setState(() => _selectedTagIds.clear()),
-                            icon: const Icon(Icons.clear,
-                                size: 14, color: Colors.white70),
-                            label: const Text(
-                              'Clear',
-                              style:
-                                  TextStyle(color: Colors.white70, fontSize: 11),
+                          if (Platform.isIOS)
+                            IconButton(
+                              onPressed: () =>
+                                  setState(() => _selectedTagIds.clear()),
+                              icon: const Icon(Icons.clear,
+                                  size: 16, color: Colors.white70),
+                              tooltip: 'Clear',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                minWidth: 30,
+                                minHeight: 30,
+                              ),
+                            )
+                          else
+                            TextButton.icon(
+                              onPressed: () =>
+                                  setState(() => _selectedTagIds.clear()),
+                              icon: const Icon(Icons.clear,
+                                  size: 14, color: Colors.white70),
+                              label: const Text(
+                                'Clear',
+                                style: TextStyle(
+                                    color: Colors.white70, fontSize: 11),
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -1071,7 +1091,7 @@ class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
               miniatureWidth: 20,
               nonceOf: (_) => 0,
               isFlipped: false,
-              showThumbnails: true,
+              showThumbnails: false,
               enableKeyboardNavigation: true,
               focusNode: _focusNode,
               autofocus: true,

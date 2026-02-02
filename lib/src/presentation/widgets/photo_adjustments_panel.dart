@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -52,200 +53,291 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isIOS = Platform.isIOS;
     return Material(
       color: Colors.black.withOpacity(0.6),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Row(
-          children: [
-            ActionIcon(
-              icon: Icons.rotate_left,
-              tooltip: 'Rotate -90°',
-              onPressed: onRotateLeft,
-            ),
-            const SizedBox(width: 6),
-            ActionIcon(
-              icon: Icons.rotate_right,
-              tooltip: 'Rotate +90°',
-              onPressed: onRotateRight,
-            ),
-            ActionIcon(
-              icon: Icons.flip,
-              tooltip: 'Flip horizontal',
-              onPressed: onFlipX,
-            ),
-            if (onFlipY != null)
-              ActionIcon(
-                icon: Icons.flip_camera_android,
-                tooltip: 'Flip vertical',
-                onPressed: onFlipY!,
+        child: Builder(
+          builder: (context) {
+            final sliders = [
+              MiniSlider(
+                label: 'Brt',
+                value: brightness,
+                min: 0.0,
+                max: 4.0,
+                divisions: 20,
+                centerValue: 1.0,
+                onChanged: onBrightnessChanged,
               ),
-            if (onSendBackward != null)
-              ActionIcon(
-                icon: Icons.vertical_align_bottom,
-                tooltip: 'Send backward',
-                onPressed: onSendBackward!,
+              MiniSlider(
+                label: 'Sat',
+                value: saturation,
+                min: 0.0,
+                max: 2.0,
+                divisions: 20,
+                centerValue: 1.0,
+                onChanged: onSaturationChanged,
               ),
-            if (onBringForward != null)
-              ActionIcon(
-                icon: Icons.vertical_align_top,
-                tooltip: 'Bring forward',
-                onPressed: onBringForward!,
+              MiniSlider(
+                label: 'Tmp',
+                value: temp,
+                min: -5.0,
+                max: 5.0,
+                divisions: 20,
+                centerValue: 0.0,
+                onChanged: onTempChanged,
               ),
-            const VerticalDivider(
-              color: Colors.white24,
-              thickness: 1,
-              width: 16,
-              indent: 6,
-              endIndent: 6,
-            ),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final columns = c.maxWidth > 900 ? 3 : 2;
+              MiniSlider(
+                label: 'Hue',
+                value: hue,
+                min: -math.pi / 4,
+                max: math.pi / 4,
+                divisions: 20,
+                centerValue: 0.0,
+                format: (v) => '${(v * 180 / math.pi).toStringAsFixed(0)}°',
+                onChanged: onHueChanged,
+              ),
+              MiniSlider(
+                label: 'Cnt',
+                value: contrast,
+                min: 0.0,
+                max: 2.0,
+                divisions: 20,
+                centerValue: 1.0,
+                format: (v) => '${v.toStringAsFixed(2)}x',
+                onChanged: onContrastChanged,
+              ),
+              MiniSlider(
+                label: 'Op',
+                value: opacity,
+                min: 0.0,
+                max: 1.0,
+                divisions: 20,
+                centerValue: 1.0,
+                format: (v) => '${(v * 100).round()}%',
+                onChanged: onOpacityChanged,
+              ),
+            ];
 
-                  final sliders = [
-                    MiniSlider(
-                      label: 'Brt',
-                      value: brightness,
-                      min: 0.0,
-                      max: 4.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      onChanged: onBrightnessChanged,
-                    ),
-                    MiniSlider(
-                      label: 'Sat',
-                      value: saturation,
-                      min: 0.0,
-                      max: 2.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      onChanged: onSaturationChanged,
-                    ),
-                    MiniSlider(
-                      label: 'Tmp',
-                      value: temp,
-                      min: -5.0,
-                      max: 5.0,
-                      divisions: 20,
-                      centerValue: 0.0,
-                      onChanged: onTempChanged,
-                    ),
-                    MiniSlider(
-                      label: 'Hue',
-                      value: hue,
-                      min: -math.pi / 4,
-                      max: math.pi / 4,
-                      divisions: 20,
-                      centerValue: 0.0,
-                      format: (v) =>
-                          '${(v * 180 / math.pi).toStringAsFixed(0)}°',
-                      onChanged: onHueChanged,
-                    ),
-                    MiniSlider(
-                      label: 'Cnt',
-                      value: contrast,
-                      min: 0.0,
-                      max: 2.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      format: (v) => '${v.toStringAsFixed(2)}x',
-                      onChanged: onContrastChanged,
-                    ),
-                    MiniSlider(
-                      label: 'Op',
-                      value: opacity,
-                      min: 0.0,
-                      max: 1.0,
-                      divisions: 20,
-                      centerValue: 1.0,
-                      format: (v) => '${(v * 100).round()}%',
-                      onChanged: onOpacityChanged,
-                    ),
-                  ];
-
-                  if (columns == 2) {
-                    return Wrap(
-                      spacing: 12,
-                      runSpacing: 6,
-                      children: sliders
-                          .map((w) => SizedBox(
-                                width: c.maxWidth / 2 - 12,
-                                child: w,
-                              ))
-                          .toList(),
-                    );
-                  }
-
-                  final colW = (c.maxWidth - 24) / 3;
-                  return Row(
-                    children: [
-                      SizedBox(
-                        width: colW,
-                        child: Column(
-                          children: [
-                            sliders[0],
-                            const SizedBox(height: 6),
-                            sliders[1],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: colW,
-                        child: Column(
-                          children: [
-                            sliders[2],
-                            const SizedBox(height: 6),
-                            sliders[3],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: colW,
-                        child: Column(
-                          children: [
-                            sliders[4],
-                            const SizedBox(height: 6),
-                            sliders[5],
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
+            final actions = <Widget>[
+              ActionIcon(
+                icon: Icons.rotate_left,
+                tooltip: 'Rotate -90°',
+                onPressed: onRotateLeft,
               ),
-            ),
-            if (onDone != null) ...[
-              const VerticalDivider(
-                color: Colors.white24,
-                thickness: 1,
-                width: 16,
-                indent: 6,
-                endIndent: 6,
+              ActionIcon(
+                icon: Icons.rotate_right,
+                tooltip: 'Rotate +90°',
+                onPressed: onRotateRight,
               ),
-              SizedBox(
-                height: 32,
-                child: ElevatedButton(
-                  onPressed: onDone,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    backgroundColor: Colors.white10,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+              ActionIcon(
+                icon: Icons.flip,
+                tooltip: 'Flip horizontal',
+                onPressed: onFlipX,
+              ),
+              if (onFlipY != null)
+                ActionIcon(
+                  icon: Icons.flip_camera_android,
+                  tooltip: 'Flip vertical',
+                  onPressed: onFlipY!,
+                ),
+              if (onSendBackward != null)
+                ActionIcon(
+                  icon: Icons.vertical_align_bottom,
+                  tooltip: 'Send backward',
+                  onPressed: onSendBackward!,
+                ),
+              if (onBringForward != null)
+                ActionIcon(
+                  icon: Icons.vertical_align_top,
+                  tooltip: 'Bring forward',
+                  onPressed: onBringForward!,
+                ),
+              if (onDone != null)
+                SizedBox(
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: onDone,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      backgroundColor: Colors.white10,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'OK',
+                      style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ],
+            ];
+
+            if (isIOS) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    alignment: WrapAlignment.center,
+                    children: actions,
+                  ),
+                  const SizedBox(height: 6),
+                  const Divider(color: Colors.white24, height: 12),
+                  LayoutBuilder(
+                    builder: (context, c) {
+                      final columns = 2;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 6,
+                        children: sliders
+                            .map((w) => SizedBox(
+                                  width: c.maxWidth / columns - 12,
+                                  child: w,
+                                ))
+                            .toList(),
+                      );
+                    },
+                  ),
+                ],
+              );
+            }
+
+            return Row(
+              children: [
+                ActionIcon(
+                  icon: Icons.rotate_left,
+                  tooltip: 'Rotate -90°',
+                  onPressed: onRotateLeft,
+                ),
+                const SizedBox(width: 6),
+                ActionIcon(
+                  icon: Icons.rotate_right,
+                  tooltip: 'Rotate +90°',
+                  onPressed: onRotateRight,
+                ),
+                ActionIcon(
+                  icon: Icons.flip,
+                  tooltip: 'Flip horizontal',
+                  onPressed: onFlipX,
+                ),
+                if (onFlipY != null)
+                  ActionIcon(
+                    icon: Icons.flip_camera_android,
+                    tooltip: 'Flip vertical',
+                    onPressed: onFlipY!,
+                  ),
+                if (onSendBackward != null)
+                  ActionIcon(
+                    icon: Icons.vertical_align_bottom,
+                    tooltip: 'Send backward',
+                    onPressed: onSendBackward!,
+                  ),
+                if (onBringForward != null)
+                  ActionIcon(
+                    icon: Icons.vertical_align_top,
+                    tooltip: 'Bring forward',
+                    onPressed: onBringForward!,
+                  ),
+                const VerticalDivider(
+                  color: Colors.white24,
+                  thickness: 1,
+                  width: 16,
+                  indent: 6,
+                  endIndent: 6,
+                ),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, c) {
+                      final columns = c.maxWidth > 900 ? 3 : 2;
+
+                      if (columns == 2) {
+                        return Wrap(
+                          spacing: 12,
+                          runSpacing: 6,
+                          children: sliders
+                              .map((w) => SizedBox(
+                                    width: c.maxWidth / 2 - 12,
+                                    child: w,
+                                  ))
+                              .toList(),
+                        );
+                      }
+
+                      final colW = (c.maxWidth - 24) / 3;
+                      return Row(
+                        children: [
+                          SizedBox(
+                            width: colW,
+                            child: Column(
+                              children: [
+                                sliders[0],
+                                const SizedBox(height: 6),
+                                sliders[1],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: colW,
+                            child: Column(
+                              children: [
+                                sliders[2],
+                                const SizedBox(height: 6),
+                                sliders[3],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          SizedBox(
+                            width: colW,
+                            child: Column(
+                              children: [
+                                sliders[4],
+                                const SizedBox(height: 6),
+                                sliders[5],
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+                if (onDone != null) ...[
+                  const VerticalDivider(
+                    color: Colors.white24,
+                    thickness: 1,
+                    width: 16,
+                    indent: 6,
+                    endIndent: 6,
+                  ),
+                  SizedBox(
+                    height: 32,
+                    child: ElevatedButton(
+                      onPressed: onDone,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        backgroundColor: Colors.white10,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text(
+                        'OK',
+                        style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );

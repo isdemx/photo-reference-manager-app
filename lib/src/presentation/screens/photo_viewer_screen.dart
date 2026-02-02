@@ -59,7 +59,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   bool _isFlipped = false; // «Переворот» фото по горизонтали
   bool _pageViewScrollable = true; // Отключаем листание при зуме
 
-  final double _miniatureWidth = 20.0;
+  late final double _miniatureWidth;
+  late final double _thumbnailWidth;
   final List<Photo> _selectedPhotos = [];
 
   final Map<String, int> _reloadNonce = <String, int>{};
@@ -67,6 +68,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   // ------ Зум (PhotoViewGallery) ------
   bool _isZoomed = false;
   late PhotoViewScaleStateController _scaleStateController;
+
+  final GlobalKey _bottomBarKey = GlobalKey();
+  double _bottomBarHeightPx = 0.0;
+  final GlobalKey _thumbnailsKey = GlobalKey();
 
   // ------ Фокус для клавиатуры ------
   final FocusNode _focusNode = FocusNode(debugLabel: 'PhotoViewerFocusNode');
@@ -118,6 +123,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     super.initState();
 
     _currentIndex = widget.initialIndex;
+    _miniatureWidth = Platform.isIOS ? 40.0 : 20.0;
+    _thumbnailWidth = Platform.isIOS ? 20.0 : 20.0;
     _pageController = PageController(initialPage: _currentIndex);
     _thumbnailScrollController = ScrollController();
 
@@ -372,10 +379,54 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
+  void _updateBottomBarHeight() {
+    if (!_showActions) return;
+    final ctx = _bottomBarKey.currentContext;
+    final box = ctx?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final nextHeight = box.size.height;
+    if ((nextHeight - _bottomBarHeightPx).abs() < 0.5) return;
+    if (!mounted) return;
+    setState(() => _bottomBarHeightPx = nextHeight);
+    debugPrint(
+      '[PhotoViewer] bottomBarHeight=${nextHeight.toStringAsFixed(1)} safeBottom=${MediaQuery.of(context).padding.bottom.toStringAsFixed(1)}',
+    );
+  }
+
+  void _logOverlayPositions() {
+    if (!mounted) return;
+    final screenSize = MediaQuery.of(context).size;
+    final thumbBox =
+        _thumbnailsKey.currentContext?.findRenderObject() as RenderBox?;
+    final barBox =
+        _bottomBarKey.currentContext?.findRenderObject() as RenderBox?;
+
+    if (thumbBox != null && thumbBox.hasSize) {
+      final topLeft = thumbBox.localToGlobal(Offset.zero);
+      final bottom = topLeft.dy + thumbBox.size.height;
+      debugPrint(
+        '[PhotoViewer] thumbs y=${topLeft.dy.toStringAsFixed(1)} h=${thumbBox.size.height.toStringAsFixed(1)} bottom=${bottom.toStringAsFixed(1)} screenH=${screenSize.height.toStringAsFixed(1)}',
+      );
+    }
+    if (barBox != null && barBox.hasSize) {
+      final topLeft = barBox.localToGlobal(Offset.zero);
+      final bottom = topLeft.dy + barBox.size.height;
+      debugPrint(
+        '[PhotoViewer] bar y=${topLeft.dy.toStringAsFixed(1)} h=${barBox.size.height.toStringAsFixed(1)} bottom=${bottom.toStringAsFixed(1)} screenH=${screenSize.height.toStringAsFixed(1)}',
+      );
+    }
+  }
+
   double _galleryBottomPadding(Photo p) {
     if (!_showActions) return 0.0;
-    if (p.mediaType == 'video' && (p.tagIds.isEmpty)) return 50.0;
-    return 90.0;
+    final safeBottom = MediaQuery.of(context).padding.bottom;
+    final barHeight = _bottomBarHeightPx > 0 ? _bottomBarHeightPx : 140.0;
+    final extraLift = Platform.isIOS ? -40.0 : 0.0;
+    final padding = barHeight + safeBottom + 8 + extraLift;
+    debugPrint(
+      '[PhotoViewer] galleryBottomPadding=$padding barHeight=$barHeight safeBottom=$safeBottom extraLift=$extraLift',
+    );
+    return padding;
   }
 
   Future<void> _openEditor(Photo photo) async {
@@ -487,6 +538,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final isSelected = _selectedPhotos.contains(currentPhoto);
     final sizeLabel = _fileSizeLabel(currentPhoto);
     final commentText = (currentPhoto.comment ?? '').trim();
+    if (_showActions) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _updateBottomBarHeight();
+        _logOverlayPositions();
+      });
+    }
     final titleParts = <String>[
       if (currentPhoto.mediaType == 'video') currentPhoto.fileName,
       '${_currentIndex + 1}/${widget.photos.length}',
@@ -620,11 +677,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         initialIndex: _currentIndex,
                         pageViewScrollable: _pageViewScrollable,
                         miniatureWidth: _miniatureWidth,
+                        thumbnailWidth: _thumbnailWidth,
                         nonceOf: _nonce,
                         isFlipped: _isFlipped,
                         enableKeyboardNavigation: false,
                         pageController: _pageController,
                         thumbnailController: _thumbnailScrollController,
+                        thumbnailsKey: _thumbnailsKey,
                         showThumbnails:
                             _showActions && !Platform.isMacOS,
                         scaleStateController: _scaleStateController,
@@ -652,7 +711,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   Positioned(
                     left: 0,
                     right: 0,
-                    bottom: _showActions ? 200 : 24,
+                    bottom: _showActions
+                        ? (_bottomBarHeightPx > 0
+                            ? _bottomBarHeightPx + 8
+                            : 200) -
+                            (Platform.isIOS ? -50.0 : 0.0)
+                        : 24,
                     child: IgnorePointer(
                       ignoring: true,
                       child: Opacity(
@@ -693,7 +757,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      child: _buildBottomBar(currentPhoto),
+                      child: KeyedSubtree(
+                        key: _bottomBarKey,
+                        child: _buildBottomBar(currentPhoto),
+                      ),
                     ),
                 ],
               ),

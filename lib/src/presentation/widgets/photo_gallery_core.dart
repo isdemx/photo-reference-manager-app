@@ -14,6 +14,7 @@ class PhotoGalleryCore extends StatefulWidget {
   final int initialIndex;
   final bool pageViewScrollable;
   final double miniatureWidth;
+  final double? thumbnailWidth;
   final int Function(Photo p) nonceOf;
   final VoidCallback? onTap;
   final ValueChanged<int>? onIndexChanged;
@@ -28,6 +29,8 @@ class PhotoGalleryCore extends StatefulWidget {
   final bool enableKeyboardNavigation;
   final FocusNode? focusNode;
   final bool autofocus;
+  final GlobalKey? thumbnailsKey;
+  final double thumbnailsBottomPadding;
 
   const PhotoGalleryCore({
     super.key,
@@ -49,6 +52,9 @@ class PhotoGalleryCore extends StatefulWidget {
     this.enableKeyboardNavigation = false,
     this.focusNode,
     this.autofocus = false,
+    this.thumbnailsKey,
+    this.thumbnailWidth,
+    this.thumbnailsBottomPadding = 0.0,
   });
 
   @override
@@ -207,8 +213,10 @@ class _PhotoGalleryCoreState extends State<PhotoGalleryCore> {
 
   Widget _buildThumbnails() {
     final controller = widget.thumbnailController ?? ScrollController();
+    final thumbWidth = widget.thumbnailWidth ?? widget.miniatureWidth;
     return SizedBox(
-      height: widget.miniatureWidth,
+      key: widget.thumbnailsKey,
+      height: widget.miniatureWidth + widget.thumbnailsBottomPadding,
       child: NotificationListener<ScrollNotification>(
         onNotification: (scrollInfo) {
           if (scrollInfo is ScrollUpdateNotification) {
@@ -216,37 +224,43 @@ class _PhotoGalleryCoreState extends State<PhotoGalleryCore> {
           }
           return false;
         },
-        child: ListView.builder(
-          controller: controller,
-          scrollDirection: Axis.horizontal,
-          itemCount: widget.photos.length + 2,
-          itemBuilder: (context, index) {
-            if (index == 0 || index == widget.photos.length + 1) {
-              return SizedBox(
-                width: MediaQuery.of(context).size.width * 0.5,
-              );
-            }
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            height: widget.miniatureWidth,
+            child: ListView.builder(
+              controller: controller,
+              scrollDirection: Axis.horizontal,
+              itemCount: widget.photos.length + 2,
+              itemBuilder: (context, index) {
+                if (index == 0 || index == widget.photos.length + 1) {
+                  return SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.5,
+                  );
+                }
 
-            final photo = widget.photos[index - 1];
-            final thumbPath = photo.mediaType == 'video' &&
-                    photo.videoPreview != null &&
-                    photo.videoPreview!.isNotEmpty
-                ? PhotoPathHelper().getFullPath(photo.videoPreview!)
-                : _resolvePhotoPath(photo);
+                final photo = widget.photos[index - 1];
+                final thumbPath = photo.mediaType == 'video' &&
+                        photo.videoPreview != null &&
+                        photo.videoPreview!.isNotEmpty
+                    ? PhotoPathHelper().getFullPath(photo.videoPreview!)
+                    : _resolvePhotoPath(photo);
 
-            return GestureDetector(
-              onTap: () => widget.onThumbnailTap?.call(index - 1),
-              child: Container(
-                width: widget.miniatureWidth,
-                margin: const EdgeInsets.symmetric(horizontal: 0.0),
-                child: Image.file(
-                  File(thumbPath),
-                  key: ValueKey('thumb_${photo.id}_${widget.nonceOf(photo)}'),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            );
-          },
+                return GestureDetector(
+                  onTap: () => widget.onThumbnailTap?.call(index - 1),
+                  child: Container(
+                    width: thumbWidth,
+                    margin: const EdgeInsets.symmetric(horizontal: 0.0),
+                    child: Image.file(
+                      File(thumbPath),
+                      key: ValueKey('thumb_${photo.id}_${widget.nonceOf(photo)}'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
