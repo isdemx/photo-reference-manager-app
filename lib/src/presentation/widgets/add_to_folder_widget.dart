@@ -19,7 +19,7 @@ class AddToFolderWidget extends StatelessWidget {
   Future<void> _showFoldersModal(BuildContext context) async {
     var res = await FoldersHelpers.showAddToFolderDialog(context, photos);
     if (res) {
-      onFolderAdded;
+      onFolderAdded();
     }
   }
 

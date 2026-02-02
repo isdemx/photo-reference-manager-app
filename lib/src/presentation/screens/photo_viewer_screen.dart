@@ -15,6 +15,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/tags_helper
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_editor_overlay.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_gallery_core.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
@@ -597,16 +598,51 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               },
               child: Stack(
                 children: [
-                  Padding(
-                    padding: EdgeInsets.only(
-                      top: _showActions
-                          ? kToolbarHeight +
-                              MediaQuery.of(context).padding.top
-                          : 0,
-                      bottom:
-                          _galleryBottomPadding(widget.photos[_currentIndex]),
+                  Positioned.fill(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: _showActions
+                            ? kToolbarHeight +
+                                MediaQuery.of(context).padding.top
+                            : 0,
+                        bottom:
+                            _galleryBottomPadding(widget.photos[_currentIndex]),
+                      ),
+                      child: PhotoGalleryCore(
+                        photos: widget.photos,
+                        initialIndex: _currentIndex,
+                        pageViewScrollable: _pageViewScrollable,
+                        miniatureWidth: _miniatureWidth,
+                        nonceOf: _nonce,
+                        isFlipped: _isFlipped,
+                        enableKeyboardNavigation: true,
+                        focusNode: _focusNode,
+                        autofocus: true,
+                        pageController: _pageController,
+                        thumbnailController: _thumbnailScrollController,
+                        showThumbnails:
+                            _showActions && !Platform.isMacOS,
+                        scaleStateController: _scaleStateController,
+                        onTap: _toggleActions,
+                        onIndexChanged: (index) {
+                          if (!_preventAutoScroll) {
+                            _scrollThumbnailsToCenter(index);
+                          }
+                          setState(() {
+                            _currentIndex = index;
+                            _isFlipped = false;
+                            _preventAutoScroll = false;
+                          });
+                        },
+                        onThumbnailTap: _onThumbnailTap,
+                        onThumbnailScrollUpdate: () {
+                          setState(() {
+                            _preventAutoScroll = true;
+                          });
+                          _onThumbnailScroll();
+                        },
+                      ),
                     ),
-                    child: _buildPhotoGallery(),
                   ),
                   Positioned(
                     left: 0,
@@ -647,14 +683,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       ),
                     ),
                   ),
-                  if (!Platform.isMacOS && _showActions)
-                    Positioned(
-                      bottom: 120,
-                      left: 0,
-                      right: 0,
-                      height: 40,
-                      child: _buildThumbnails(),
-                    ),
                   if (_showActions)
                     Positioned(
                       bottom: 0,
@@ -721,149 +749,5 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     Navigator.of(context).pop();
   }
 
-  Widget _buildPhotoGallery() {
-    return PhotoViewGallery.builder(
-      pageController: _pageController,
-      scrollPhysics: _pageViewScrollable
-          ? const ClampingScrollPhysics()
-          : const NeverScrollableScrollPhysics(),
-      itemCount: widget.photos.length,
-      onPageChanged: (index) {
-        if (!_preventAutoScroll) {
-          Future.delayed(const Duration(milliseconds: 1), () {
-            _scrollThumbnailsToCenter(index);
-            if (mounted) {
-              setState(() {
-                _preventAutoScroll = false;
-              });
-            }
-          });
-        }
-
-        setState(() {
-          _currentIndex = index;
-          _isFlipped = false;
-          _preventAutoScroll = false;
-        });
-      },
-      builder: (context, index) {
-        final photo = widget.photos[index];
-
-        if (photo.mediaType == 'video') {
-          return PhotoViewGalleryPageOptions.customChild(
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.contained,
-            onTapUp: (BuildContext context, TapUpDetails details,
-                PhotoViewControllerValue controllerValue) {
-              _toggleActions();
-            },
-            heroAttributes: PhotoViewHeroAttributes(tag: 'video_${photo.id}'),
-            child: GalleryVideoPage(
-              index: index,
-              currentIndex: _currentIndex,
-              photo: photo,
-              autoplay: true,
-              looping: true,
-              volume: 0.0,
-            ),
-          );
-        } else {
-          final fullPath = _resolvePhotoPath(photo);
-          final isGif = _isGifPath(fullPath);
-
-          return PhotoViewGalleryPageOptions.customChild(
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 2.0,
-            onTapUp: (BuildContext context, TapUpDetails details,
-                PhotoViewControllerValue controllerValue) {
-              _toggleActions();
-            },
-            heroAttributes: PhotoViewHeroAttributes(
-              tag: 'image_${photo.id}_${_nonce(photo)}',
-            ),
-            child: KeyedSubtree(
-              key: ValueKey('image_${photo.id}_${_nonce(photo)}'),
-              child: Transform(
-                alignment: Alignment.center,
-                transform: _isFlipped
-                    ? Matrix4.rotationY(3.14159)
-                    : Matrix4.identity(),
-                child: isGif
-                    ? InteractiveViewer(
-                        minScale: 1.0,
-                        maxScale: 4.0,
-                        child: Image.file(
-                          File(fullPath),
-                          gaplessPlayback: true,
-                          fit: BoxFit.contain,
-                        ),
-                      )
-                    : PhotoView(
-                        imageProvider: FileImage(File(fullPath)),
-                        gaplessPlayback: true,
-                        scaleStateController: _scaleStateController,
-                        loadingBuilder: (context, progress) =>
-                            const Center(child: null),
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Center(
-                            child: Icon(
-                              Icons.broken_image,
-                              size: 50,
-                              color: Color.fromARGB(255, 171, 244, 54),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ),
-          );
-        }
-      },
-    );
-  }
-
-  Widget _buildThumbnails() {
-    return NotificationListener<ScrollNotification>(
-      onNotification: (scrollInfo) {
-        if (scrollInfo is ScrollUpdateNotification) {
-          setState(() {
-            _preventAutoScroll = true;
-          });
-          _onThumbnailScroll();
-        }
-        return false;
-      },
-      child: ListView.builder(
-        controller: _thumbnailScrollController,
-        scrollDirection: Axis.horizontal,
-        itemCount: widget.photos.length + 2,
-        itemBuilder: (context, index) {
-          if (index == 0 || index == widget.photos.length + 1) {
-            return SizedBox(
-              width: MediaQuery.of(context).size.width * 0.5,
-            );
-          }
-
-          final photo = widget.photos[index - 1];
-
-          final thumbPath = photo.mediaType == 'video'
-              ? PhotoPathHelper().getFullPath(photo.videoPreview!)
-              : _resolvePhotoPath(photo);
-
-          return GestureDetector(
-            onTap: () => _onThumbnailTap(index - 1),
-            child: Container(
-              width: _miniatureWidth,
-              margin: const EdgeInsets.symmetric(horizontal: 0.0),
-              child: Image.file(
-                File(thumbPath),
-                key: ValueKey('thumb_${photo.id}_${_nonce(photo)}'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
+  // Photo gallery and thumbnail rendering are handled by PhotoGalleryCore.
 }

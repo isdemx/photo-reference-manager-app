@@ -1,8 +1,13 @@
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:image_size_getter/file_input.dart';
+import 'package:image_size_getter/image_size_getter.dart';
+import 'package:path/path.dart' as p;
 
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
@@ -19,6 +24,9 @@ import 'package:photographers_reference_app/src/presentation/helpers/tags_helper
 import 'package:uuid/uuid.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_surface_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/photo_gallery_core.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 
 class _VideoThumbUi {
   double startFrac;
@@ -70,6 +78,13 @@ class PhotoPickerWidget extends StatefulWidget {
 
 class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
     with TickerProviderStateMixin {
+  // --- Viewer mode ---
+  bool _viewerMode = false;
+  int _viewerIndex = 0;
+
+  // --- Layout mode ---
+  _PickerLayoutMode _layoutMode = _PickerLayoutMode.grid;
+
   String? _folderId;
 
   /// Выбранные теги (мультивыбор)
@@ -86,6 +101,8 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
   final Map<String, _VideoThumbUi> _videoThumbStates = <String, _VideoThumbUi>{};
   final Map<String, bool> _videoHover = <String, bool>{};
   final Map<String, bool> _controlsHover = <String, bool>{};
+  final Map<String, double> _ratioById = {};
+  final Set<String> _ratioLoading = {};
 
   /// Состояние панели фильтров (по умолчанию открыта)
   bool _filtersOpen = true;
@@ -135,6 +152,9 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                   photoState.photos,
                   notRefTagIds: notRefTagIds,
                 );
+                if (_viewerIndex >= photos.length) {
+                  _viewerIndex = photos.isEmpty ? 0 : photos.length - 1;
+                }
 
                 return Scaffold(
                   appBar: AppBar(
@@ -242,6 +262,46 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                             ),
                             labelPadding: const EdgeInsets.only(right: 6),
                           ),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Colors.white10,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.white12),
+                            ),
+                            child: ToggleButtons(
+                              isSelected: [
+                                _layoutMode == _PickerLayoutMode.grid,
+                                _layoutMode == _PickerLayoutMode.masonry,
+                              ],
+                              onPressed: (index) {
+                                setState(() {
+                                  _layoutMode = index == 0
+                                      ? _PickerLayoutMode.grid
+                                      : _PickerLayoutMode.masonry;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              borderColor: Colors.transparent,
+                              selectedBorderColor: Colors.transparent,
+                              fillColor: Colors.blueGrey.shade700,
+                              color: Colors.white70,
+                              selectedColor: Colors.white,
+                              constraints: const BoxConstraints(
+                                minHeight: 24,
+                                minWidth: 36,
+                              ),
+                              children: const [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6),
+                                  child: Icon(Icons.grid_on, size: 14),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6),
+                                  child: Icon(Icons.view_agenda, size: 14),
+                                ),
+                              ],
+                            ),
+                          ),
                           TextButton.icon(
                             onPressed: () =>
                                 setState(() => _selectedTagIds.clear()),
@@ -339,129 +399,68 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                       Expanded(
                         child: Stack(
                           children: [
-                            // GRID
-                            GridView.builder(
-                              padding: const EdgeInsets.all(8),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: _crossAxisCount,
-                                mainAxisSpacing: 8,
-                                crossAxisSpacing: 8,
+                            if (!_viewerMode) _buildGridOrMasonry(photos),
+                            if (_viewerMode)
+                              _EmbeddedPhotoViewer(
+                                photos: photos,
+                                startIndex: _viewerIndex,
+                                isSelected: (p) => _selectedPhotos.contains(p),
+                                selectedPhotos: _selectedPhotos,
+                                isMultiSelect: _multiSelect,
+                                onClose: () {
+                                  setState(() => _viewerMode = false);
+                                },
+                                onAddCurrent: (p) => _addSingle(p, photos),
+                                onFolderAdded: () {
+                                  context.read<PhotoBloc>().add(LoadPhotos());
+                                  setState(() {});
+                                },
+                                onToggleMulti: () {
+                                  if (_multiSelect) return;
+                                  setState(() => _multiSelect = true);
+                                },
+                                onToggleSelect: (p) => _toggle(p),
+                                onAddSelected: () {
+                                  if (_selectedPhotos.isEmpty) return;
+                                  final contextFileNames = photos
+                                      .map((e) => e.fileName)
+                                      .toList(growable: false);
+                                  final indexByFileName = <String, int>{
+                                    for (int i = 0;
+                                        i < contextFileNames.length;
+                                        i++)
+                                      contextFileNames[i]: i,
+                                  };
+                                  final contextId = const Uuid().v4();
+                                  final results = _selectedPhotos
+                                      .map(
+                                        (p) => PhotoPickResult(
+                                          photo: p,
+                                          contextId: contextId,
+                                          contextFileNames: contextFileNames,
+                                          indexInContext:
+                                              indexByFileName[p.fileName] ?? 0,
+                                        ),
+                                      )
+                                      .toList(growable: false);
+                                  widget.onMultiSelectDone?.call(results);
+                                  _exitMultiSelect();
+                                },
+                                onIndexChanged: (i) {
+                                  _viewerIndex = i;
+                                },
+                                onShowTags: (p) async {
+                                  final changed = await TagsHelpers
+                                      .showAddTagToImagesDialog(
+                                    context,
+                                    [p],
+                                  );
+                                  if (changed && mounted) {
+                                    context.read<PhotoBloc>().add(LoadPhotos());
+                                    setState(() {});
+                                  }
+                                },
                               ),
-                              itemCount: photos.length,
-                              itemBuilder: (_, i) {
-                                final p = photos[i];
-                                final path =
-                                    PhotoPathHelper().getFullPath(p.fileName);
-                                final sel = _selectedPhotos.contains(p);
-
-                                Widget media;
-                                if (p.mediaType == 'video') {
-                                  media = _buildVideoThumb(p);
-                                } else {
-                                  media =
-                                      Image.file(File(path), fit: BoxFit.cover);
-                                }
-
-                                return GestureDetector(
-                                  onTap: () => _onTap(p, photos),
-                                  onLongPress: () => _onLongPress(p),
-                                  child: Stack(
-                                    fit: StackFit.expand,
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: media,
-                                      ),
-
-                                      // // подпись файла на видео
-                                      // if (p.mediaType == 'video')
-                                      //   Positioned(
-                                      //     left: 0,
-                                      //     right: 0,
-                                      //     bottom: 0,
-                                      //     child: Container(
-                                      //       padding: const EdgeInsets.symmetric(
-                                      //           vertical: 2, horizontal: 4)
-                                      //         .copyWith(left: 34),
-                                      //       color: Colors.black45,
-                                      //       child: Text(
-                                      //         p.fileName,
-                                      //         overflow: TextOverflow.ellipsis,
-                                      //         style: const TextStyle(
-                                      //             color: Colors.white,
-                                      //             fontSize: 11),
-                                      //         textAlign: TextAlign.left,
-                                      //       ),
-                                      //     ),
-                                      //   ),
-
-                                      // кнопка "Tag" снизу слева
-                                      Positioned(
-                                        left: 6,
-                                        bottom: 6,
-                                        child: _TagQuickButton(
-                                          onTap: () async {
-                                            final changed = await TagsHelpers
-                                                .showAddTagToImagesDialog(
-                                              context,
-                                              [p],
-                                            );
-                                            if (changed && mounted) {
-                                              // Обновим список фото из БЛОКа
-                                              context
-                                                  .read<PhotoBloc>()
-                                                  .add(LoadPhotos());
-                                              setState(() {});
-                                            }
-                                          },
-                                        ),
-                                      ),
-
-                                      // выделение при мультиселекте
-                                      if (sel)
-                                        Container(
-                                          decoration: BoxDecoration(
-                                            color:
-                                                Colors.blue.withOpacity(0.45),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                      if (sel)
-                                        const Positioned(
-                                          right: 6,
-                                          bottom: 6,
-                                          child: Icon(Icons.check_circle,
-                                              color: Colors.white),
-                                        ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            ),
-
-                            // SLIDER OVERLAY (внизу, поверх фоток)
-                            Positioned(
-                              left: 12,
-                              right: 12,
-                              bottom: 12,
-                              child: SafeArea(
-                                top: false,
-                                child: Center(
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(
-                                      maxWidth: 500,
-                                    ),
-                                    child: _GridSizeSlider(
-                                      value: _gridColumnsSlider,
-                                      onChanged: (v) => setState(
-                                          () => _gridColumnsSlider = v),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -475,6 +474,222 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
       },
     );
   }
+
+  Widget _buildGridOrMasonry(List<Photo> photos) {
+    return Stack(
+      children: [
+        if (_layoutMode == _PickerLayoutMode.grid)
+          GridView.builder(
+            padding: const EdgeInsets.all(8),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: _crossAxisCount,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+            ),
+            itemCount: photos.length,
+            itemBuilder: (_, i) => _buildPhotoTile(photos, i),
+          )
+        else
+          MasonryGridView.count(
+            padding: const EdgeInsets.all(8),
+            crossAxisCount: _crossAxisCount,
+            mainAxisSpacing: 8,
+            crossAxisSpacing: 8,
+            itemCount: photos.length,
+            itemBuilder: (_, i) => _buildPhotoTile(photos, i),
+          ),
+        Positioned(
+          left: 12,
+          right: 12,
+          bottom: 12,
+          child: SafeArea(
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: 500,
+                ),
+                child: _GridSizeSlider(
+                  value: _gridColumnsSlider,
+                  onChanged: (v) => setState(() => _gridColumnsSlider = v),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPhotoTile(List<Photo> photos, int i) {
+    final p = photos[i];
+    final path = PhotoPathHelper().getFullPath(p.fileName);
+    final sel = _selectedPhotos.contains(p);
+
+    Widget media;
+    if (p.mediaType == 'video') {
+      media = _buildVideoThumb(p);
+    } else {
+      media = Image.file(File(path), fit: BoxFit.cover);
+    }
+
+    final tile = GestureDetector(
+      onTap: () => _onTap(p, photos),
+      onLongPress: () => _onLongPress(p),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: media,
+          ),
+          Positioned(
+            right: 6,
+            bottom: 6,
+            child: _ViewQuickButton(
+              onTap: () {
+                setState(() {
+                  _viewerIndex = i;
+                  _viewerMode = true;
+                  _filtersOpen = false;
+                });
+              },
+            ),
+          ),
+          Positioned(
+            left: 6,
+            bottom: 6,
+            child: _TagQuickButton(
+              onTap: () async {
+                final changed =
+                    await TagsHelpers.showAddTagToImagesDialog(context, [p]);
+                if (changed && mounted) {
+                  context.read<PhotoBloc>().add(LoadPhotos());
+                  setState(() {});
+                }
+              },
+            ),
+          ),
+          if (sel)
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          if (sel)
+            const Positioned(
+              right: 6,
+              bottom: 6,
+              child: Icon(Icons.check_circle, color: Colors.white),
+            ),
+        ],
+      ),
+    );
+
+    if (_layoutMode == _PickerLayoutMode.masonry) {
+      _ensureRatio(p);
+      final ratio = _ratioFor(p);
+      return AspectRatio(
+        aspectRatio: ratio > 0 ? ratio : 1.0,
+        child: tile,
+      );
+    }
+
+    return tile;
+  }
+
+  void _ensureRatio(Photo photo) {
+    if (_ratioById.containsKey(photo.id)) return;
+    if (_ratioLoading.contains(photo.id)) return;
+
+    final helper = PhotoPathHelper();
+
+    if (photo.isVideo) {
+      String? previewPath;
+      if (photo.videoPreview != null && photo.videoPreview!.isNotEmpty) {
+        previewPath = helper.getFullPath(photo.videoPreview!);
+      }
+
+      if (previewPath == null ||
+          previewPath.isEmpty ||
+          !File(previewPath).existsSync()) {
+        _ratioById[photo.id] = 1.0;
+        return;
+      }
+
+      _ratioLoading.add(photo.id);
+      _readImageRatioInIsolate(previewPath).then((ratio) {
+        _ratioLoading.remove(photo.id);
+        if (!mounted) return;
+        setState(() {
+          _ratioById[photo.id] = ratio <= 0 ? 1.0 : ratio;
+        });
+      }).catchError((_) {
+        _ratioLoading.remove(photo.id);
+        if (!mounted) return;
+        setState(() {
+          _ratioById[photo.id] = 1.0;
+        });
+      });
+
+      return;
+    }
+
+    final String path =
+        photo.isStoredInApp ? helper.getFullPath(photo.fileName) : photo.path;
+
+    if (path.isEmpty || !File(path).existsSync()) {
+      _ratioById[photo.id] = 1.0;
+      return;
+    }
+
+    _ratioLoading.add(photo.id);
+    _readImageRatioInIsolate(path).then((ratio) {
+      _ratioLoading.remove(photo.id);
+      if (!mounted) return;
+      setState(() {
+        _ratioById[photo.id] = ratio <= 0 ? 1.0 : ratio;
+      });
+    }).catchError((_) {
+      _ratioLoading.remove(photo.id);
+      if (!mounted) return;
+      setState(() {
+        _ratioById[photo.id] = 1.0;
+      });
+    });
+  }
+
+  static Future<double> _readImageRatioInIsolate(String path) async {
+    return await Isolate.run<double>(() {
+      try {
+        final file = File(path);
+        if (!file.existsSync()) return 1.0;
+
+        final ext = p.extension(path).toLowerCase();
+        const exts = [
+          '.jpg',
+          '.jpeg',
+          '.png',
+          '.webp',
+          '.gif',
+          '.heic',
+          '.heif'
+        ];
+        if (!exts.contains(ext)) return 1.0;
+
+        final sz = ImageSizeGetter.getSize(FileInput(file));
+        final w = sz.width;
+        final h = sz.height;
+        if (w <= 0 || h <= 0) return 1.0;
+        return w / h;
+      } catch (_) {
+        return 1.0;
+      }
+    });
+  }
+
+  double _ratioFor(Photo photo) => _ratioById[photo.id] ?? 1.0;
 
   // ---------------------------------------------------------------------------
   List<Photo> _applyFilters(
@@ -650,19 +865,22 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
     if (_multiSelect) {
       _toggle(p);
     } else {
-      final contextFileNames =
-          context.map((e) => e.fileName).toList(growable: false);
-      final indexInContext =
-          context.indexWhere((e) => e.fileName == p.fileName);
-      widget.onPhotoSelected(
-        PhotoPickResult(
-          photo: p,
-          contextId: const Uuid().v4(),
-          contextFileNames: contextFileNames,
-          indexInContext: indexInContext,
-        ),
-      );
+      _addSingle(p, context);
     }
+  }
+
+  void _addSingle(Photo p, List<Photo> context) {
+    final contextFileNames =
+        context.map((e) => e.fileName).toList(growable: false);
+    final indexInContext = context.indexWhere((e) => e.fileName == p.fileName);
+    widget.onPhotoSelected(
+      PhotoPickResult(
+        photo: p,
+        contextId: const Uuid().v4(),
+        contextFileNames: contextFileNames,
+        indexInContext: indexInContext,
+      ),
+    );
   }
 
   void _onLongPress(Photo p) {
@@ -691,6 +909,243 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
   @override
   void dispose() {
     super.dispose();
+  }
+}
+
+enum _PickerLayoutMode { grid, masonry }
+
+class _ViewQuickButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _ViewQuickButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.black54,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: const Icon(
+          Icons.visibility,
+          size: 14,
+          color: Colors.white,
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectionIndicator extends StatelessWidget {
+  final bool selected;
+
+  const _SelectionIndicator({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? Colors.blue : Colors.white70;
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: selected ? Colors.blue.withOpacity(0.25) : Colors.white10,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color, width: 1),
+      ),
+      child: Icon(
+        selected ? Icons.check_circle : Icons.check_circle_outline,
+        color: color,
+        size: 18,
+      ),
+    );
+  }
+}
+
+class _EmbeddedPhotoViewer extends StatefulWidget {
+  final List<Photo> photos;
+  final int startIndex;
+  final bool Function(Photo) isSelected;
+  final List<Photo> selectedPhotos;
+  final bool isMultiSelect;
+  final VoidCallback onClose;
+  final void Function(Photo) onAddCurrent;
+  final VoidCallback onFolderAdded;
+  final VoidCallback onToggleMulti;
+  final void Function(Photo) onToggleSelect;
+  final VoidCallback onAddSelected;
+  final void Function(int) onIndexChanged;
+  final Future<void> Function(Photo) onShowTags;
+
+  const _EmbeddedPhotoViewer({
+    required this.photos,
+    required this.startIndex,
+    required this.isSelected,
+    required this.selectedPhotos,
+    required this.isMultiSelect,
+    required this.onClose,
+    required this.onAddCurrent,
+    required this.onFolderAdded,
+    required this.onToggleMulti,
+    required this.onToggleSelect,
+    required this.onAddSelected,
+    required this.onIndexChanged,
+    required this.onShowTags,
+  });
+
+  @override
+  State<_EmbeddedPhotoViewer> createState() => _EmbeddedPhotoViewerState();
+}
+
+class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
+  late int _currentIndex;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.startIndex;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_focusNode.hasFocus) {
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.photos.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black,
+        child: Stack(
+          children: [
+            PhotoGalleryCore(
+              photos: widget.photos,
+              initialIndex: _currentIndex,
+              pageViewScrollable: true,
+              miniatureWidth: 20,
+              nonceOf: (_) => 0,
+              isFlipped: false,
+              showThumbnails: true,
+              enableKeyboardNavigation: true,
+              focusNode: _focusNode,
+              autofocus: true,
+              onTap: () {},
+              onIndexChanged: (i) {
+                setState(() => _currentIndex = i);
+                widget.onIndexChanged(i);
+              },
+              onThumbnailTap: (i) {
+                setState(() => _currentIndex = i);
+                widget.onIndexChanged(i);
+              },
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: widget.onClose,
+                    ),
+                    const Spacer(),
+                    if (!widget.isMultiSelect)
+                      IconButton(
+                        onPressed: widget.onToggleMulti,
+                        tooltip: 'Enable multi-select',
+                        icon: const Icon(
+                          Icons.collections_outlined,
+                          color: Colors.white,
+                        ),
+                      )
+                    else
+                      IconButton(
+                        onPressed: () => widget.onToggleSelect(
+                          widget.photos[_currentIndex],
+                        ),
+                        tooltip: 'Add/remove from multi',
+                        icon: _SelectionIndicator(
+                          selected: widget
+                              .isSelected(widget.photos[_currentIndex]),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  color: Colors.black54,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: PhotoTagsViewWidget(
+                          photo: widget.photos[_currentIndex],
+                        ),
+                      ),
+                      AddToFolderWidget(
+                        photos: widget.selectedPhotos.isNotEmpty
+                            ? widget.selectedPhotos
+                            : [widget.photos[_currentIndex]],
+                        onFolderAdded: widget.onFolderAdded,
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.check,
+                          color: widget.isMultiSelect
+                              ? Colors.blue
+                              : Colors.white,
+                        ),
+                        tooltip: widget.isMultiSelect
+                            ? 'Add selected photos'
+                            : 'Add photo',
+                        onPressed: () {
+                          if (widget.isMultiSelect) {
+                            widget.onAddSelected();
+                          } else {
+                            widget.onAddCurrent(
+                              widget.photos[_currentIndex],
+                            );
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.tag, color: Colors.white),
+                        tooltip: 'Edit tags',
+                        onPressed: () =>
+                            widget.onShowTags(widget.photos[_currentIndex]),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
