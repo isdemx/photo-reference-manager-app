@@ -487,6 +487,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final isSelected = _selectedPhotos.contains(currentPhoto);
     final sizeLabel = _fileSizeLabel(currentPhoto);
     final commentText = (currentPhoto.comment ?? '').trim();
+    final titleParts = <String>[
+      if (currentPhoto.mediaType == 'video') currentPhoto.fileName,
+      '${_currentIndex + 1}/${widget.photos.length}',
+      formatDate(currentPhoto.dateAdded),
+      if (sizeLabel.isNotEmpty) sizeLabel,
+      if (_extensionLabel(currentPhoto).isNotEmpty)
+        _extensionLabel(currentPhoto).toUpperCase(),
+    ];
 
     return Shortcuts(
       shortcuts: {
@@ -538,11 +546,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                     surfaceTintColor: Colors.transparent,
                     shadowColor: Colors.transparent,
                     title: Text(
-                      '${_currentIndex + 1}/${widget.photos.length} • '
-                      '${formatDate(currentPhoto.dateAdded)}'
-                      '${sizeLabel.isEmpty ? '' : ' • $sizeLabel'}'
-                      '${_extensionLabel(currentPhoto).isEmpty ? '' : ' • ${_extensionLabel(currentPhoto).toUpperCase()}'}',
+                      titleParts.join(' • '),
                       style: const TextStyle(fontSize: 14.0),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     actions: [
                       if (_selectPhotoMode)

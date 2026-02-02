@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
@@ -8,6 +9,7 @@ import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
 import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_editor/image_editor.dart';
@@ -15,6 +17,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:photographers_reference_app/src/data/utils/compress_photo_isolate.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
 import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
@@ -178,6 +181,11 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   double _trimEndFrac = 1.0;
   double _videoPositionFrac = 0.0;
   double _videoVolume = 0.0;
+  _VideoExportQuality _videoExportQuality = _VideoExportQuality.balanced;
+  _VideoExportSize _videoExportSize = _VideoExportSize.original;
+  _VideoExportFps _videoExportFps = _VideoExportFps.original;
+  _VideoExportAudio _videoExportAudio = _VideoExportAudio.keep;
+  double? _exportProgress;
   DateTime _lastVideoTick = DateTime.fromMillisecondsSinceEpoch(0);
 
   double _rotation = 0.0;
@@ -527,10 +535,162 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
     if (mounted) {
       widget.onAddNewPhoto?.call(newPhoto);
+      context.read<PhotoBloc>().add(AddPhoto(newPhoto));
     }
 
     if (mounted) {
-      setState(() => _saving = false);
+      setState(() {
+        _saving = false;
+        _exportProgress = null;
+      });
+      Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _exportVideoToNewFile() async {
+    final c = _videoController;
+    if (_saving || c == null || !c.value.isInitialized) return;
+
+    setState(() {
+      _saving = true;
+      _savingText = 'Exporting video…';
+      _exportProgress = 0.0;
+    });
+
+    final inputPath = _resolveVideoPath(widget.photo);
+    final appDir = await getApplicationDocumentsDirectory();
+    final photosDir = Directory(p.join(appDir.path, 'photos'));
+    if (!await photosDir.exists()) {
+      await photosDir.create(recursive: true);
+    }
+
+    final id = const Uuid().v4();
+    final newFileName = 'export_$id.mp4';
+    final outPath = p.join(photosDir.path, newFileName);
+
+    final duration = c.value.duration;
+    final startMs = (duration.inMilliseconds * _trimStartFrac).round();
+    final endMs = (duration.inMilliseconds * _trimEndFrac).round();
+
+    final args = <String>[];
+    if (endMs > startMs + 200 &&
+        (_trimStartFrac > 0.0 || _trimEndFrac < 1.0)) {
+      args.addAll(['-ss', (startMs / 1000).toStringAsFixed(3)]);
+      args.addAll(['-to', (endMs / 1000).toStringAsFixed(3)]);
+    }
+    args.addAll(['-i', inputPath]);
+
+    final filters = <String>[];
+    if (_videoExportSize != _VideoExportSize.original) {
+      final maxW = switch (_videoExportSize) {
+        _VideoExportSize.p1080 => 1920,
+        _VideoExportSize.p720 => 1280,
+        _VideoExportSize.p480 => 854,
+        _ => 0,
+      };
+      if (maxW > 0) {
+        filters.add('scale=min($maxW,iw):-2');
+      }
+    }
+    if (_videoExportFps != _VideoExportFps.original) {
+      final fps = _videoExportFps == _VideoExportFps.fps30 ? 30 : 24;
+      filters.add('fps=$fps');
+    }
+    if (filters.isNotEmpty) {
+      args.addAll(['-vf', filters.join(',')]);
+    }
+
+    final crf = switch (_videoExportQuality) {
+      _VideoExportQuality.balanced => 23,
+      _VideoExportQuality.small => 27,
+      _VideoExportQuality.tiny => 31,
+    };
+
+    args.addAll(['-c:v', 'libx264', '-preset', 'medium', '-crf', '$crf']);
+
+    if (_videoExportAudio == _VideoExportAudio.mute) {
+      args.add('-an');
+    } else {
+      args.addAll(['-c:a', 'aac', '-b:a', '128k']);
+    }
+
+    args.addAll(['-movflags', '+faststart', outPath]);
+
+    final cmd = args.map((a) => a.contains(' ') ? '"$a"' : a).join(' ');
+    final durationMs = c.value.duration.inMilliseconds;
+    final completer = Completer<ReturnCode?>();
+    await FFmpegKit.executeAsync(
+      cmd,
+      (session) async {
+        final rc = await session.getReturnCode();
+        if (!completer.isCompleted) {
+          completer.complete(rc);
+        }
+      },
+      null,
+      (stats) {
+        if (!mounted) return;
+        final timeMs = stats.getTime();
+        if (durationMs <= 0) return;
+        final p = (timeMs / durationMs).clamp(0.0, 1.0);
+        setState(() => _exportProgress = p);
+      },
+    );
+    final rc = await completer.future;
+    if (!ReturnCode.isSuccess(rc)) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed')),
+        );
+      }
+      return;
+    }
+
+    final outFile = File(outPath);
+    if (!await outFile.exists() || await outFile.length() == 0) {
+      if (mounted) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Export failed')),
+        );
+      }
+      return;
+    }
+
+    final now = DateTime.now();
+    final newPhoto = widget.photo.copyWith(
+      id: id,
+      fileName: newFileName,
+      path: outPath,
+      mediaType: 'video',
+      dateAdded: now,
+      isStoredInApp: true,
+      comment: _commentController.text.trim(),
+      videoPreview: null,
+      videoDuration: null,
+      videoWidth: null,
+      videoHeight: null,
+    );
+
+    final thumb = await generateVideoThumbnail(newPhoto);
+    if (thumb != null) {
+      newPhoto.videoPreview = thumb['videoPreview'] as String?;
+      newPhoto.videoDuration = thumb['videoDuration'] as String?;
+      newPhoto.videoWidth = (thumb['videoWidth'] as num?)?.toDouble();
+      newPhoto.videoHeight = (thumb['videoHeight'] as num?)?.toDouble();
+    }
+
+    if (mounted) {
+      widget.onAddNewPhoto?.call(newPhoto);
+      context.read<PhotoBloc>().add(AddPhoto(newPhoto));
+    }
+
+    if (mounted) {
+      setState(() {
+        _saving = false;
+        _exportProgress = null;
+      });
       Navigator.of(context).pop();
     }
   }
@@ -780,138 +940,154 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                         ),
                       ),
               ),
-              if (!_isVideo)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: PhotoAdjustmentsPanel(
-                    onRotateLeft: () =>
-                        setState(() => _rotation -= math.pi / 2),
-                    onRotateRight: () =>
-                        setState(() => _rotation += math.pi / 2),
-                    onFlipX: () => setState(() => _flipX = !_flipX),
-                    onFlipY: () => setState(() => _flipY = !_flipY),
-                    onSendBackward: null,
-                    onBringForward: null,
-                    brightness: _brightness,
-                    saturation: _saturation,
-                    temp: _temp,
-                    hue: _hue,
-                    contrast: _contrast,
-                    opacity: _opacity,
-                    onBrightnessChanged: (v) =>
-                        setState(() => _brightness = v),
-                    onSaturationChanged: (v) =>
-                        setState(() => _saturation = v),
-                    onTempChanged: (v) => setState(() => _temp = v),
-                    onHueChanged: (v) => setState(() => _hue = v),
-                    onContrastChanged: (v) =>
-                        setState(() => _contrast = v),
-                    onOpacityChanged: (v) =>
-                        setState(() => _opacity = v),
-                  ),
-                ),
-              if (!_isVideo && _currentSizeBytes != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: Row(
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.zero,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Size: ${_formatBytes(_currentSizeBytes!)}'
-                        '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
+                      if (!_isVideo)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: PhotoAdjustmentsPanel(
+                            onRotateLeft: () =>
+                                setState(() => _rotation -= math.pi / 2),
+                            onRotateRight: () =>
+                                setState(() => _rotation += math.pi / 2),
+                            onFlipX: () => setState(() => _flipX = !_flipX),
+                            onFlipY: () => setState(() => _flipY = !_flipY),
+                            onSendBackward: null,
+                            onBringForward: null,
+                            brightness: _brightness,
+                            saturation: _saturation,
+                            temp: _temp,
+                            hue: _hue,
+                            contrast: _contrast,
+                            opacity: _opacity,
+                            onBrightnessChanged: (v) =>
+                                setState(() => _brightness = v),
+                            onSaturationChanged: (v) =>
+                                setState(() => _saturation = v),
+                            onTempChanged: (v) => setState(() => _temp = v),
+                            onHueChanged: (v) => setState(() => _hue = v),
+                            onContrastChanged: (v) =>
+                                setState(() => _contrast = v),
+                            onOpacityChanged: (v) =>
+                                setState(() => _opacity = v),
+                          ),
+                        ),
+                      if (!_isVideo && _currentSizeBytes != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
+                          ),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Size: ${_formatBytes(_currentSizeBytes!)}'
+                                '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (_currentSizeBytes! > 300 * 1024)
+                                ElevatedButton(
+                                  onPressed:
+                                      _compressing ? null : _prepareCompression,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: _compressOnSave
+                                        ? Colors.green.shade600
+                                        : Colors.blueGrey.shade700,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    textStyle:
+                                        const TextStyle(fontSize: 12),
+                                  ),
+                                  child: Text(
+                                    _compressOnSave
+                                        ? 'Compressed'
+                                        : _compressing
+                                            ? 'Compressing...'
+                                            : 'Compress',
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        child: TextField(
+                          controller: _commentController,
+                          maxLines: 3,
+                          minLines: 2,
+                          textInputAction: TextInputAction.newline,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            hintText: 'Comment',
+                            hintStyle:
+                                TextStyle(color: Colors.white.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: Colors.white12,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                          ),
                         ),
                       ),
-                      const Spacer(),
-                      if (_currentSizeBytes! > 300 * 1024)
-                        ElevatedButton(
-                          onPressed: _compressing ? null : _prepareCompression,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _compressOnSave
-                                ? Colors.green.shade600
-                                : Colors.blueGrey.shade700,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            textStyle: const TextStyle(fontSize: 12),
-                          ),
-                          child: Text(
-                            _compressOnSave
-                                ? 'Compressed'
-                                : _compressing
-                                    ? 'Compressing...'
-                                    : 'Compress',
+                      if (_isVideo)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: VideoControls(
+                            startFrac: _trimStartFrac,
+                            endFrac: _trimEndFrac,
+                            positionFrac: _videoPositionFrac,
+                            onSeekFrac: (value) async {
+                              final c = _videoController;
+                              if (c == null || !c.value.isInitialized) return;
+                              final duration = c.value.duration;
+                              final ms =
+                                  (duration.inMilliseconds * value).round();
+                              await c.seekTo(Duration(milliseconds: ms));
+                            },
+                            onChangeRange: (range) {
+                              final start = range.start.clamp(0.0, 1.0);
+                              final end = range.end.clamp(0.0, 1.0);
+                              if (end <= start) return;
+                              setState(() {
+                                _trimStartFrac = start;
+                                _trimEndFrac = end;
+                              });
+                            },
+                            volume: _videoVolume,
+                            speed: 1.0,
+                            showLoopRange: true,
+                            showVolume: true,
+                            showSpeed: false,
+                            totalDuration: _videoController?.value.duration,
+                            onChangeVolume: (v) {
+                              final c = _videoController;
+                              setState(() => _videoVolume = v);
+                              c?.setVolume(_videoVolume);
+                            },
                           ),
                         ),
+                      if (_isVideo) _buildVideoInfoRow(),
+                      if (_isVideo) _buildVideoExportSettingsPanel(),
                     ],
                   ),
                 ),
-              Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: TextField(
-                  controller: _commentController,
-                  maxLines: 3,
-                  minLines: 2,
-                  textInputAction: TextInputAction.newline,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Comment',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    filled: true,
-                    fillColor: Colors.white12,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                  ),
-                ),
               ),
-              if (_isVideo)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: VideoControls(
-                    startFrac: _trimStartFrac,
-                    endFrac: _trimEndFrac,
-                    positionFrac: _videoPositionFrac,
-                    onSeekFrac: (value) async {
-                      final c = _videoController;
-                      if (c == null || !c.value.isInitialized) return;
-                      final duration = c.value.duration;
-                      final ms = (duration.inMilliseconds * value).round();
-                      await c.seekTo(Duration(milliseconds: ms));
-                    },
-                    onChangeRange: (range) {
-                      final start = range.start.clamp(0.0, 1.0);
-                      final end = range.end.clamp(0.0, 1.0);
-                      if (end <= start) return;
-                      setState(() {
-                        _trimStartFrac = start;
-                        _trimEndFrac = end;
-                      });
-                    },
-                    volume: _videoVolume,
-                    speed: 1.0,
-                    showLoopRange: true,
-                    showVolume: true,
-                    showSpeed: false,
-                    totalDuration: _videoController?.value.duration,
-                    onChangeVolume: (v) {
-                      final c = _videoController;
-                      setState(() => _videoVolume = v);
-                      c?.setVolume(_videoVolume);
-                    },
-                  ),
-                ),
               SafeArea(
                 top: false,
                 child: SizedBox(
@@ -937,9 +1113,32 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                           children: [
                             if (_isVideo)
                               Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _saving ? null : _trimVideoToNewFile,
-                                  child: const Text('Cut video to new file'),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: OutlinedButton(
+                                            onPressed: _saving
+                                                ? null
+                                                : _trimVideoToNewFile,
+                                            child: const Text('Cut video'),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: _saving
+                                                ? null
+                                                : _exportVideoToNewFile,
+                                            child: const Text('Save new file'),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                 ),
                               )
                             else ...[
@@ -977,7 +1176,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
             Positioned.fill(
               child: Center(
                 child: Container(
-                  width: 240,
+                  width: 260,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
@@ -1003,6 +1202,16 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                           height: 1.2,
                         ),
                       ),
+                      if (_exportProgress != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          '${(_exportProgress! * 100).toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1049,4 +1258,246 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       },
     );
   }
+
+  Widget _buildVideoExportSettingsPanel() {
+    final est = _estimateVideoExportSizeBytes();
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Export settings',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              if (est != null)
+                Text(
+                  'Est. ${_formatBytes(est)}',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildChoiceChip<_VideoExportQuality>(
+                label: 'Balanced',
+                value: _VideoExportQuality.balanced,
+                groupValue: _videoExportQuality,
+                onSelected: (v) => setState(() => _videoExportQuality = v),
+              ),
+              _buildChoiceChip<_VideoExportQuality>(
+                label: 'Small',
+                value: _VideoExportQuality.small,
+                groupValue: _videoExportQuality,
+                onSelected: (v) => setState(() => _videoExportQuality = v),
+              ),
+              _buildChoiceChip<_VideoExportQuality>(
+                label: 'Tiny',
+                value: _VideoExportQuality.tiny,
+                groupValue: _videoExportQuality,
+                onSelected: (v) => setState(() => _videoExportQuality = v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildChoiceChip<_VideoExportSize>(
+                label: 'Original',
+                value: _VideoExportSize.original,
+                groupValue: _videoExportSize,
+                onSelected: (v) => setState(() => _videoExportSize = v),
+              ),
+              _buildChoiceChip<_VideoExportSize>(
+                label: '1080p',
+                value: _VideoExportSize.p1080,
+                groupValue: _videoExportSize,
+                onSelected: (v) => setState(() => _videoExportSize = v),
+              ),
+              _buildChoiceChip<_VideoExportSize>(
+                label: '720p',
+                value: _VideoExportSize.p720,
+                groupValue: _videoExportSize,
+                onSelected: (v) => setState(() => _videoExportSize = v),
+              ),
+              _buildChoiceChip<_VideoExportSize>(
+                label: '480p',
+                value: _VideoExportSize.p480,
+                groupValue: _videoExportSize,
+                onSelected: (v) => setState(() => _videoExportSize = v),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _buildChoiceChip<_VideoExportFps>(
+                label: 'FPS: Keep',
+                value: _VideoExportFps.original,
+                groupValue: _videoExportFps,
+                onSelected: (v) => setState(() => _videoExportFps = v),
+              ),
+              _buildChoiceChip<_VideoExportFps>(
+                label: 'FPS: 30',
+                value: _VideoExportFps.fps30,
+                groupValue: _videoExportFps,
+                onSelected: (v) => setState(() => _videoExportFps = v),
+              ),
+              _buildChoiceChip<_VideoExportFps>(
+                label: 'FPS: 24',
+                value: _VideoExportFps.fps24,
+                groupValue: _videoExportFps,
+                onSelected: (v) => setState(() => _videoExportFps = v),
+              ),
+              _buildChoiceChip<_VideoExportAudio>(
+                label: 'Audio: Keep',
+                value: _VideoExportAudio.keep,
+                groupValue: _videoExportAudio,
+                onSelected: (v) => setState(() => _videoExportAudio = v),
+              ),
+              _buildChoiceChip<_VideoExportAudio>(
+                label: 'Audio: Mute',
+                value: _VideoExportAudio.mute,
+                groupValue: _videoExportAudio,
+                onSelected: (v) => setState(() => _videoExportAudio = v),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVideoInfoRow() {
+    final sizeBytes = _currentSizeBytes;
+    final duration = _videoController?.value.duration;
+    String? durationLabel;
+    if (duration != null && duration != Duration.zero) {
+      durationLabel = formatDuration(duration);
+    } else if (widget.photo.videoDuration != null &&
+        widget.photo.videoDuration!.isNotEmpty) {
+      durationLabel = widget.photo.videoDuration;
+    }
+
+    if (sizeBytes == null && durationLabel == null) {
+      return const SizedBox.shrink();
+    }
+
+    final parts = <String>[];
+    if (sizeBytes != null) {
+      parts.add('Size: ${_formatBytes(sizeBytes)}');
+    }
+    if (durationLabel != null) {
+      parts.add('Duration: $durationLabel');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          parts.join(' • '),
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
+    );
+  }
+
+  int? _estimateVideoExportSizeBytes() {
+    final duration = _videoController?.value.duration;
+    int? durationMs;
+    if (duration != null && duration != Duration.zero) {
+      durationMs = duration.inMilliseconds;
+    } else if (widget.photo.videoDuration != null) {
+      final parts = widget.photo.videoDuration!.split(':');
+      if (parts.length == 2) {
+        final m = int.tryParse(parts[0]) ?? 0;
+        final s = int.tryParse(parts[1]) ?? 0;
+        durationMs = (m * 60 + s) * 1000;
+      }
+    }
+    if (durationMs == null || durationMs <= 0) return null;
+
+    final baseKbps = switch (_videoExportQuality) {
+      _VideoExportQuality.balanced => 4000,
+      _VideoExportQuality.small => 2000,
+      _VideoExportQuality.tiny => 1000,
+    };
+    final sizeFactor = switch (_videoExportSize) {
+      _VideoExportSize.original => 1.0,
+      _VideoExportSize.p1080 => 0.9,
+      _VideoExportSize.p720 => 0.55,
+      _VideoExportSize.p480 => 0.25,
+    };
+    final fpsFactor = switch (_videoExportFps) {
+      _VideoExportFps.original => 1.0,
+      _VideoExportFps.fps30 => 0.85,
+      _VideoExportFps.fps24 => 0.7,
+    };
+    final audioKbps = _videoExportAudio == _VideoExportAudio.keep ? 128 : 0;
+    final totalKbps = (baseKbps * sizeFactor * fpsFactor) + audioKbps;
+    final bytes = (totalKbps * 1000 / 8) * (durationMs / 1000);
+    return bytes.round();
+  }
+
+  Widget _buildChoiceChip<T>({
+    required String label,
+    required T value,
+    required T groupValue,
+    required ValueChanged<T> onSelected,
+  }) {
+    final selected = value == groupValue;
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(value),
+      selectedColor: Colors.blueGrey.shade700,
+      backgroundColor: Colors.white10,
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.white70,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+    );
+  }
 }
+
+enum _VideoExportQuality { balanced, small, tiny }
+
+enum _VideoExportSize { original, p1080, p720, p480 }
+
+enum _VideoExportFps { original, fps30, fps24 }
+
+enum _VideoExportAudio { keep, mute }

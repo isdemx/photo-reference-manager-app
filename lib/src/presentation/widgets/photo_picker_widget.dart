@@ -794,6 +794,26 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(child: preview),
+          Positioned(
+            left: 6,
+            top: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.6),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                photo.fileName,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Colors.white,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
           if (_videoHover[photo.fileName] == true)
             Positioned.fill(
               child: IgnorePointer(
