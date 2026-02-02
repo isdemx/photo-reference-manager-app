@@ -773,6 +773,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Size _canvasViewportSize = Size.zero;
   static const double _videoControlsHeight = 34.0;
+  final ScrollController _overviewScrollController = ScrollController();
 
   @override
   void initState() {
@@ -1214,20 +1215,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _enterOverviewLayout() {
     _originalOffsets = _items.map((e) => e.offset).toList();
     _originalScales = _items.map((e) => e.scale).toList();
-
-    final screenWidth = MediaQuery.of(context).size.width;
-
-    final r = OverviewLayoutHelper.compute(
-      items: _items,
-      screenWidth: screenWidth,
-      spacing: 20.0,
-      itemTargetWidth: 200.0,
-    );
-
-    for (int i = 0; i < _items.length; i++) {
-      _items[i].offset = r.offsets[i];
-      _items[i].scale = r.scales[i];
-    }
   }
 
   void _exitOverviewLayout({int? bringToFrontIndex}) {
@@ -1903,19 +1890,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final bool isIOS = Platform.isIOS;
     final double bottomInset = MediaQuery.of(context).padding.bottom;
 
-    final videoOverlays = sorted
-        .where((it) => it.isVideo)
-        .map((item) {
-          final uiState = _videoStates[item.id];
-          if (uiState == null) return const SizedBox.shrink();
-          return _buildVideoControlsViewportOverlay(item, uiState);
-        })
-        .toList(growable: false);
+    final videoOverlays = _overviewMode
+        ? const <Widget>[]
+        : sorted
+            .where((it) => it.isVideo)
+            .map((item) {
+              final uiState = _videoStates[item.id];
+              if (uiState == null) return const SizedBox.shrink();
+              return _buildVideoControlsViewportOverlay(item, uiState);
+            })
+            .toList(growable: false);
 
-    final rotationOverlays = sorted
-        .where((it) => it.isEditing)
-        .map(_buildRotationSliderViewportOverlay)
-        .toList(growable: false);
+    final rotationOverlays = _overviewMode
+        ? const <Widget>[]
+        : sorted
+            .where((it) => it.isEditing)
+            .map(_buildRotationSliderViewportOverlay)
+            .toList(growable: false);
 
     return Focus(
       focusNode: _focusNode,
@@ -2114,9 +2105,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         return Listener(
                           behavior: HitTestBehavior.opaque,
                           onPointerPanZoomStart: (_) {
+                            if (_overviewMode) return;
                             _isTrackpadPanZoomActive = true;
                           },
                           onPointerPanZoomUpdate: (e) {
+                            if (_overviewMode) return;
                             if (_isItemScaleGestureActive &&
                                 !_isTrackpadPanZoomActive) {
                               return;
@@ -2130,12 +2123,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                             }
                           },
                           onPointerPanZoomEnd: (_) {
+                            if (_overviewMode) return;
                             _isTrackpadPanZoomActive = false;
                             _saveCollageScale(_collageScale);
                           },
                           child: GestureDetector(
                             behavior: HitTestBehavior.translucent,
                             onTap: () {
+                              if (_overviewMode) return;
                               _exitEditingMode();
                             },
                             child: Stack(
@@ -2155,52 +2150,64 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                         _transformationController.value);
                                     _saveCollageScale(_collageScale);
                                   },
-                                  child: RepaintBoundary(
-                                    key: _collageKey,
-                                    child: SizedBox(
-                                      width: canvasSize.width,
-                                      height: canvasSize.height,
-                                      child: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          Positioned.fill(
-                                              child: Container(
-                                                  color: _backgroundColor)),
-                                          for (final item in sorted)
-                                            _buildPhotoItem(item),
-                                          if (_showViewZoneOverlay)
+                                  child: IgnorePointer(
+                                    ignoring: _overviewMode,
+                                    child: RepaintBoundary(
+                                      key: _collageKey,
+                                      child: SizedBox(
+                                        width: canvasSize.width,
+                                        height: canvasSize.height,
+                                        child: Stack(
+                                          clipBehavior: Clip.none,
+                                          children: [
                                             Positioned.fill(
-                                              child: CustomPaint(
-                                                painter: _ViewZonesPainter(
-                                                  zones: _viewZones,
-                                                  colors: _viewZoneColors,
-                                                  viewportSize: _viewportSize(),
-                                                  strokeWidth: math.max(
-                                                    1.0,
-                                                    2 / (_collageScale == 0
-                                                        ? 1
-                                                        : _collageScale),
+                                                child: Container(
+                                                    color: _backgroundColor)),
+                                            for (final item in sorted)
+                                              _buildPhotoItem(item),
+                                            if (_showViewZoneOverlay)
+                                              Positioned.fill(
+                                                child: CustomPaint(
+                                                  painter: _ViewZonesPainter(
+                                                    zones: _viewZones,
+                                                    colors: _viewZoneColors,
+                                                    viewportSize:
+                                                        _viewportSize(),
+                                                    strokeWidth: math.max(
+                                                      1.0,
+                                                      2 / (_collageScale == 0
+                                                          ? 1
+                                                          : _collageScale),
+                                                    ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
-                                          if (_showViewZoneOverlay)
-                                            Positioned.fill(
-                                              child: GestureDetector(
-                                                behavior:
-                                                    HitTestBehavior.translucent,
-                                                onTap: _exitViewZoneOverlay,
+                                            if (_showViewZoneOverlay)
+                                              Positioned.fill(
+                                                child: GestureDetector(
+                                                  behavior:
+                                                      HitTestBehavior.translucent,
+                                                  onTap: _exitViewZoneOverlay,
+                                                ),
                                               ),
-                                            ),
-                                          if (_showViewZoneOverlay)
-                                            ..._buildViewZoneHandles(),
-                                        ],
+                                            if (_showViewZoneOverlay)
+                                              ..._buildViewZoneHandles(),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                                 ...videoOverlays,
                                 ...rotationOverlays,
+                                if (_overviewMode)
+                                  const Positioned.fill(
+                                    child: ModalBarrier(
+                                      dismissible: false,
+                                      color: Colors.black,
+                                    ),
+                                  ),
+                                if (_overviewMode) _buildOverviewGrid(_items),
                                 if (!isSomePhotoInEditMode &&
                                     (_showForInitDeleteIcon ||
                                         _draggingIndex != null))
@@ -2740,139 +2747,150 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       key: ValueKey(item.id),
       left: item.offset.dx,
       top: item.offset.dy,
-      child: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (e) => _tapDrag.pointerDown(item.id, e.position),
-        onPointerMove: (e) => _tapDrag.pointerMove(item.id, e.position),
-        onPointerUp: (_) {
-          final isTap = _tapDrag.pointerUp(item.id);
-          if (_deleteHover && _draggingIndex != null) {
-            setState(() {
-              _controller.removeAt(_draggingIndex!);
-              _draggingIndex = null;
-              _deleteHover = false;
-              _isItemScaleGestureActive = false;
-              item.baseScaleOnGesture = null;
-            });
-            return;
-          }
-          if (_isItemScaleGestureActive || _draggingIndex != null) {
-            setState(() {
-              _isItemScaleGestureActive = false;
-              _draggingIndex = null;
-              _deleteHover = false;
-              item.baseScaleOnGesture = null;
-            });
-          }
-          if (isTap) {
-            _bringToFront(item);
-          }
-        },
-        child: GestureDetector(
-          onTap: () {
-            if (_overviewMode) {
-              final tappedIndex = _items.indexOf(item);
-              _exitOverviewLayout(bringToFrontIndex: tappedIndex);
-            } else {
-              setState(() {
-                _controller.clearEditing();
-                _controller.bringToFront(item);
-                _maxZIndex = _controller.maxZIndex;
-                _activeItemIndex = _items.indexOf(item);
-              });
-            }
-          },
-          onLongPress: () {
-            setState(() {
-              vibrate();
-              _controller.setEditing(item, true);
-            });
-          },
-          child: GestureDetector(
+      child: Builder(
+        builder: (itemCtx) {
+          return Listener(
             behavior: HitTestBehavior.translucent,
-            onScaleStart: (_) {
-              setState(() {
-                _isItemScaleGestureActive = true;
-                item.baseScaleOnGesture = null;
-                item.baseOffsetOnGesture = null;
-              });
-            },
-            onScaleUpdate: (details) {
-              if (_controlsHover[item.id] == true) return;
-
-              const double scaleEps = 0.002;
-              final bool isScaling = (details.scale - 1.0).abs() > scaleEps ||
-                  details.pointerCount >= 2;
-
-              setState(() {
-                if (isScaling) {
-                  item.baseScaleOnGesture ??= item.scale;
-                  item.baseOffsetOnGesture ??= item.offset;
-
+            onPointerDown: (e) => _tapDrag.pointerDown(item.id, e.position),
+            onPointerMove: (e) => _tapDrag.pointerMove(item.id, e.position),
+            onPointerUp: (_) {
+              final isTap = _tapDrag.pointerUp(item.id);
+              if (_deleteHover && _draggingIndex != null) {
+                setState(() {
+                  _controller.removeAt(_draggingIndex!);
                   _draggingIndex = null;
                   _deleteHover = false;
-
-                  final baseScale = item.baseScaleOnGesture ?? item.scale;
-                  final nextScale = math.max(0.001, baseScale * details.scale);
-                  final baseOffset = item.baseOffsetOnGesture ?? item.offset;
-                  final focalCanvas = baseOffset + details.localFocalPoint;
-                  final basePoint =
-                      (focalCanvas - baseOffset) / baseScale;
-                  final nextOffset = focalCanvas - basePoint * nextScale;
-
-                  item.scale = nextScale;
-                  item.offset = nextOffset;
-                  _clampItemOffset(item);
-                  return;
-                }
-
-                if (_draggingIndex == null) {
-                  _draggingIndex = _items.indexOf(item);
-                  _scheduleDeleteRectUpdate();
-                }
-
-                if (item.isEditing) {
-                  item.internalOffset += details.focalPointDelta;
+                  _isItemScaleGestureActive = false;
+                  item.baseScaleOnGesture = null;
+                  item.baseOffsetOnGesture = null;
+                });
+                return;
+              }
+              if (_isItemScaleGestureActive || _draggingIndex != null) {
+                setState(() {
+                  _isItemScaleGestureActive = false;
+                  _draggingIndex = null;
+                  _deleteHover = false;
+                  item.baseScaleOnGesture = null;
+                  item.baseOffsetOnGesture = null;
+                });
+              }
+              if (isTap) {
+                _bringToFront(item);
+              }
+            },
+            child: GestureDetector(
+              onTap: () {
+                if (_overviewMode) {
+                  final tappedIndex = _items.indexOf(item);
+                  _exitOverviewLayout(bringToFrontIndex: tappedIndex);
                 } else {
-                  item.offset += details.focalPointDelta;
-                  _clampItemOffset(item);
+                  setState(() {
+                    _controller.clearEditing();
+                    _controller.bringToFront(item);
+                    _maxZIndex = _controller.maxZIndex;
+                    _activeItemIndex = _items.indexOf(item);
+                  });
                 }
+              },
+              onLongPress: () {
+                setState(() {
+                  vibrate();
+                  _controller.setEditing(item, true);
+                });
+              },
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onScaleStart: (_) {
+                  setState(() {
+                    _isItemScaleGestureActive = true;
+                    item.baseScaleOnGesture = null;
+                    item.baseOffsetOnGesture = null;
+                  });
+                },
+                onScaleUpdate: (details) {
+                  if (_controlsHover[item.id] == true) return;
 
-                final pointer = details.focalPoint;
-                final wasHover = _deleteHover;
-                _deleteHover = _deleteRect.contains(pointer);
-                if (_deleteHover && !wasHover) {
-                  vibrate(5);
-                }
-              });
-            },
-            onScaleEnd: (_) {
-              setState(() {
-                if (_deleteHover && _draggingIndex != null) {
-                  _controller.removeAt(_draggingIndex!);
-                }
-                _draggingIndex = null;
-                _deleteHover = false;
-                _isItemScaleGestureActive = false;
-                item.baseScaleOnGesture = null;
-                item.baseOffsetOnGesture = null;
-                _clampItemOffset(item);
-              });
-              _tapDrag.clear(item.id);
-            },
-            child: Transform(
-              transform: () {
-                final m = Matrix4.identity()
-                  ..translate(w / 2, h / 2)
-                  ..rotateZ(item.rotation)
-                  ..scale(item.flipX ? -1.0 : 1.0, 1.0)
-                  ..translate(-w / 2, -h / 2);
-                return m;
-              }(),
-              child: _buildEditableContent(item, w, h),
+                  const double scaleEps = 0.002;
+                  final bool isScaling = (details.scale - 1.0).abs() > scaleEps ||
+                      details.pointerCount >= 2;
+
+                  setState(() {
+                    if (isScaling) {
+                      item.baseScaleOnGesture ??= item.scale;
+                      item.baseOffsetOnGesture ??= item.offset;
+
+                      _draggingIndex = null;
+                      _deleteHover = false;
+
+                      final box = itemCtx.findRenderObject() as RenderBox?;
+                      final localFocal = box != null
+                          ? box.globalToLocal(details.focalPoint)
+                          : details.localFocalPoint;
+
+                      final baseScale = item.baseScaleOnGesture ?? item.scale;
+                      final nextScale =
+                          math.max(0.001, baseScale * details.scale);
+                      final baseOffset = item.baseOffsetOnGesture ?? item.offset;
+                      final focalCanvas = baseOffset + localFocal;
+                      final basePoint = (focalCanvas - baseOffset) / baseScale;
+                      final nextOffset = focalCanvas - basePoint * nextScale;
+
+                      item.scale = nextScale;
+                      item.offset = nextOffset;
+                      _clampItemOffset(item);
+                      return;
+                    }
+
+                    if (_draggingIndex == null) {
+                      _draggingIndex = _items.indexOf(item);
+                      _scheduleDeleteRectUpdate();
+                    }
+
+                    if (item.isEditing) {
+                      item.internalOffset += details.focalPointDelta;
+                    } else {
+                      item.offset += details.focalPointDelta;
+                      _clampItemOffset(item);
+                    }
+
+                    final pointer = details.focalPoint;
+                    final wasHover = _deleteHover;
+                    _deleteHover = _deleteRect.contains(pointer);
+                    if (_deleteHover && !wasHover) {
+                      vibrate(5);
+                    }
+                  });
+                },
+                onScaleEnd: (_) {
+                  setState(() {
+                    if (_deleteHover && _draggingIndex != null) {
+                      _controller.removeAt(_draggingIndex!);
+                    }
+                    _draggingIndex = null;
+                    _deleteHover = false;
+                    _isItemScaleGestureActive = false;
+                    item.baseScaleOnGesture = null;
+                    item.baseOffsetOnGesture = null;
+                    _clampItemOffset(item);
+                  });
+                  _tapDrag.clear(item.id);
+                },
+                child: Transform(
+                  transform: () {
+                    final m = Matrix4.identity()
+                      ..translate(w / 2, h / 2)
+                      ..rotateZ(item.rotation)
+                      ..scale(item.flipX ? -1.0 : 1.0, 1.0)
+                      ..translate(-w / 2, -h / 2);
+                    return m;
+                  }(),
+                  child: _buildEditableContent(item, w, h),
+                ),
+              ),
             ),
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -3010,6 +3028,93 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildOverviewGrid(List<CollagePhotoState> items) {
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final viewport = Size(constraints.maxWidth, constraints.maxHeight);
+          const padding = 12.0;
+          const spacing = 10.0;
+          const targetCell = 180.0;
+
+          final availableWidth = viewport.width - padding * 2;
+          final rawColumns =
+              ((availableWidth + spacing) / (targetCell + spacing)).floor();
+          final columns = rawColumns.clamp(1, 6);
+          final cellWidth = (availableWidth - spacing * (columns - 1)) / columns;
+          final cellSize = cellWidth;
+          final rows = (items.length / columns).ceil();
+          final totalHeight =
+              padding * 2 + rows * cellSize + spacing * (rows - 1);
+
+          final children = <Widget>[];
+          for (int i = 0; i < items.length; i++) {
+            final item = items[i];
+            final col = i % columns;
+            final row = i ~/ columns;
+            final dx = padding + col * (cellSize + spacing);
+            final dy = padding + row * (cellSize + spacing);
+
+            final baseW = item.baseWidth * item.scale;
+            final baseH = item.baseHeight * item.scale;
+            final fitScale = baseW <= 0 || baseH <= 0
+                ? 1.0
+                : math.min(cellSize / baseW, cellSize / baseH);
+            final overviewScale = item.scale * fitScale;
+            final w = item.baseWidth * overviewScale;
+            final h = item.baseHeight * overviewScale;
+            final offset = Offset(dx + (cellSize - w) / 2,
+                dy + (cellSize - h) / 2);
+
+            children.add(
+              Positioned(
+                left: offset.dx,
+                top: offset.dy,
+                child: GestureDetector(
+                  onTap: () {
+                    final indexInItems = _items.indexOf(item);
+                    setState(() {
+                      _activeItemIndex = indexInItems;
+                    });
+                    _exitOverviewLayout(bringToFrontIndex: indexInItems);
+                  },
+                  child: Transform(
+                    transform: () {
+                      final m = Matrix4.identity()
+                        ..translate(w / 2, h / 2)
+                        ..rotateZ(item.rotation)
+                        ..scale(item.flipX ? -1.0 : 1.0, 1.0)
+                        ..translate(-w / 2, -h / 2);
+                      return m;
+                    }(),
+                    child: _buildEditableContent(item, w, h),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return Container(
+            color: Colors.black,
+            child: Scrollbar(
+              controller: _overviewScrollController,
+              thumbVisibility: true,
+              child: SingleChildScrollView(
+                controller: _overviewScrollController,
+                primary: false,
+                child: SizedBox(
+                  height: totalHeight,
+                  width: viewport.width,
+                  child: Stack(children: children),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -3528,6 +3633,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _cancelArrowRepeat();
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
+    _overviewScrollController.dispose();
     _focusNode.dispose();
 
     // Dispose video controllers safely
