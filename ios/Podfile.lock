@@ -51,6 +51,8 @@ PODS:
     - SDWebImageWebPCoder
   - flutter_native_splash (2.4.3):
     - Flutter
+  - image_editor_common (1.0.0):
+    - Flutter
   - image_picker_ios (0.0.1):
     - Flutter
   - libwebp (1.5.0):
@@ -112,6 +114,7 @@ DEPENDENCIES:
   - flutter_archive (from `.symlinks/plugins/flutter_archive/ios`)
   - flutter_image_compress_common (from `.symlinks/plugins/flutter_image_compress_common/ios`)
   - flutter_native_splash (from `.symlinks/plugins/flutter_native_splash/ios`)
+  - image_editor_common (from `.symlinks/plugins/image_editor_common/ios`)
   - image_picker_ios (from `.symlinks/plugins/image_picker_ios/ios`)
   - local_auth_darwin (from `.symlinks/plugins/local_auth_darwin/darwin`)
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
@@ -151,6 +154,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/flutter_image_compress_common/ios"
   flutter_native_splash:
     :path: ".symlinks/plugins/flutter_native_splash/ios"
+  image_editor_common:
+    :path: ".symlinks/plugins/image_editor_common/ios"
   image_picker_ios:
     :path: ".symlinks/plugins/image_picker_ios/ios"
   local_auth_darwin:
@@ -186,6 +191,7 @@ SPEC CHECKSUMS:
   flutter_archive: cb3e0219e555897ba4b36f166baa1eca394890b9
   flutter_image_compress_common: ec1d45c362c9d30a3f6a0426c297f47c52007e3e
   flutter_native_splash: df59bb2e1421aa0282cb2e95618af4dcb0c56c29
+  image_editor_common: d6f6644ae4a6de80481e89fe6d0a8c49e30b4b43
   image_picker_ios: c560581cceedb403a6ff17f2f816d7fea1421fc1
   libwebp: 02b23773aedb6ff1fd38cec7a77b81414c6842a8
   local_auth_darwin: 63c73d6d28cc3e239be2b6aa460ea6e317cd5100

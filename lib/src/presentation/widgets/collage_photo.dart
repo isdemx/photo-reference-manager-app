@@ -2521,20 +2521,24 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         tooltip: 'Add photo (A)',
         onPressed: _showAllPhotosSheet,
       ),
-      GestureDetector(
-        onLongPress: _showViewZonePanel,
-        child: IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
+      if (!Platform.isIOS)
+        GestureDetector(
+          onLongPress: _showViewZonePanel,
+          child: IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+            ),
+            icon: const Icon(
+              Icons.crop_free,
+              color: Colors.white,
+              shadows: iconShadow,
+            ),
+            tooltip: 'Add view zone (Z, hold for list)',
+            onPressed: _addViewZone,
           ),
-          icon: const Icon(Icons.crop_free,
-              color: Colors.white, shadows: iconShadow),
-          tooltip: 'Add view zone (Z, hold for list)',
-          onPressed: _addViewZone,
         ),
-      ),
       IconButton(
         style: IconButton.styleFrom(
           backgroundColor: Colors.transparent,
