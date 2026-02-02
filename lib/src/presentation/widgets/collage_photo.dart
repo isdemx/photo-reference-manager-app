@@ -75,6 +75,7 @@ class CollagePhotoState {
 
   /// Начальный масштаб при onScaleStart (плавный зум)
   double? baseScaleOnGesture;
+  Offset? baseOffsetOnGesture;
 
   /// "Базовые" размеры (без учёта scale)
   double baseWidth;
@@ -129,6 +130,7 @@ class CollagePhotoState {
     this.pickContextId,
     this.pickContextIndex,
     Offset? internalOffset,
+    this.baseOffsetOnGesture,
   })  : cropRect = cropRect ?? const Rect.fromLTWH(0, 0, 1, 1),
         internalOffset = internalOffset ?? Offset.zero;
 
@@ -2792,6 +2794,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               setState(() {
                 _isItemScaleGestureActive = true;
                 item.baseScaleOnGesture = null;
+                item.baseOffsetOnGesture = null;
               });
             },
             onScaleUpdate: (details) {
@@ -2804,13 +2807,21 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               setState(() {
                 if (isScaling) {
                   item.baseScaleOnGesture ??= item.scale;
+                  item.baseOffsetOnGesture ??= item.offset;
 
                   _draggingIndex = null;
                   _deleteHover = false;
 
-                  final base = item.baseScaleOnGesture ?? item.scale;
-                  final nextScale = base * details.scale;
-                  item.scale = math.max(0.001, nextScale);
+                  final baseScale = item.baseScaleOnGesture ?? item.scale;
+                  final nextScale = math.max(0.001, baseScale * details.scale);
+                  final baseOffset = item.baseOffsetOnGesture ?? item.offset;
+                  final focalCanvas = baseOffset + details.localFocalPoint;
+                  final basePoint =
+                      (focalCanvas - baseOffset) / baseScale;
+                  final nextOffset = focalCanvas - basePoint * nextScale;
+
+                  item.scale = nextScale;
+                  item.offset = nextOffset;
                   _clampItemOffset(item);
                   return;
                 }
@@ -2844,6 +2855,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 _deleteHover = false;
                 _isItemScaleGestureActive = false;
                 item.baseScaleOnGesture = null;
+                item.baseOffsetOnGesture = null;
                 _clampItemOffset(item);
               });
               _tapDrag.clear(item.id);
