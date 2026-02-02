@@ -1372,6 +1372,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           content: TextField(
             controller: titleController,
             autofocus: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) =>
+                Navigator.of(ctx).pop(titleController.text),
             decoration: const InputDecoration(hintText: 'Collage Title'),
           ),
           actions: [

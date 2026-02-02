@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -531,6 +532,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             extendBodyBehindAppBar: true,
             appBar: _showActions
                 ? AppBar(
+                    backgroundColor: Colors.black.withOpacity(0.5),
+                    elevation: 0,
+                    surfaceTintColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
                     title: Text(
                       '${_currentIndex + 1}/${widget.photos.length} • '
                       '${formatDate(currentPhoto.dateAdded)}'
@@ -594,6 +599,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 children: [
                   Padding(
                     padding: EdgeInsets.only(
+                      top: _showActions
+                          ? kToolbarHeight +
+                              MediaQuery.of(context).padding.top
+                          : 0,
                       bottom:
                           _galleryBottomPadding(widget.photos[_currentIndex]),
                     ),
@@ -651,47 +660,58 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      child: ActionBar(
-                        photo: currentPhoto,
-                        photos: widget.photos,
-                        isSelectionMode:
-                            _selectedPhotos.isNotEmpty || _selectPhotoMode,
-                        enableSelectPhotoMode: () =>
-                            _enableSelectPhotoMode(!_selectPhotoMode),
-                        onShare: _shareSelectedPhotos,
-                        deletePhoto: () =>
-                            _deleteImageWithConfirmation(context),
-                        onAddToFolder: () {
-                          // Ваш метод
-                        },
-                        onCancel: _clearSelection,
-                        onAddToFolderMulti: () async {
-                          if (_selectedPhotos.isEmpty) return;
-                          final ok = await FoldersHelpers.showAddToFolderDialog(
-                            context,
-                            _selectedPhotos,
-                          );
-                          if (ok) _clearSelection();
-                        },
-                        onAddToTag: () async {
-                          if (_selectedPhotos.isEmpty) return;
-                          final ok = await TagsHelpers.showAddTagToImagesDialog(
-                            context,
-                            _selectedPhotos,
-                          );
-                          if (ok) _clearSelection();
-                        },
-                        onAddToCollage: () =>
-                            _openCollageWithPhotos([currentPhoto]),
-                        onAddToCollageMulti: () =>
-                            _openCollageWithPhotos(_selectedPhotos),
-                        onEdit: () => _openEditor(currentPhoto),
-                      ),
+                      child: _buildBottomBar(currentPhoto),
                     ),
                 ],
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(Photo currentPhoto) {
+    final bar = ActionBar(
+      photo: currentPhoto,
+      photos: widget.photos,
+      isSelectionMode: _selectedPhotos.isNotEmpty || _selectPhotoMode,
+      enableSelectPhotoMode: () => _enableSelectPhotoMode(!_selectPhotoMode),
+      onShare: _shareSelectedPhotos,
+      deletePhoto: () => _deleteImageWithConfirmation(context),
+      onAddToFolder: () {
+        // Ваш метод
+      },
+      onCancel: _clearSelection,
+      onAddToFolderMulti: () async {
+        if (_selectedPhotos.isEmpty) return;
+        final ok = await FoldersHelpers.showAddToFolderDialog(
+          context,
+          _selectedPhotos,
+        );
+        if (ok) _clearSelection();
+      },
+      onAddToTag: () async {
+        if (_selectedPhotos.isEmpty) return;
+        final ok = await TagsHelpers.showAddTagToImagesDialog(
+          context,
+          _selectedPhotos,
+        );
+        if (ok) _clearSelection();
+      },
+      onAddToCollage: () => _openCollageWithPhotos([currentPhoto]),
+      onAddToCollageMulti: () => _openCollageWithPhotos(_selectedPhotos),
+      onEdit: () => _openEditor(currentPhoto),
+    );
+
+    if (!_isZoomed) return bar;
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          color: Colors.black.withOpacity(0.2),
+          child: bar,
         ),
       ),
     );

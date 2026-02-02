@@ -43,7 +43,7 @@ class ActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: Colors.black54,
+      color: Colors.transparent,
       padding: const EdgeInsets.all(8.0),
       child: SingleChildScrollView(
         child: Column(
@@ -154,7 +154,6 @@ class ActionBar extends StatelessWidget {
     );
   }
 }
-
 
 
 
