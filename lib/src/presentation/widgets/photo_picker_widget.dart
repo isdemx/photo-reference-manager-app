@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -156,8 +157,20 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                   _viewerIndex = photos.isEmpty ? 0 : photos.length - 1;
                 }
 
-                return Scaffold(
-                  appBar: AppBar(
+                return Focus(
+                  autofocus: true,
+                  onKeyEvent: (_, event) {
+                    if (event is! KeyDownEvent) {
+                      return KeyEventResult.ignored;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.keyA) {
+                      Navigator.of(context).pop();
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  },
+                  child: Scaffold(
+                    appBar: AppBar(
                     title: GestureDetector(
                       onTap: () =>
                           setState(() => _filtersOpen = !_filtersOpen),
@@ -466,7 +479,8 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                       ),
                     ],
                   ),
-                );
+                ),
+              );
               },
             );
           },

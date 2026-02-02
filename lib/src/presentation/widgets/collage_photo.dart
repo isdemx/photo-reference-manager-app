@@ -1968,7 +1968,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         }
 
         if (event.logicalKey == LogicalKeyboardKey.keyZ) {
-          _addViewZone();
+          if (_showViewZoneOverlay) {
+            _exitViewZoneOverlay();
+          } else {
+            _showViewZonePanel();
+          }
           return KeyEventResult.handled;
         }
 

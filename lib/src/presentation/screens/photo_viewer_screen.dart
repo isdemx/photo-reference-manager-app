@@ -615,9 +615,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         miniatureWidth: _miniatureWidth,
                         nonceOf: _nonce,
                         isFlipped: _isFlipped,
-                        enableKeyboardNavigation: true,
-                        focusNode: _focusNode,
-                        autofocus: true,
+                        enableKeyboardNavigation: false,
                         pageController: _pageController,
                         thumbnailController: _thumbnailScrollController,
                         showThumbnails:

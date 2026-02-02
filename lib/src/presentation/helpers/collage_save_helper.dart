@@ -62,9 +62,8 @@ class CollageSaveHelper {
 
       // 5. SnackBar + закрытие (опционально)
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Collage saved successfully!')),
+        const SnackBar(content: Text('Snapshot saved')),
       );
-      Navigator.pop(context);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error generating collage: $e')),
