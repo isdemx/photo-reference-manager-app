@@ -9,6 +9,8 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
   final VoidCallback onRotateRight;
   final VoidCallback onFlipX;
   final VoidCallback? onFlipY;
+  final VoidCallback? onSendBackward;
+  final VoidCallback? onBringForward;
   final VoidCallback? onDone;
 
   final double brightness;
@@ -31,6 +33,8 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
     required this.onRotateRight,
     required this.onFlipX,
     this.onFlipY,
+    this.onSendBackward,
+    this.onBringForward,
     this.onDone,
     required this.brightness,
     required this.saturation,
@@ -75,6 +79,18 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                 icon: Icons.flip_camera_android,
                 tooltip: 'Flip vertical',
                 onPressed: onFlipY!,
+              ),
+            if (onSendBackward != null)
+              ActionIcon(
+                icon: Icons.vertical_align_bottom,
+                tooltip: 'Send backward',
+                onPressed: onSendBackward!,
+              ),
+            if (onBringForward != null)
+              ActionIcon(
+                icon: Icons.vertical_align_top,
+                tooltip: 'Bring forward',
+                onPressed: onBringForward!,
               ),
             const VerticalDivider(
               color: Colors.white24,

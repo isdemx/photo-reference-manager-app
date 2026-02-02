@@ -788,6 +788,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                         setState(() => _rotation += math.pi / 2),
                     onFlipX: () => setState(() => _flipX = !_flipX),
                     onFlipY: () => setState(() => _flipY = !_flipY),
+                    onSendBackward: null,
+                    onBringForward: null,
                     brightness: _brightness,
                     saturation: _saturation,
                     temp: _temp,

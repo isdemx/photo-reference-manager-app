@@ -466,6 +466,30 @@ class CollageController {
     item.zIndex = maxZIndex;
   }
 
+  void sendBackward(CollagePhotoState item) {
+    if (items.length < 2) return;
+    final sorted = List<CollagePhotoState>.of(items)
+      ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    final index = sorted.indexOf(item);
+    if (index <= 0) return;
+    final below = sorted[index - 1];
+    final tmp = item.zIndex;
+    item.zIndex = below.zIndex;
+    below.zIndex = tmp;
+  }
+
+  void sendForward(CollagePhotoState item) {
+    if (items.length < 2) return;
+    final sorted = List<CollagePhotoState>.of(items)
+      ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    final index = sorted.indexOf(item);
+    if (index == -1 || index >= sorted.length - 1) return;
+    final above = sorted[index + 1];
+    final tmp = item.zIndex;
+    item.zIndex = above.zIndex;
+    above.zIndex = tmp;
+  }
+
   void ensureVideoStateFor(CollagePhotoState item) {
     if (item.photo.mediaType != 'video') return;
     videoStates.putIfAbsent(item.id, () => VideoUi());
@@ -553,6 +577,24 @@ class CollageController {
         ? 0.0
         : (clamped.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
     ui.seekRequestId++;
+  }
+
+  Future<void> toggleActiveVideoPlayPause(int? activeItemIndex) async {
+    if (activeItemIndex == null) return;
+    if (activeItemIndex < 0 || activeItemIndex >= items.length) return;
+
+    final item = items[activeItemIndex];
+    if (item.photo.mediaType != 'video') return;
+
+    final ui = videoStates[item.id];
+    final c = ui?.controller;
+    if (ui == null || c == null || !c.value.isInitialized) return;
+
+    if (c.value.isPlaying) {
+      await c.pause();
+    } else {
+      await c.play();
+    }
   }
 }
 
@@ -643,6 +685,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   PersistentBottomSheetController? _viewZoneSheetController;
   bool _skipViewZoneRestore = false;
   int? _pendingViewZoneIndex;
+  double? _pendingZoomMultiplier;
 
   // --- Delete drag target ---
   Rect _deleteRect = Rect.zero;
@@ -1133,6 +1176,22 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
     if (!mounted) return;
     setState(() {});
+  }
+
+  Future<void> _toggleActiveVideoPlayPause() async {
+    await _controller.toggleActiveVideoPlayPause(_activeItemIndex);
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _zoomByStep(double multiplier) {
+    final current = _collageScale;
+    final next = (current * multiplier).clamp(_minCollageScale, _maxCollageScale);
+    final focal = _canvasViewportSize == Size.zero
+        ? Offset.zero
+        : _canvasViewportSize.center(Offset.zero);
+    _zoomToScale(next, focal);
+    _saveCollageScale(next);
   }
 
   // ----------------------------
@@ -1903,6 +1962,82 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           return KeyEventResult.handled;
         }
 
+        if (event.logicalKey == LogicalKeyboardKey.keyA) {
+          _showAllPhotosSheet();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyZ) {
+          _addViewZone();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyO) {
+          _toggleOverviewMode();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyB) {
+          _showColorPickerDialog();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyS) {
+          _onSaveCollageToDb();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyP) {
+          setState(() => _isPrivate = !_isPrivate);
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.keyI) {
+          _onGenerateCollage();
+          return KeyEventResult.handled;
+        }
+
+        if (event.logicalKey == LogicalKeyboardKey.space) {
+          _toggleActiveVideoPlayPause();
+          return KeyEventResult.handled;
+        }
+
+        final label = event.logicalKey.keyLabel;
+        final isPlus = label == '+' || label == '=';
+        final isMinus = label == '-' || label == '_';
+
+        if (isPlus ||
+            event.logicalKey == LogicalKeyboardKey.equal ||
+            event.logicalKey == LogicalKeyboardKey.numpadAdd) {
+          if (isPlus ||
+              HardwareKeyboard.instance.isShiftPressed ||
+              event.logicalKey == LogicalKeyboardKey.numpadAdd) {
+            if (_showViewZoneOverlay) {
+              _pendingViewZoneIndex = null;
+              _skipViewZoneRestore = false;
+              _pendingZoomMultiplier = 1.1;
+              _viewZoneSheetController?.close();
+            } else {
+              _zoomByStep(1.1);
+            }
+            return KeyEventResult.handled;
+          }
+        }
+
+        if (isMinus ||
+            event.logicalKey == LogicalKeyboardKey.minus ||
+            event.logicalKey == LogicalKeyboardKey.numpadSubtract) {
+          if (_showViewZoneOverlay) {
+            _pendingViewZoneIndex = null;
+            _skipViewZoneRestore = false;
+            _pendingZoomMultiplier = 0.9;
+            _viewZoneSheetController?.close();
+          } else {
+            _zoomByStep(0.9);
+          }
+          return KeyEventResult.handled;
+        }
+
         final shift = HardwareKeyboard.instance.isShiftPressed;
 
         if (event.logicalKey == LogicalKeyboardKey.comma && shift) {
@@ -2148,6 +2283,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         setState(() => editingPhoto.rotation += math.pi / 2),
                     onFlipX: () =>
                         setState(() => editingPhoto.flipX = !editingPhoto.flipX),
+                    onSendBackward: () => _sendItemBackward(editingPhoto),
+                    onBringForward: () => _sendItemForward(editingPhoto),
                     onFlipY: null,
                     onDone: () =>
                         _exitEditingMode(),
@@ -2377,7 +2514,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           surfaceTintColor: Colors.transparent,
         ),
         icon: const Icon(Iconsax.add, color: Colors.white, shadows: iconShadow),
-        tooltip: 'Add photo',
+        tooltip: 'Add photo (A)',
         onPressed: _showAllPhotosSheet,
       ),
       GestureDetector(
@@ -2390,7 +2527,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
           icon: const Icon(Icons.crop_free,
               color: Colors.white, shadows: iconShadow),
-          tooltip: 'Add view zone (hold for list)',
+          tooltip: 'Add view zone (Z, hold for list)',
           onPressed: _addViewZone,
         ),
       ),
@@ -2402,7 +2539,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         ),
         icon:
             const Icon(Icons.grid_view, color: Colors.white, shadows: iconShadow),
-        tooltip: 'Overview mode',
+        tooltip: 'Overview mode (O)',
         onPressed: _toggleOverviewMode,
       ),
       IconButton(
@@ -2413,7 +2550,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         ),
         icon: const Icon(Iconsax.colorfilter,
             color: Colors.white, shadows: iconShadow),
-        tooltip: 'Change background color',
+        tooltip: 'Change background color (B)',
         onPressed: _showColorPickerDialog,
       ),
       IconButton(
@@ -2423,7 +2560,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           surfaceTintColor: Colors.transparent,
         ),
         icon: const Icon(Iconsax.save_2, color: Colors.white, shadows: iconShadow),
-        tooltip: 'Save collage',
+        tooltip: 'Save collage (S)',
         onPressed: _onSaveCollageToDb,
       ),
       IconButton(
@@ -2437,7 +2574,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           color: _isPrivate ? Colors.amber : Colors.white,
           shadows: iconShadow,
         ),
-        tooltip: _isPrivate ? 'Private collage' : 'Public collage',
+        tooltip:
+            _isPrivate ? 'Private collage (P)' : 'Public collage (P)',
         onPressed: () => setState(() => _isPrivate = !_isPrivate),
       ),
       IconButton(
@@ -2448,7 +2586,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         ),
         icon:
             const Icon(Iconsax.image, color: Colors.green, shadows: iconShadow),
-        tooltip: 'Save collage as image',
+        tooltip: 'Save collage as image (I)',
         onPressed: _onGenerateCollage,
       ),
       IconButton(
@@ -2728,6 +2866,20 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
+  void _sendItemBackward(CollagePhotoState item) {
+    if (_overviewMode) return;
+    setState(() {
+      _controller.sendBackward(item);
+    });
+  }
+
+  void _sendItemForward(CollagePhotoState item) {
+    if (_overviewMode) return;
+    setState(() {
+      _controller.sendForward(item);
+    });
+  }
+
   Widget _buildEditableContent(
     CollagePhotoState item,
     double effectiveWidth,
@@ -2872,11 +3024,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final index = digit == 0 ? 9 : digit - 1;
     if (index < 0 || index >= _maxViewZones) return false;
     if (HardwareKeyboard.instance.isShiftPressed) {
-      _setZoneAtIndex(index);
+      if (_showViewZoneOverlay) {
+        _pendingZoomMultiplier = null;
+        _pendingViewZoneIndex = null;
+        _skipViewZoneRestore = false;
+        _setZoneAtIndex(index);
+        _viewZoneSheetController?.close();
+      } else {
+        _setZoneAtIndex(index);
+      }
       return true;
     }
     if (_viewZones[index] == null) return false;
-    _applyViewZone(index);
+    if (_showViewZoneOverlay) {
+      _pendingZoomMultiplier = null;
+      _pendingViewZoneIndex = index;
+      _skipViewZoneRestore = true;
+      _viewZoneSheetController?.close();
+    } else {
+      _applyViewZone(index);
+    }
     return true;
   }
 
@@ -2992,6 +3159,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           final idx = _pendingViewZoneIndex!;
           _skipViewZoneRestore = false;
           _pendingViewZoneIndex = null;
+          _pendingZoomMultiplier = null;
           _preViewZoneMatrix = null;
           _applyViewZone(idx);
         } else {
@@ -3001,6 +3169,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           _preViewZoneMatrix = null;
           _skipViewZoneRestore = false;
           _pendingViewZoneIndex = null;
+          final zoom = _pendingZoomMultiplier;
+          _pendingZoomMultiplier = null;
+          if (zoom != null) {
+            _zoomByStep(zoom);
+          }
         }
         _viewZoneSheetController = null;
       });
@@ -3016,6 +3189,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         _setTransform(_preViewZoneMatrix!);
       }
       _preViewZoneMatrix = null;
+      _pendingViewZoneIndex = null;
+      _pendingZoomMultiplier = null;
+      _skipViewZoneRestore = false;
     });
     _viewZoneSheetController?.close();
     _viewZoneSheetController = null;
@@ -3249,16 +3425,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       child: Builder(
         builder: (context) {
           final baseVisible = (_videoHover[item.id] == true) ||
+              (_controlsHover[item.id] == true) ||
               item.isEditing ||
               isActive;
           final controlsHover = _controlsHover[item.id] == true;
           final show = baseVisible || controlsHover;
 
           return MouseRegion(
-            onEnter: (_) {
-              if (!baseVisible) return;
-              setState(() => _controlsHover[item.id] = true);
-            },
+            onEnter: (_) =>
+                setState(() => _controlsHover[item.id] = true),
             onExit: (_) => setState(() => _controlsHover[item.id] = false),
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 150),
