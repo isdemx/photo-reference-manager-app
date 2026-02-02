@@ -596,8 +596,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   bool _ignoreTransformUpdates = false;
 
   double _collageScale = 1.0;
-  static const double _minCollageScale = 0.05;
-  static const double _maxCollageScale = 6.0;
+  static const double _minCollageScale = 0.9;
+  static const double _maxCollageScale = 60.0;
+  static const double _canvasSizeMultiplier = 10.0;
 
   // --- Items state ---
   late final Map<String, VideoUi> _videoStates = <String, VideoUi>{};
@@ -762,8 +763,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         final saved = await _prefs.loadCollageScale();
         if (!mounted) return;
         if (widget.initialCollage == null) {
-          final size = _currentCanvasSize();
-          final scale = 2.1;
+          final size = _viewportSize();
+          final scale = 5.0;
           final center = Offset(size.width / 2, size.height / 2);
           final translation =
               Offset(center.dx * (1 - scale), center.dy * (1 - scale));
@@ -1486,7 +1487,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     item.cropRect = const Rect.fromLTWH(0, 0, 1, 1);
     item.photo = newPhoto;
 
-    final canvasSize = _currentCanvasSize();
+    final canvasSize = _viewportSize();
     final maxScreenSide = math.min(canvasSize.width, canvasSize.height);
     final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
     final maxAllowedCanvasSide = maxScreenSide / screenScale;
@@ -1508,9 +1509,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _controller.ensureVideoStateFor(item);
   }
 
-  Size _currentCanvasSize() {
+  Size _viewportSize() {
     if (_canvasViewportSize != Size.zero) return _canvasViewportSize;
     return MediaQuery.of(context).size;
+  }
+
+  Size _currentCanvasSize() {
+    final base = _viewportSize();
+    return Size(
+      base.width * _canvasSizeMultiplier,
+      base.height * _canvasSizeMultiplier,
+    );
   }
 
   Offset _screenToCanvas(Offset screen) {
@@ -1559,7 +1568,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Offset _cascadeOffsetForIndex(int index, CollagePhotoState item) {
     const cascadeOffset = 50.0;
     const padding = 20.0;
-    final size = _currentCanvasSize();
+    final size = _viewportSize();
     final screenScale = _collageScale;
     final w = item.baseWidth * item.scale * screenScale;
     final h = item.baseHeight * item.scale * screenScale;
@@ -1575,7 +1584,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   void _fitAndCenterFirstItem(CollagePhotoState item) {
-    final size = _currentCanvasSize();
+    final size = _viewportSize();
     final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
     final scaleW = size.width / (item.baseWidth * screenScale);
     final scaleH = size.height / (item.baseHeight * screenScale);
@@ -1792,7 +1801,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       builder: (context, constraints) {
                         _canvasViewportSize =
                             Size(constraints.maxWidth, constraints.maxHeight);
-                        final canvasSize = _canvasViewportSize;
+                        final canvasSize = _currentCanvasSize();
 
                         return Listener(
                           behavior: HitTestBehavior.opaque,
@@ -2070,18 +2079,19 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   SliderTheme(
                     data: sliderTheme,
                     child: Slider(
-                      min: _minCollageScale,
-                      max: _maxCollageScale,
-                      value: _collageScale
-                          .clamp(_minCollageScale, _maxCollageScale),
-                      onChanged: (val) {
-                        final clamped =
-                            val.clamp(_minCollageScale, _maxCollageScale);
+                      min: 0.0,
+                      max: 1.0,
+                      value: _scaleToSliderValue(
+                        _collageScale
+                            .clamp(_minCollageScale, _maxCollageScale),
+                      ),
+                      onChanged: (t) {
+                        final next = _sliderValueToScale(t);
                         final focal = _canvasViewportSize == Size.zero
                             ? Offset.zero
                             : _canvasViewportSize.center(Offset.zero);
-                        _zoomToScale(clamped, focal);
-                        _saveCollageScale(clamped);
+                        _zoomToScale(next, focal);
+                        _saveCollageScale(next);
                       },
                     ),
                   ),
@@ -2524,7 +2534,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
         ),
         if (item.isEditing) ...[
-          Positioned.fill(child: CustomPaint(painter: _CropBorderPainter())),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _CropBorderPainter(
+                strokeWidth: math.max(0.5, 2 / (_collageScale == 0 ? 1 : _collageScale)),
+              ),
+            ),
+          ),
           ...buildCropHandles(
             item,
             effectiveWidth,
@@ -2540,6 +2556,24 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     const min = -math.pi / 2;
     const max = math.pi / 2;
     return rotation.clamp(min, max);
+  }
+
+  double _scaleToSliderValue(double scale) {
+    final min = _minCollageScale;
+    final max = _maxCollageScale;
+    final clamped = scale.clamp(min, max);
+    final logMin = math.log(min);
+    final logMax = math.log(max);
+    return (math.log(clamped) - logMin) / (logMax - logMin);
+  }
+
+  double _sliderValueToScale(double t) {
+    final min = _minCollageScale;
+    final max = _maxCollageScale;
+    final logMin = math.log(min);
+    final logMax = math.log(max);
+    final clampedT = t.clamp(0.0, 1.0);
+    return math.exp(logMin + (logMax - logMin) * clampedT);
   }
 
   Rect _getItemScreenRect(CollagePhotoState item) {
@@ -2682,13 +2716,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 ////////////////////////////////////////////////////////////////
 
 class _CropBorderPainter extends CustomPainter {
+  final double strokeWidth;
+
+  const _CropBorderPainter({required this.strokeWidth});
+
   @override
   void paint(Canvas canvas, Size size) {
     final r = Offset.zero & size;
     final paint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      ..strokeWidth = strokeWidth;
     canvas.drawRect(r, paint);
   }
 
