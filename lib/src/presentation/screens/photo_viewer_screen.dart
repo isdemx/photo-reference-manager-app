@@ -72,6 +72,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   final GlobalKey _bottomBarKey = GlobalKey();
   double _bottomBarHeightPx = 0.0;
   final GlobalKey _thumbnailsKey = GlobalKey();
+  bool _suppressThumbnailSync = false;
 
   // ------ Фокус для клавиатуры ------
   final FocusNode _focusNode = FocusNode(debugLabel: 'PhotoViewerFocusNode');
@@ -195,19 +196,22 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   // ------------------------------------------------------------------
   Future<void> _scrollThumbnailsToCenter(int index) async {
     final screenWidth = MediaQuery.of(context).size.width;
-    final itemWidth = _miniatureWidth;
+    final itemWidth = _thumbnailWidth;
 
-    final double offset =
-        (index * itemWidth - (screenWidth / 2) + (itemWidth / 2)) +
-            (screenWidth / 2);
+    final double offset = index * itemWidth;
 
     if (_thumbnailScrollController.hasClients) {
+      _suppressThumbnailSync = true;
       _thumbnailScrollController.jumpTo(
         offset.clamp(
           _thumbnailScrollController.position.minScrollExtent,
           _thumbnailScrollController.position.maxScrollExtent,
         ),
       );
+      Future.delayed(const Duration(milliseconds: 1), () {
+        if (!mounted) return;
+        _suppressThumbnailSync = false;
+      });
     }
   }
 
@@ -225,9 +229,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   void _onThumbnailScroll() {
+    if (_suppressThumbnailSync) return;
     if (!isInitScrolling) {
       final screenWidth = MediaQuery.of(context).size.width;
-      final itemWidth = _miniatureWidth;
+      final itemWidth = _thumbnailWidth;
       final scrollOffset = _thumbnailScrollController.offset;
       final double centerPosition =
           (scrollOffset + screenWidth / 2) - (screenWidth / 2);
