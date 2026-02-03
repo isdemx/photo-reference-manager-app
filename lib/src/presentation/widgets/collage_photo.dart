@@ -2101,6 +2101,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         _canvasViewportSize =
                             Size(constraints.maxWidth, constraints.maxHeight);
                         final canvasSize = _currentCanvasSize();
+                        final topInset =
+                            isIOS && !_isFullscreen ? MediaQuery.of(context).padding.top : 0.0;
 
                         return Listener(
                           behavior: HitTestBehavior.opaque,
@@ -2135,64 +2137,75 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                             },
                             child: Stack(
                               children: [
-                                Container(color: Colors.grey[900]),
-                                InteractiveViewer(
-                                  transformationController:
-                                      _transformationController,
-                                  boundaryMargin: const EdgeInsets.all(999999),
-                                  minScale: _minCollageScale,
-                                  maxScale: _maxCollageScale,
-                                  scaleEnabled: false,
-                                  panEnabled: false,
-                                  clipBehavior: Clip.none,
-                                  onInteractionEnd: (_) {
-                                    _setTransform(
-                                        _transformationController.value);
-                                    _saveCollageScale(_collageScale);
-                                  },
-                                  child: IgnorePointer(
-                                    ignoring: _overviewMode,
-                                    child: RepaintBoundary(
-                                      key: _collageKey,
-                                      child: SizedBox(
-                                        width: canvasSize.width,
-                                        height: canvasSize.height,
-                                        child: Stack(
-                                          clipBehavior: Clip.none,
-                                          children: [
-                                            Positioned.fill(
-                                                child: Container(
-                                                    color: _backgroundColor)),
-                                            for (final item in sorted)
-                                              _buildPhotoItem(item),
-                                            if (_showViewZoneOverlay)
-                                              Positioned.fill(
-                                                child: CustomPaint(
-                                                  painter: _ViewZonesPainter(
-                                                    zones: _viewZones,
-                                                    colors: _viewZoneColors,
-                                                    viewportSize:
-                                                        _viewportSize(),
-                                                    strokeWidth: math.max(
-                                                      1.0,
-                                                      2 / (_collageScale == 0
-                                                          ? 1
-                                                          : _collageScale),
+                                Positioned.fill(
+                                  child: Container(color: Colors.grey[900]),
+                                ),
+                                Positioned.fill(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(top: topInset),
+                                    child: InteractiveViewer(
+                                      transformationController:
+                                          _transformationController,
+                                      boundaryMargin:
+                                          const EdgeInsets.all(999999),
+                                      minScale: _minCollageScale,
+                                      maxScale: _maxCollageScale,
+                                      scaleEnabled: false,
+                                      panEnabled: false,
+                                      clipBehavior: Clip.none,
+                                      onInteractionEnd: (_) {
+                                        _setTransform(
+                                            _transformationController.value);
+                                        _saveCollageScale(_collageScale);
+                                      },
+                                      child: IgnorePointer(
+                                        ignoring: _overviewMode,
+                                        child: RepaintBoundary(
+                                          key: _collageKey,
+                                          child: SizedBox(
+                                            width: canvasSize.width,
+                                            height: canvasSize.height,
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                Positioned.fill(
+                                                    child: Container(
+                                                        color:
+                                                            _backgroundColor)),
+                                                for (final item in sorted)
+                                                  _buildPhotoItem(item),
+                                                if (_showViewZoneOverlay)
+                                                  Positioned.fill(
+                                                    child: CustomPaint(
+                                                      painter: _ViewZonesPainter(
+                                                        zones: _viewZones,
+                                                        colors: _viewZoneColors,
+                                                        viewportSize:
+                                                            _viewportSize(),
+                                                        strokeWidth: math.max(
+                                                          1.0,
+                                                          2 / (_collageScale ==
+                                                                  0
+                                                              ? 1
+                                                              : _collageScale),
+                                                        ),
+                                                      ),
                                                     ),
                                                   ),
-                                                ),
-                                              ),
-                                            if (_showViewZoneOverlay)
-                                              Positioned.fill(
-                                                child: GestureDetector(
-                                                  behavior:
-                                                      HitTestBehavior.translucent,
-                                                  onTap: _exitViewZoneOverlay,
-                                                ),
-                                              ),
-                                            if (_showViewZoneOverlay)
-                                              ..._buildViewZoneHandles(),
-                                          ],
+                                                if (_showViewZoneOverlay)
+                                                  Positioned.fill(
+                                                    child: GestureDetector(
+                                                      behavior: HitTestBehavior
+                                                          .translucent,
+                                                      onTap:
+                                                          _exitViewZoneOverlay,
+                                                    ),
+                                                  ),
+                                                if (_showViewZoneOverlay)
+                                                  ..._buildViewZoneHandles(),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
