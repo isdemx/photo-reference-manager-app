@@ -81,6 +81,15 @@ class SharedInboxImportService {
           }
         }
       }
+      final folderIdsRaw = item['folderIds'];
+      final folderIds = <String>[];
+      if (folderIdsRaw is List) {
+        for (final id in folderIdsRaw) {
+          if (id is String && id.isNotEmpty) {
+            folderIds.add(id);
+          }
+        }
+      }
       final originalName = (item['originalName'] as String?) ?? 'shared';
       final comment = (item['comment'] as String?) ?? '';
       final targetName = _resolveUniqueName(
@@ -104,7 +113,7 @@ class SharedInboxImportService {
         path: destPath,
         mediaType: mediaType,
         dateAdded: DateTime.now(),
-        folderIds: [],
+        folderIds: folderIds,
         comment: comment,
         tagIds: tagIds,
         sortOrder: 0,

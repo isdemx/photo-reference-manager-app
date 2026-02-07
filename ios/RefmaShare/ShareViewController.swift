@@ -17,6 +17,13 @@ struct SharedTag {
     let categoryName: String?
 }
 
+struct SharedFolder {
+    let id: String
+    let name: String
+    let categoryId: String?
+    let categoryName: String?
+}
+
 final class ShareItem {
     let provider: NSItemProvider
     let typeIdentifier: String
@@ -433,10 +440,13 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
     private let inboxFolderName = "SharedInbox"
     private let manifestKey = "refma.shared.import.manifest"
     private let sharedTagsKey = "refma.shared.tags.json"
+    private let sharedFoldersKey = "refma.shared.folders.json"
 
     private var shareItems: [ShareItem] = []
     private var sharedTags: [SharedTag] = []
     private var globalTagIds: Set<String> = []
+    private var sharedFolders: [SharedFolder] = []
+    private var globalFolderId: String?
 
     private let headerBlock = UIView()
     private let compressAllContainer = UIView()
@@ -450,6 +460,10 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
     private let tagsStack = UIStackView()
     private let tagsToggleButton = UIButton(type: .system)
 
+    private let albumRow = UIView()
+    private let albumLabel = UILabel()
+    private let albumButton = UIButton(type: .system)
+
     private let tagsOverlayView = UIView()
     private let tagsOverlayPanel = UIView()
     private let tagsOverlayHeader = UIView()
@@ -457,14 +471,25 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
     private let tagsOverlayCloseButton = UIButton(type: .system)
     private let tagsOverlayViewContent = GroupedTagsView()
 
+    private let albumOverlayView = UIView()
+    private let albumOverlayPanel = UIView()
+    private let albumOverlayHeader = UIView()
+    private let albumOverlayTitle = UILabel()
+    private let albumOverlayCloseButton = UIButton(type: .system)
+    private let albumTableView = UITableView(frame: .zero, style: .insetGrouped)
+
     private var tagsTopToCompressConstraint: NSLayoutConstraint?
     private var tagsTopToHeaderConstraint: NSLayoutConstraint?
     private var itemsTableTopToHeaderConstraint: NSLayoutConstraint?
     private var itemsTableTopToSafeConstraint: NSLayoutConstraint?
+    private var albumTopToHeaderConstraint: NSLayoutConstraint?
+    private var albumTopToSafeConstraint: NSLayoutConstraint?
+    private var itemsTableTopToAlbumConstraint: NSLayoutConstraint?
     private var itemsTableBottomToWrapConstraint: NSLayoutConstraint?
     private var itemsTableBottomToAddConstraint: NSLayoutConstraint?
     private var wrapTagsHeightConstraint: NSLayoutConstraint?
     private var itemsTableFixedHeightConstraint: NSLayoutConstraint?
+    private var albumSections: [(String, [SharedFolder])] = []
 
     override func loadView() {
         view = UIView()
@@ -474,6 +499,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         super.viewDidLoad()
         setupUI()
         loadSharedTags()
+        loadSharedFolders()
         loadShareItems()
     }
 
@@ -496,6 +522,8 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         let typeFileURL = kUTTypeFileURL as String
         let typeData = kUTTypeData as String
 
+        let folderIds = globalFolderId == nil ? [] : [globalFolderId!]
+
         for item in items {
             guard let providers = item.attachments else { continue }
             for provider in providers {
@@ -506,7 +534,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeImage, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "image", compress: compress, tagIds: tagIds, comment: comment) {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "image", compress: compress, tagIds: tagIds, comment: comment, folderIds: folderIds) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -517,7 +545,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeMovie, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "video", compress: false, tagIds: [], comment: "") {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: "video", compress: false, tagIds: [], comment: "", folderIds: folderIds) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -528,7 +556,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeFileURL, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false, tagIds: [], comment: "") {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false, tagIds: [], comment: "", folderIds: folderIds) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -539,7 +567,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
                     group.enter()
                     provider.loadItem(forTypeIdentifier: typeData, options: nil) { data, _ in
                         defer { group.leave() }
-                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false, tagIds: [], comment: "") {
+                        if let entry = self.handleLoadedItem(data, mediaTypeHint: nil, compress: false, tagIds: [], comment: "", folderIds: folderIds) {
                             manifestQueue.sync { newEntries.append(entry) }
                         }
                     }
@@ -604,6 +632,25 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         headerBlock.addSubview(tagsLabel)
         headerBlock.addSubview(tagsToggleButton)
         headerBlock.addSubview(tagsScrollView)
+
+        albumRow.translatesAutoresizingMaskIntoConstraints = false
+        albumRow.backgroundColor = .secondarySystemBackground
+        albumRow.layer.cornerRadius = 12
+        albumRow.layer.masksToBounds = true
+
+        albumLabel.translatesAutoresizingMaskIntoConstraints = false
+        albumLabel.text = "Album"
+        albumLabel.font = UIFont.systemFont(ofSize: 13, weight: .semibold)
+        albumLabel.textColor = .secondaryLabel
+
+        albumButton.translatesAutoresizingMaskIntoConstraints = false
+        albumButton.setTitle("Select album", for: .normal)
+        albumButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        albumButton.contentHorizontalAlignment = .right
+        albumButton.addTarget(self, action: #selector(handleShowAlbums), for: .touchUpInside)
+
+        albumRow.addSubview(albumLabel)
+        albumRow.addSubview(albumButton)
 
         tagsTopToCompressConstraint = tagsLabel.topAnchor.constraint(equalTo: compressAllContainer.bottomAnchor, constant: 38)
         tagsTopToHeaderConstraint = tagsLabel.topAnchor.constraint(equalTo: headerBlock.topAnchor, constant: 22)
@@ -673,25 +720,34 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         addButton.addTarget(self, action: #selector(handleAdd), for: .touchUpInside)
 
         view.addSubview(headerBlock)
+        view.addSubview(albumRow)
         view.addSubview(itemsTableView)
         view.addSubview(wrapTagsContainer)
         view.addSubview(addButton)
         setupTagsOverlay()
+        setupAlbumOverlay()
 
-        itemsTableTopToHeaderConstraint = itemsTableView.topAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: 8)
-        itemsTableTopToSafeConstraint = itemsTableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8)
+        itemsTableTopToHeaderConstraint = nil
+        itemsTableTopToSafeConstraint = nil
+        albumTopToHeaderConstraint = albumRow.topAnchor.constraint(equalTo: headerBlock.bottomAnchor, constant: 8)
+        albumTopToSafeConstraint = albumRow.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8)
+        itemsTableTopToAlbumConstraint = itemsTableView.topAnchor.constraint(equalTo: albumRow.bottomAnchor, constant: 8)
         itemsTableBottomToWrapConstraint = itemsTableView.bottomAnchor.constraint(equalTo: wrapTagsContainer.topAnchor, constant: -8)
         itemsTableBottomToAddConstraint = itemsTableView.bottomAnchor.constraint(equalTo: addButton.topAnchor, constant: -8)
         wrapTagsHeightConstraint = wrapTagsContainer.heightAnchor.constraint(equalToConstant: 0)
         itemsTableFixedHeightConstraint = itemsTableView.heightAnchor.constraint(equalToConstant: 220)
 
-        itemsTableTopToHeaderConstraint?.isActive = true
+        albumTopToHeaderConstraint?.isActive = true
+        itemsTableTopToAlbumConstraint?.isActive = true
         itemsTableBottomToWrapConstraint?.isActive = true
 
         NSLayoutConstraint.activate([
             headerBlock.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
             headerBlock.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             headerBlock.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            albumRow.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            albumRow.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
 
             itemsTableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             itemsTableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -712,6 +768,16 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             addButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             addButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
             addButton.heightAnchor.constraint(equalToConstant: 44)
+        ])
+
+        NSLayoutConstraint.activate([
+            albumLabel.leadingAnchor.constraint(equalTo: albumRow.leadingAnchor, constant: 12),
+            albumLabel.centerYAnchor.constraint(equalTo: albumRow.centerYAnchor),
+
+            albumButton.trailingAnchor.constraint(equalTo: albumRow.trailingAnchor, constant: -12),
+            albumButton.leadingAnchor.constraint(greaterThanOrEqualTo: albumLabel.trailingAnchor, constant: 12),
+            albumButton.topAnchor.constraint(equalTo: albumRow.topAnchor, constant: 8),
+            albumButton.bottomAnchor.constraint(equalTo: albumRow.bottomAnchor, constant: -8)
         ])
     }
 
@@ -776,6 +842,74 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         ])
     }
 
+    private func setupAlbumOverlay() {
+        albumOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        albumOverlayView.backgroundColor = .clear
+        albumOverlayView.isHidden = true
+
+        albumOverlayPanel.translatesAutoresizingMaskIntoConstraints = false
+        albumOverlayPanel.backgroundColor = .systemGroupedBackground
+        albumOverlayPanel.layer.cornerRadius = 16
+        albumOverlayPanel.layer.masksToBounds = true
+
+        albumOverlayHeader.translatesAutoresizingMaskIntoConstraints = false
+
+        albumOverlayTitle.translatesAutoresizingMaskIntoConstraints = false
+        albumOverlayTitle.text = "Albums"
+        albumOverlayTitle.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        albumOverlayTitle.textColor = .label
+        albumOverlayTitle.textAlignment = .center
+
+        albumOverlayCloseButton.translatesAutoresizingMaskIntoConstraints = false
+        albumOverlayCloseButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
+        albumOverlayCloseButton.tintColor = .secondaryLabel
+        albumOverlayCloseButton.addTarget(self, action: #selector(handleCloseAlbums), for: .touchUpInside)
+
+        albumTableView.translatesAutoresizingMaskIntoConstraints = false
+        albumTableView.dataSource = self
+        albumTableView.delegate = self
+        albumTableView.rowHeight = UITableView.automaticDimension
+        albumTableView.estimatedRowHeight = 44
+        albumTableView.backgroundColor = .clear
+
+        albumOverlayHeader.addSubview(albumOverlayTitle)
+        albumOverlayHeader.addSubview(albumOverlayCloseButton)
+        albumOverlayPanel.addSubview(albumOverlayHeader)
+        albumOverlayPanel.addSubview(albumTableView)
+        albumOverlayView.addSubview(albumOverlayPanel)
+        view.addSubview(albumOverlayView)
+
+        NSLayoutConstraint.activate([
+            albumOverlayView.topAnchor.constraint(equalTo: view.topAnchor),
+            albumOverlayView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            albumOverlayView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            albumOverlayView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            albumOverlayPanel.topAnchor.constraint(equalTo: albumOverlayView.safeAreaLayoutGuide.topAnchor, constant: 30),
+            albumOverlayPanel.leadingAnchor.constraint(equalTo: albumOverlayView.leadingAnchor, constant: 10),
+            albumOverlayPanel.trailingAnchor.constraint(equalTo: albumOverlayView.trailingAnchor, constant: -10),
+            albumOverlayPanel.bottomAnchor.constraint(equalTo: albumOverlayView.bottomAnchor, constant: -30),
+
+            albumOverlayHeader.topAnchor.constraint(equalTo: albumOverlayPanel.topAnchor),
+            albumOverlayHeader.leadingAnchor.constraint(equalTo: albumOverlayPanel.leadingAnchor),
+            albumOverlayHeader.trailingAnchor.constraint(equalTo: albumOverlayPanel.trailingAnchor),
+            albumOverlayHeader.heightAnchor.constraint(equalToConstant: 52),
+
+            albumOverlayTitle.centerXAnchor.constraint(equalTo: albumOverlayHeader.centerXAnchor),
+            albumOverlayTitle.centerYAnchor.constraint(equalTo: albumOverlayHeader.centerYAnchor),
+
+            albumOverlayCloseButton.trailingAnchor.constraint(equalTo: albumOverlayHeader.trailingAnchor, constant: -16),
+            albumOverlayCloseButton.centerYAnchor.constraint(equalTo: albumOverlayHeader.centerYAnchor),
+            albumOverlayCloseButton.widthAnchor.constraint(equalToConstant: 28),
+            albumOverlayCloseButton.heightAnchor.constraint(equalToConstant: 28),
+
+            albumTableView.leadingAnchor.constraint(equalTo: albumOverlayPanel.leadingAnchor),
+            albumTableView.trailingAnchor.constraint(equalTo: albumOverlayPanel.trailingAnchor),
+            albumTableView.topAnchor.constraint(equalTo: albumOverlayHeader.bottomAnchor),
+            albumTableView.bottomAnchor.constraint(equalTo: albumOverlayPanel.bottomAnchor)
+        ])
+    }
+
     @objc private func handleEndEditing() {
         view.endEditing(true)
     }
@@ -815,6 +949,37 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         updateGroupedTagViews()
     }
 
+    private func loadSharedFolders() {
+        guard let defaults = UserDefaults(suiteName: appGroupId) else { return }
+        guard let json = defaults.string(forKey: sharedFoldersKey),
+              let data = json.data(using: .utf8) else {
+            sharedFolders = []
+            rebuildAlbumSections()
+            updateAlbumButtonTitle()
+            albumTableView.reloadData()
+            return
+        }
+
+        do {
+            let payload = try JSONSerialization.jsonObject(with: data, options: [])
+            if let items = payload as? [[String: Any]] {
+                sharedFolders = items.compactMap { item -> SharedFolder? in
+                    guard let id = item["id"] as? String,
+                          let name = item["name"] as? String else { return nil }
+                    let categoryId = item["categoryId"] as? String
+                    let categoryName = item["categoryName"] as? String
+                    return SharedFolder(id: id, name: name, categoryId: categoryId, categoryName: categoryName)
+                }
+            }
+        } catch {
+            sharedFolders = []
+        }
+
+        rebuildAlbumSections()
+        updateAlbumButtonTitle()
+        albumTableView.reloadData()
+    }
+
     private func reloadTagChips() {
         tagsStack.arrangedSubviews.forEach { view in
             tagsStack.removeArrangedSubview(view)
@@ -840,6 +1005,38 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         tagsOverlayViewContent.onTapTag = wrapTagsView.onTapTag
         wrapTagsView.update(tags: sharedTags, selectedIds: globalTagIds)
         tagsOverlayViewContent.update(tags: sharedTags, selectedIds: globalTagIds)
+    }
+
+    private func rebuildAlbumSections() {
+        let grouped = Dictionary(grouping: sharedFolders) { folder -> String in
+            return folder.categoryName?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                ? folder.categoryName!
+                : "Other"
+        }
+        let sortedCategories = grouped.keys.sorted {
+            $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+        }
+        albumSections = sortedCategories.compactMap { key in
+            guard let folders = grouped[key] else { return nil }
+            return (key, folders.sorted {
+                $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            })
+        }
+    }
+
+    private func updateAlbumButtonTitle() {
+        if sharedFolders.isEmpty {
+            albumButton.setTitle("No albums", for: .normal)
+            albumButton.isEnabled = false
+            return
+        }
+        albumButton.isEnabled = true
+        if let id = globalFolderId,
+           let folder = sharedFolders.first(where: { $0.id == id }) {
+            albumButton.setTitle(folder.name, for: .normal)
+        } else {
+            albumButton.setTitle("Select album", for: .normal)
+        }
     }
 
     private func loadShareItems() {
@@ -924,8 +1121,8 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         headerBlock.isHidden = !hasMultiple
         wrapTagsContainer.isHidden = hasMultiple
 
-        itemsTableTopToHeaderConstraint?.isActive = hasMultiple
-        itemsTableTopToSafeConstraint?.isActive = !hasMultiple
+        albumTopToHeaderConstraint?.isActive = hasMultiple
+        albumTopToSafeConstraint?.isActive = !hasMultiple
 
         itemsTableBottomToWrapConstraint?.isActive = !hasMultiple
         itemsTableBottomToAddConstraint?.isActive = hasMultiple
@@ -998,6 +1195,15 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         tagsOverlayView.isHidden = true
     }
 
+    @objc private func handleShowAlbums() {
+        albumOverlayView.isHidden = false
+        view.bringSubviewToFront(albumOverlayView)
+    }
+
+    @objc private func handleCloseAlbums() {
+        albumOverlayView.isHidden = true
+    }
+
     @objc private func handleAdd() {
         addButton.isEnabled = false
         addButton.alpha = 0.6
@@ -1017,26 +1223,26 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
         return inbox
     }
 
-    private func handleLoadedItem(_ item: NSSecureCoding?, mediaTypeHint: String?, compress: Bool, tagIds: [String], comment: String) -> [String: Any]? {
+    private func handleLoadedItem(_ item: NSSecureCoding?, mediaTypeHint: String?, compress: Bool, tagIds: [String], comment: String, folderIds: [String]) -> [String: Any]? {
         if let url = item as? URL {
-            return copyFile(from: url, mediaTypeHint: mediaTypeHint, compress: compress, tagIds: tagIds, comment: comment)
+            return copyFile(from: url, mediaTypeHint: mediaTypeHint, compress: compress, tagIds: tagIds, comment: comment, folderIds: folderIds)
         }
         if let image = item as? UIImage {
             guard let data = image.pngData() else { return nil }
-            return writeData(data, ext: "png", originalName: "shared.png", mediaType: "image", compress: compress, tagIds: tagIds, comment: comment)
+            return writeData(data, ext: "png", originalName: "shared.png", mediaType: "image", compress: compress, tagIds: tagIds, comment: comment, folderIds: folderIds)
         }
         if let data = item as? Data {
             if mediaTypeHint == "image" {
                 let ext = inferImageExtension(from: data)
                 let name = ext.isEmpty ? "shared" : "shared.\(ext)"
-                return writeData(data, ext: ext.isEmpty ? "img" : ext, originalName: name, mediaType: "image", compress: compress, tagIds: tagIds, comment: comment)
+                return writeData(data, ext: ext.isEmpty ? "img" : ext, originalName: name, mediaType: "image", compress: compress, tagIds: tagIds, comment: comment, folderIds: folderIds)
             }
-            return writeData(data, ext: "bin", originalName: "shared.bin", mediaType: mediaTypeHint ?? "file", compress: compress, tagIds: tagIds, comment: comment)
+            return writeData(data, ext: "bin", originalName: "shared.bin", mediaType: mediaTypeHint ?? "file", compress: compress, tagIds: tagIds, comment: comment, folderIds: folderIds)
         }
         return nil
     }
 
-    private func copyFile(from url: URL, mediaTypeHint: String?, compress: Bool, tagIds: [String], comment: String) -> [String: Any]? {
+    private func copyFile(from url: URL, mediaTypeHint: String?, compress: Bool, tagIds: [String], comment: String, folderIds: [String]) -> [String: Any]? {
         let access = url.startAccessingSecurityScopedResource()
         defer {
             if access { url.stopAccessingSecurityScopedResource() }
@@ -1066,12 +1272,13 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             "mediaType": mediaType,
             "compress": compress,
             "tagIds": tagIds,
+            "folderIds": folderIds,
             "comment": comment,
             "createdAt": Date().timeIntervalSince1970
         ]
     }
 
-    private func writeData(_ data: Data, ext: String, originalName: String, mediaType: String, compress: Bool, tagIds: [String], comment: String) -> [String: Any]? {
+    private func writeData(_ data: Data, ext: String, originalName: String, mediaType: String, compress: Bool, tagIds: [String], comment: String, folderIds: [String]) -> [String: Any]? {
         guard let inbox = appGroupInboxURL() else { return nil }
 
         let targetName = "\(UUID().uuidString).\(ext)"
@@ -1090,6 +1297,7 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
             "mediaType": mediaType,
             "compress": compress,
             "tagIds": tagIds,
+            "folderIds": folderIds,
             "comment": comment,
             "createdAt": Date().timeIntervalSince1970
         ]
@@ -1136,11 +1344,38 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
 
     // MARK: UITableViewDataSource
 
+    func numberOfSections(in tableView: UITableView) -> Int {
+        if tableView == albumTableView {
+            return albumSections.count
+        }
+        return 1
+    }
+
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        if tableView == albumTableView {
+            return albumSections[section].1.count
+        }
         return shareItems.count
     }
 
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        if tableView == albumTableView {
+            return albumSections[section].0
+        }
+        return nil
+    }
+
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if tableView == albumTableView {
+            let cell = tableView.dequeueReusableCell(withIdentifier: "AlbumCell") ??
+                UITableViewCell(style: .subtitle, reuseIdentifier: "AlbumCell")
+            let folder = albumSections[indexPath.section].1[indexPath.row]
+            cell.textLabel?.text = folder.name
+            cell.textLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+            cell.accessoryType = (folder.id == globalFolderId) ? .checkmark : .none
+            return cell
+        }
+
         guard let cell = tableView.dequeueReusableCell(withIdentifier: ShareItemCell.reuseId, for: indexPath) as? ShareItemCell else {
             return UITableViewCell()
         }
@@ -1178,6 +1413,19 @@ class ShareViewController: SLComposeServiceViewController, UITableViewDataSource
     // MARK: UITableViewDelegate
 
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        if tableView == albumTableView {
+            let folder = albumSections[indexPath.section].1[indexPath.row]
+            if globalFolderId == folder.id {
+                globalFolderId = nil
+            } else {
+                globalFolderId = folder.id
+            }
+            updateAlbumButtonTitle()
+            albumTableView.reloadData()
+            albumOverlayView.isHidden = true
+            return
+        }
+
         shareItems[indexPath.row].isExpanded.toggle()
         tableView.beginUpdates()
         tableView.reloadRows(at: [indexPath], with: .none)

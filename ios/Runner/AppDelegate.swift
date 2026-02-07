@@ -101,6 +101,29 @@ import Flutter
         result(FlutterMethodNotImplemented)
       }
     }
+
+    let sharedFoldersChannel = FlutterMethodChannel(
+      name: "refma/shared_folders",
+      binaryMessenger: controller.binaryMessenger
+    )
+    sharedFoldersChannel.setMethodCallHandler { (call, result) in
+      let appGroupId = "group.app.greenmonster.photoreferencemanager"
+      let foldersKey = "refma.shared.folders.json"
+      let defaults = UserDefaults(suiteName: appGroupId)
+
+      switch call.method {
+      case "setFoldersJson":
+        guard let json = call.arguments as? String else {
+          result(false)
+          return
+        }
+        defaults?.set(json, forKey: foldersKey)
+        defaults?.synchronize()
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
     
     // Устанавливаем черный фон для всего окнаr
     window?.backgroundColor = UIColor.black

@@ -49,6 +49,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/migration_o
 import 'package:photographers_reference_app/src/presentation/widgets/app_lock_host.dart';
 
 import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
+import 'package:photographers_reference_app/src/services/shared_folders_sync_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 
@@ -94,6 +95,7 @@ void main(List<String> args) async {
     await TagCategoryRepositoryImpl(tagCategoryBox, tagBox).initializeDefaultTagCategory();
     await SharedTagsSyncService().syncTags(await tagRepository.getTags());
     await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
+    await SharedFoldersSyncService().syncFolders(folderBox.values.toList());
     await PhotoPathHelper().initialize();
 
     // 5) Запуск приложения

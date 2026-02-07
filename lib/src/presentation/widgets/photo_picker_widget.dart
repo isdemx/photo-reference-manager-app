@@ -1055,6 +1055,8 @@ class _EmbeddedPhotoViewer extends StatefulWidget {
 class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
   late int _currentIndex;
   final FocusNode _focusNode = FocusNode();
+  final GlobalKey _bottomBarKey = GlobalKey();
+  double _bottomBarHeight = 0.0;
 
   @override
   void initState() {
@@ -1079,31 +1081,46 @@ class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
       return const SizedBox.shrink();
     }
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _bottomBarKey.currentContext;
+      final box = ctx?.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+      final nextHeight = box.size.height;
+      if ((nextHeight - _bottomBarHeight).abs() < 0.5) return;
+      if (!mounted) return;
+      setState(() => _bottomBarHeight = nextHeight);
+    });
+
     return Positioned.fill(
       child: Container(
         color: Colors.black,
         child: Stack(
           children: [
-            PhotoGalleryCore(
-              photos: widget.photos,
-              initialIndex: _currentIndex,
-              pageViewScrollable: true,
-              miniatureWidth: 20,
-              nonceOf: (_) => 0,
-              isFlipped: false,
-              showThumbnails: false,
-              enableKeyboardNavigation: true,
-              focusNode: _focusNode,
-              autofocus: true,
-              onTap: () {},
-              onIndexChanged: (i) {
-                setState(() => _currentIndex = i);
-                widget.onIndexChanged(i);
-              },
-              onThumbnailTap: (i) {
-                setState(() => _currentIndex = i);
-                widget.onIndexChanged(i);
-              },
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: _bottomBarHeight),
+                child: PhotoGalleryCore(
+                  photos: widget.photos,
+                  initialIndex: _currentIndex,
+                  pageViewScrollable: true,
+                  miniatureWidth: 20,
+                  nonceOf: (_) => 0,
+                  isFlipped: false,
+                  showThumbnails: false,
+                  enableKeyboardNavigation: true,
+                  focusNode: _focusNode,
+                  autofocus: true,
+                  onTap: () {},
+                  onIndexChanged: (i) {
+                    setState(() => _currentIndex = i);
+                    widget.onIndexChanged(i);
+                  },
+                  onThumbnailTap: (i) {
+                    setState(() => _currentIndex = i);
+                    widget.onIndexChanged(i);
+                  },
+                ),
+              ),
             ),
             Positioned(
               top: 0,
@@ -1149,6 +1166,7 @@ class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
               child: SafeArea(
                 top: false,
                 child: Container(
+                  key: _bottomBarKey,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   color: Colors.black54,
