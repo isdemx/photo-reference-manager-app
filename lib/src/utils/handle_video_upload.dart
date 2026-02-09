@@ -48,6 +48,10 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
       print('[Thumb] Error: thumbnail файл 0 байт: $finalThumbnailPath');
       return null;
     }
+    if (!await _isValidJpegFile(outFile)) {
+      print('[Thumb] Error: thumbnail невалидный JPEG: $finalThumbnailPath');
+      return null;
+    }
 
     // 2) Длительность и размер (video_player)
     final c = VideoPlayerController.file(File(video.path));
@@ -68,6 +72,57 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
   }
 }
 
+Future<String?> convertVideoToMp4IfNeeded({
+  required String inputPath,
+  required String outputDir,
+}) async {
+  if (!Platform.isMacOS) return null;
+
+  final ext = p.extension(inputPath).toLowerCase();
+  const needsConvert = ['.avi', '.wmv', '.vmv', '.m4v'];
+  if (!needsConvert.contains(ext)) return null;
+
+  final baseName = p.basenameWithoutExtension(inputPath).trim();
+  final safeBase = baseName.isEmpty ? 'video' : baseName;
+  final outputPath = _uniqueOutputPath(outputDir, safeBase, '.mp4');
+
+  final existing = File(outputPath);
+  if (await existing.exists() && await existing.length() > 0) {
+    return outputPath;
+  }
+
+  final cmd = [
+    '-i ${_q(inputPath)}',
+    '-c:v libx264',
+    '-pix_fmt yuv420p',
+    '-c:a aac',
+    '-movflags +faststart',
+    '-y ${_q(outputPath)}',
+  ].join(' ');
+
+  print('[Convert][FFmpeg] $cmd');
+
+  final session = await FFmpegKit.execute(cmd);
+  final rc = await session.getReturnCode();
+
+  if (!ReturnCode.isSuccess(rc)) {
+    final logs = await session.getLogs();
+    for (final l in logs) {
+      print('[Convert][FFmpeg] ${l.getMessage()}');
+    }
+    print('[Convert][FFmpeg] FAILED rc=$rc');
+    return null;
+  }
+
+  final outFile = File(outputPath);
+  if (!await outFile.exists() || await outFile.length() == 0) {
+    print('[Convert][FFmpeg] Output invalid: $outputPath');
+    return null;
+  }
+
+  return outputPath;
+}
+
 Future<String?> _createThumbnailFileCrossPlatform({
   required String videoPath,
   required String outPath,
@@ -79,9 +134,14 @@ Future<String?> _createThumbnailFileCrossPlatform({
     return null;
   }
 
-  // Если уже есть — не перегенерим
+  // Если уже есть — проверим валидность
   final existing = File(outPath);
-  if (await existing.exists()) return outPath;
+  if (await existing.exists()) {
+    if (await _isValidJpegFile(existing)) {
+      return outPath;
+    }
+    await existing.delete();
+  }
 
   // ✅ macOS: используем FFmpegKit (стабильно, без “плагина для превью”)
   if (Platform.isMacOS) {
@@ -109,6 +169,10 @@ Future<String?> _createThumbnailFileCrossPlatform({
   final genFile = File(generatedPath);
   if (!await genFile.exists()) {
     print('[Thumb] generated thumbnail file not found: $generatedPath');
+    return null;
+  }
+  if (!await _isValidJpegFile(genFile)) {
+    print('[Thumb] generated thumbnail invalid JPEG: $generatedPath');
     return null;
   }
 
@@ -160,11 +224,46 @@ Future<String?> _createThumbnailWithFfmpeg({
     print('[Thumb][FFmpeg] Output is 0 bytes: $outPath');
     return null;
   }
+  if (!await _isValidJpegFile(outFile)) {
+    print('[Thumb][FFmpeg] Output invalid JPEG: $outPath');
+    return null;
+  }
 
   return outPath;
 }
 
 String _q(String s) => '"${s.replaceAll('"', r'\"')}"';
+
+String _uniqueOutputPath(String dir, String baseName, String ext) {
+  String candidate = p.join(dir, '$baseName$ext');
+  int i = 1;
+  while (File(candidate).existsSync()) {
+    candidate = p.join(dir, '$baseName ($i)$ext');
+    i++;
+  }
+  return candidate;
+}
+
+Future<bool> _isValidJpegFile(File file) async {
+  try {
+    if (!await file.exists()) return false;
+    final length = await file.length();
+    if (length < 4) return false;
+    final raf = await file.open();
+    final head = await raf.read(2);
+    await raf.setPosition(length - 2);
+    final tail = await raf.read(2);
+    await raf.close();
+    return head.length == 2 &&
+        tail.length == 2 &&
+        head[0] == 0xFF &&
+        head[1] == 0xD8 &&
+        tail[0] == 0xFF &&
+        tail[1] == 0xD9;
+  } catch (_) {
+    return false;
+  }
+}
 
 String formatDuration(Duration duration) {
   String twoDigits(int n) => n.toString().padLeft(2, '0');

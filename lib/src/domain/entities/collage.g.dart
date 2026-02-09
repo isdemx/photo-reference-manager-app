@@ -40,13 +40,14 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       videoSpeed: fields[20] as double?,
       contrast: (fields[21] as num?)?.toDouble() ?? 1.0,
       opacity: (fields[22] as num?)?.toDouble() ?? 1.0,
+      flipX: fields[23] as bool? ?? false,
     );
   }
 
   @override
   void write(BinaryWriter writer, CollageItem obj) {
     writer
-      ..writeByte(23)
+      ..writeByte(24)
       ..writeByte(0)
       ..write(obj.fileName)
       ..writeByte(1)
@@ -92,7 +93,9 @@ class CollageItemAdapter extends TypeAdapter<CollageItem> {
       ..writeByte(21)
       ..write(obj.contrast)
       ..writeByte(22)
-      ..write(obj.opacity);
+      ..write(obj.opacity)
+      ..writeByte(23)
+      ..write(obj.flipX);
   }
 
   @override
@@ -128,13 +131,14 @@ class CollageAdapter extends TypeAdapter<Collage> {
       canvasOffsetX: fields[8] as double?,
       canvasOffsetY: fields[9] as double?,
       canvasScale: fields[10] as double?,
+      viewZones: (fields[11] as List?)?.cast<CollageViewZoneEntry>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Collage obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -156,7 +160,9 @@ class CollageAdapter extends TypeAdapter<Collage> {
       ..writeByte(9)
       ..write(obj.canvasOffsetY)
       ..writeByte(10)
-      ..write(obj.canvasScale);
+      ..write(obj.canvasScale)
+      ..writeByte(11)
+      ..write(obj.viewZones);
   }
 
   @override
@@ -166,6 +172,49 @@ class CollageAdapter extends TypeAdapter<Collage> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is CollageAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class CollageViewZoneEntryAdapter extends TypeAdapter<CollageViewZoneEntry> {
+  @override
+  final int typeId = 102;
+
+  @override
+  CollageViewZoneEntry read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return CollageViewZoneEntry(
+      index: fields[0] as int,
+      translationX: fields[1] as double,
+      translationY: fields[2] as double,
+      scale: fields[3] as double,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, CollageViewZoneEntry obj) {
+    writer
+      ..writeByte(4)
+      ..writeByte(0)
+      ..write(obj.index)
+      ..writeByte(1)
+      ..write(obj.translationX)
+      ..writeByte(2)
+      ..write(obj.translationY)
+      ..writeByte(3)
+      ..write(obj.scale);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CollageViewZoneEntryAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

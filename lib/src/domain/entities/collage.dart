@@ -72,6 +72,9 @@ class CollageItem extends HiveObject {
   @HiveField(22)
   double opacity;
 
+  @HiveField(23)
+  bool flipX;
+
   CollageItem({
     required this.fileName,
     required this.offsetX,
@@ -96,6 +99,7 @@ class CollageItem extends HiveObject {
     this.videoSpeed,
     this.contrast = 1.0,
     this.opacity = 1.0,
+    this.flipX = false,
   });
 
   factory CollageItem.fromJson(Map<String, dynamic> json) => CollageItem(
@@ -128,6 +132,7 @@ class CollageItem extends HiveObject {
             : null,
         contrast: (json['contrast'] as num?)?.toDouble() ?? 1.0,
         opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
+        flipX: (json['flipX'] as bool?) ?? false,
       );
 
   Map<String, dynamic> toJson() => {
@@ -154,6 +159,45 @@ class CollageItem extends HiveObject {
         'videoSpeed': videoSpeed, // <-- new
         'contrast': contrast,
         'opacity': opacity,
+        'flipX': flipX,
+      };
+}
+
+@HiveType(typeId: 102)
+class CollageViewZoneEntry extends HiveObject {
+  @HiveField(0)
+  int index;
+
+  @HiveField(1)
+  double translationX;
+
+  @HiveField(2)
+  double translationY;
+
+  @HiveField(3)
+  double scale;
+
+  CollageViewZoneEntry({
+    required this.index,
+    required this.translationX,
+    required this.translationY,
+    required this.scale,
+  });
+
+  factory CollageViewZoneEntry.fromJson(Map<String, dynamic> json) {
+    return CollageViewZoneEntry(
+      index: json['index'] as int,
+      translationX: (json['translationX'] as num).toDouble(),
+      translationY: (json['translationY'] as num).toDouble(),
+      scale: (json['scale'] as num).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'index': index,
+        'translationX': translationX,
+        'translationY': translationY,
+        'scale': scale,
       };
 }
 
@@ -192,6 +236,9 @@ class Collage extends HiveObject {
   @HiveField(10)
   double? canvasScale;
 
+  @HiveField(11)
+  List<CollageViewZoneEntry>? viewZones;
+
   Collage(
       {required this.id,
       required this.title,
@@ -203,7 +250,8 @@ class Collage extends HiveObject {
       this.isPrivate,
       this.canvasOffsetX,
       this.canvasOffsetY,
-      this.canvasScale});
+      this.canvasScale,
+      this.viewZones});
 
   factory Collage.fromJson(Map<String, dynamic> json) => Collage(
         id: json['id'],
@@ -223,6 +271,9 @@ class Collage extends HiveObject {
         canvasOffsetX: (json['canvasOffsetX'] as num?)?.toDouble(),
         canvasOffsetY: (json['canvasOffsetY'] as num?)?.toDouble(),
         canvasScale: (json['canvasScale'] as num?)?.toDouble(),
+        viewZones: (json['viewZones'] as List<dynamic>?)
+            ?.map((e) => CollageViewZoneEntry.fromJson(e))
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -237,5 +288,6 @@ class Collage extends HiveObject {
         'canvasOffsetX': canvasOffsetX,
         'canvasOffsetY': canvasOffsetY,
         'canvasScale': canvasScale,
+        'viewZones': viewZones?.map((e) => e.toJson()).toList(),
       };
 }

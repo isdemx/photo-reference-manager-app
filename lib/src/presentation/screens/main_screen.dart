@@ -13,7 +13,6 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/categories_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
-import 'package:photographers_reference_app/src/presentation/widgets/app_drop_target.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/category_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 
@@ -68,9 +67,8 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AppDropTarget(
-      child: Scaffold(
-        appBar: AppBar(
+    return Scaffold(
+      appBar: AppBar(
           // Упрощённый заголовок: логотип + тройной тап для приватного режима
           title: Row(
             mainAxisSize: MainAxisSize.min,
@@ -272,7 +270,6 @@ class _MainScreenState extends State<MainScreen> {
               },
             );
           },
-            ),
       ),
     );
   }

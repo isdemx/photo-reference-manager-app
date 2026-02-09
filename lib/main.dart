@@ -47,11 +47,13 @@ import 'package:photographers_reference_app/src/presentation/screens/upload_scre
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/migration_overlay_host.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/app_lock_host.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/drag_drop_import_overlay.dart';
 
 import 'package:photographers_reference_app/src/services/shared_tags_sync_service.dart';
 import 'package:photographers_reference_app/src/services/shared_folders_sync_service.dart';
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _ratingPromptScheduled = false;
@@ -140,6 +142,7 @@ void _registerAdaptersSafely() {
   safeRegister(() => Hive.registerAdapter(UserSettingsAdapter()));
   safeRegister(() => Hive.registerAdapter(CollageAdapter()));      // typeId = 100
   safeRegister(() => Hive.registerAdapter(CollageItemAdapter()));  // typeId = 101
+  safeRegister(() => Hive.registerAdapter(CollageViewZoneEntryAdapter())); // typeId = 102
   safeRegister(() => Hive.registerAdapter(TagCategoryAdapter()));  // typeId = 200
 }
 
@@ -185,6 +188,10 @@ class MyApp extends StatelessWidget {
         RepositoryProvider(create: (_) => TagRepositoryImpl(tagBox)),
         RepositoryProvider(create: (_) => CollageRepositoryImpl(collageBox)),
         RepositoryProvider(create: (_) => TagCategoryRepositoryImpl(tagCategoryBox, tagBox)),
+        RepositoryProvider(
+          create: (_) => DragDropImportService(),
+          dispose: (service) => service.dispose(),
+        ),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -233,8 +240,10 @@ class MyApp extends StatelessWidget {
               });
             }
             final content = child ?? const SizedBox.shrink();
-            return AppLockHost(
-              child: MigrationOverlayHost(child: content),
+            return DragDropImportOverlay(
+              child: AppLockHost(
+                child: MigrationOverlayHost(child: content),
+              ),
             );
           },
 

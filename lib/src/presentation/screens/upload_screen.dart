@@ -122,11 +122,11 @@ class _UploadScreenState extends State<UploadScreen> {
       final xfile = _images![i];
 
       // Определяем тип файла: фото или видео
-      final mediaType = determineMediaType(xfile.path);
+      final initialMediaType = determineMediaType(xfile.path);
 
       // Считываем геолокацию только если это фотография
       Map<String, double>? geoLocation;
-      if (mediaType == 'image') {
+      if (initialMediaType == 'image') {
         geoLocation = await _getGeoLocation(xfile.path);
       }
 
@@ -138,6 +138,9 @@ class _UploadScreenState extends State<UploadScreen> {
 
       /// 1. Сохраняем оригинальный файл (фото или видео) в постоянную директорию "photos/"
       final savedPath = await _saveFileToPhotosDir(xfile);
+      final resolvedMediaType = determineMediaType(savedPath);
+      final mediaType =
+          resolvedMediaType == 'unknown' ? initialMediaType : resolvedMediaType;
 
       /// 2. Создаём объект Photo и записываем в Hive
       final photo = Photo(
@@ -207,6 +210,14 @@ class _UploadScreenState extends State<UploadScreen> {
 
     if (!photosDir.existsSync()) {
       photosDir.createSync(recursive: true);
+    }
+
+    final convertedPath = await convertVideoToMp4IfNeeded(
+      inputPath: xfile.path,
+      outputDir: photosDir.path,
+    );
+    if (convertedPath != null) {
+      return convertedPath;
     }
 
     // Формируем конечный путь

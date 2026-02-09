@@ -7,7 +7,6 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
-import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -32,8 +31,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/collage_preview_helper.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/collage_save_helper.dart';
-import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
-import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
+import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
 
 import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
@@ -356,6 +354,7 @@ class CollagePersistService {
     required double canvasOffsetX,
     required double canvasOffsetY,
     required double canvasScale,
+    required List<_ViewZone?> viewZones,
   }) async {
     final now = DateTime.now();
 
@@ -386,8 +385,21 @@ class CollagePersistService {
         videoStartFrac: isVideo ? (ui?.startFrac ?? 0.0) : null,
         videoEndFrac: isVideo ? (ui?.endFrac ?? 1.0) : null,
         videoSpeed: isVideo ? (ui?.speed ?? 1.0) : null,
+        flipX: it.flipX,
       );
     }).toList();
+
+    final zoneEntries = <CollageViewZoneEntry>[];
+    for (var i = 0; i < viewZones.length; i++) {
+      final zone = viewZones[i];
+      if (zone == null) continue;
+      zoneEntries.add(CollageViewZoneEntry(
+        index: i,
+        translationX: zone.translation.dx,
+        translationY: zone.translation.dy,
+        scale: zone.scale,
+      ));
+    }
 
     if (existing == null) {
       final collageId = const Uuid().v4();
@@ -413,6 +425,7 @@ class CollagePersistService {
         canvasOffsetX: canvasOffsetX,
         canvasOffsetY: canvasOffsetY,
         canvasScale: canvasScale,
+        viewZones: zoneEntries,
       );
 
       context.read<CollageBloc>().add(AddCollage(newCollage));
@@ -438,6 +451,7 @@ class CollagePersistService {
         canvasOffsetX: canvasOffsetX,
         canvasOffsetY: canvasOffsetY,
         canvasScale: canvasScale,
+        viewZones: zoneEntries,
       );
 
       context.read<CollageBloc>().add(UpdateCollage(updated));
@@ -693,7 +707,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Rect _deleteRect = Rect.zero;
   bool _deleteHover = false;
   int? _draggingIndex; // индекс в _items (не в sorted!)
-  final Map<String, DateTime> _recentlyDropped = <String, DateTime>{};
+  late final DragDropImportService _importService;
 
   // --- Modes ---
   bool _overviewMode = false;
@@ -780,6 +794,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     super.initState();
 
     _isPrivate = widget.initialCollage?.isPrivate ?? false;
+    _importService = context.read<DragDropImportService>();
+    _importService.registerCollageHandler(_handleImportedPhotos);
 
     _controller = CollageController(
       items: _items,
@@ -1054,6 +1070,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           src.cropRectBottom,
         ),
         internalOffset: Offset(src.internalOffsetX, src.internalOffsetY),
+        flipX: src.flipX,
       );
 
       _items.add(item);
@@ -1073,6 +1090,18 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _maxZIndex =
         _items.isEmpty ? 0 : _items.map((e) => e.zIndex).reduce(math.max);
     _controller.maxZIndex = _maxZIndex;
+
+    for (var i = 0; i < _viewZones.length; i++) {
+      _viewZones[i] = null;
+    }
+    final zones = collage.viewZones ?? const <CollageViewZoneEntry>[];
+    for (final zone in zones) {
+      if (zone.index < 0 || zone.index >= _viewZones.length) continue;
+      _viewZones[zone.index] = _ViewZone(
+        translation: Offset(zone.translationX, zone.translationY),
+        scale: zone.scale,
+      );
+    }
 
     setState(() {});
   }
@@ -1505,6 +1534,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
+  Future<void> _handleImportedPhotos(List<Photo> photos) async {
+    if (!mounted) return;
+    for (int i = 0; i < photos.length; i++) {
+      _addPhotoToCollage(photos[i], cascadeIndex: i);
+    }
+  }
+
   Future<void> _onGenerateCollage() async {
     _controller.clearEditing();
     setState(() {});
@@ -1566,6 +1602,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       canvasOffsetY:
           TransformMath.getTranslation(_transformationController.value).dy,
       canvasScale: TransformMath.getScale(_transformationController.value),
+      viewZones: _viewZones,
     );
 
     if (!mounted) return;
@@ -1799,27 +1836,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     item.scale = scale;
     item.offset = _screenToCanvas(screenOffset);
-  }
-
-  bool _shouldSkipDroppedFile(File file) {
-    final now = DateTime.now();
-    _recentlyDropped.removeWhere(
-      (_, ts) => now.difference(ts) > const Duration(seconds: 3),
-    );
-    String key = p.basename(file.path);
-    try {
-      final stat = file.statSync();
-      final name = p.basename(file.path);
-      key = '$name:${stat.size}:${stat.modified.millisecondsSinceEpoch}';
-    } catch (_) {
-      // fallback to basename-only to de-dupe double onDragDone with alias paths
-    }
-    final last = _recentlyDropped[key];
-    if (last != null && now.difference(last) < const Duration(seconds: 2)) {
-      return true;
-    }
-    _recentlyDropped[key] = now;
-    return false;
   }
 
   Size _getNaturalSizeForPhoto(Photo photo) {
@@ -2057,39 +2073,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
         return KeyEventResult.ignored;
       },
-      child: DropTarget(
-        onDragDone: (details) async {
-          for (int i = 0; i < details.files.length; i++) {
-            final xfile = details.files[i];
-            final file = File(xfile.path);
-            if (!file.existsSync()) {
-              continue;
-            }
-            if (_shouldSkipDroppedFile(file)) continue;
-            final bytes = await file.readAsBytes();
-            if (bytes.isEmpty) {
-              continue;
-            }
-            final fileName = p.basename(file.path);
-            final mediaType = getMediaType(file.path);
-
-            final newPhoto = await PhotoSaveHelper.savePhoto(
-              fileName: fileName,
-              bytes: bytes,
-              context: context,
-              mediaType: mediaType,
-            );
-            if (!File(newPhoto.path).existsSync()) {
-              continue;
-            }
-
-            if (!mounted) return;
-            setState(() {
-              _addPhotoToCollage(newPhoto, cascadeIndex: i);
-            });
-          }
-        },
-        child: Scaffold(
+      child: Scaffold(
           key: _scaffoldKey,
           body: Stack(
             children: [
@@ -2446,8 +2430,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   // ----------------------------
@@ -3643,6 +3626,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       WakelockPlus.disable();
     }
+    _importService.unregisterCollageHandler(_handleImportedPhotos);
     _cancelArrowRepeat();
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();

@@ -4,7 +4,16 @@ String determineMediaType(String path) {
   final extension = path_package.extension(path).toLowerCase();
   if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
     return 'image';
-  } else if (['.mp4', '.mov', '.avi', '.mkv'].contains(extension)) {
+  } else if ([
+    '.mp4',
+    '.mov',
+    '.avi',
+    '.mkv',
+    '.m4v',
+    '.webm',
+    '.wmv',
+    '.vmv',
+  ].contains(extension)) {
     return 'video';
   }
   return 'unknown';
