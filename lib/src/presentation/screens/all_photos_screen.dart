@@ -1,15 +1,18 @@
 import 'dart:io';
-import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
-import 'package:photographers_reference_app/src/presentation/helpers/get_media_type.dart';
-import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
+import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
+import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/services/window_service.dart';
 
 class AllPhotosScreen extends StatefulWidget {
   const AllPhotosScreen({Key? key}) : super(key: key);
@@ -19,8 +22,46 @@ class AllPhotosScreen extends StatefulWidget {
 }
 
 class _AllPhotosScreenState extends State<AllPhotosScreen> {
+  static const _prefSidebarOpen = 'macos.sidebar.open';
   bool _filterNotRef = true;
-  bool _dragOver = false;
+  bool _sidebarOpen = true;
+  final GlobalKey<PhotoGridViewState> _gridKey =
+      GlobalKey<PhotoGridViewState>();
+
+  bool get _isDesktop =>
+      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSidebarPref();
+  }
+
+  Future<void> _loadSidebarPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _sidebarOpen = prefs.getBool(_prefSidebarOpen) ?? true;
+    });
+  }
+
+  Future<void> _toggleSidebar() async {
+    final next = !_sidebarOpen;
+    setState(() {
+      _sidebarOpen = next;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefSidebarOpen, next);
+  }
+
+  void _openSettings() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (_) => const SettingsDialog(appVersion: null),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +83,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
 
               // Создаём индекс тегов для быстрого и безопасного доступа
               final Map<String, Tag> tagIndex = {
-                for (final t in tags ?? <Tag>[]) t.id: t,
+                for (final t in tags) t.id: t,
               };
 
               final List<Tag> visibleTags = _filterNotRef
@@ -68,72 +109,131 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                     }).toList()
                   : photoState.photos;
 
-              return DropTarget(
-                onDragDone: (details) async {
-                  for (final xfile in details.files) {
-                    final file = File(xfile.path);
-                    final bytes = await file.readAsBytes();
-                    final fileName = p.basename(file.path);
-                    final mediaType = getMediaType(file.path);
-
-                    final newPhoto = await PhotoSaveHelper.savePhoto(
-                      fileName: fileName,
-                      bytes: bytes,
-                      context: context,
-                      mediaType: mediaType,
-                    );
-                    // PhotoSaveHelper already persists and triggers LoadPhotos.
-                    // Avoid double insert by not dispatching AddPhoto here.
-                  }
-                },
-                onDragEntered: (_) => setState(() => _dragOver = true),
-                onDragExited: (_) => setState(() => _dragOver = false),
-                child: Scaffold(
-                  backgroundColor: _dragOver ? Colors.black12 : null,
-                  body: PhotoGridView(
-                    title: 'Images',
-                    photos: photosFiltered,
-                    tags: visibleTags,
-                    actionFromParent: RawChip(
-                      label: const Text('NOT REF'),
-                      selected: !_filterNotRef,
-                      showCheckmark: false,
-                      avatar: !_filterNotRef
-                          ? const Padding(
-                              padding: EdgeInsets.only(left: 2, right: 2),
-                              child: Icon(
-                                Icons.check,
-                                size: 12,
-                                color: Colors.white,
-                              ),
-                            )
-                          : null,
-                      onSelected: (_) {
-                        setState(() {
-                          _filterNotRef = !_filterNotRef;
-                        });
-                      },
-                      selectedColor: Colors.red.shade600,
-                      backgroundColor: Colors.red.shade300,
-                      labelStyle: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                      visualDensity: const VisualDensity(
-                        horizontal: -2,
-                        vertical: -2,
-                      ),
-                      shape: const StadiumBorder(),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 0,
-                      ),
-                      labelPadding: const EdgeInsets.only(right: 6),
-                    ),
+              final grid = PhotoGridView(
+                key: _gridKey,
+                title: 'Images',
+                photos: photosFiltered,
+                tags: visibleTags,
+                showInternalAppBar: !_isDesktop,
+                actionFromParent: RawChip(
+                  label: const Text('NOT REF'),
+                  selected: !_filterNotRef,
+                  showCheckmark: false,
+                  avatar: !_filterNotRef
+                      ? const Padding(
+                          padding: EdgeInsets.only(left: 2, right: 2),
+                          child: Icon(
+                            Icons.check,
+                            size: 12,
+                            color: Colors.white,
+                          ),
+                        )
+                      : null,
+                  onSelected: (_) {
+                    setState(() {
+                      _filterNotRef = !_filterNotRef;
+                    });
+                  },
+                  selectedColor: Colors.red.shade600,
+                  backgroundColor: Colors.red.shade300,
+                  labelStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
+                  visualDensity: const VisualDensity(
+                    horizontal: -2,
+                    vertical: -2,
+                  ),
+                  shape: const StadiumBorder(),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 0,
+                  ),
+                  labelPadding: const EdgeInsets.only(right: 6),
                 ),
+              );
+
+              return Scaffold(
+                appBar: _isDesktop
+                    ? MacosTopBar(
+                        onToggleSidebar: _toggleSidebar,
+                        onOpenNewWindow: () {
+                          WindowService.openWindow(
+                            route: '/all_photos',
+                            args: {},
+                            title: 'Refma — Images',
+                          );
+                        },
+                        onBack: () => Navigator.of(context).maybePop(),
+                        onForward: () {},
+                        canGoBack: Navigator.of(context).canPop(),
+                        canGoForward: false,
+                        onUpload: () => Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (_, __, ___) => const UploadScreen(),
+                            transitionsBuilder: (_, __, ___, child) => child,
+                          ),
+                        ),
+                        onAllPhotos: () {},
+                        onCollages: () =>
+                            Navigator.pushNamed(context, '/my_collages'),
+                        onTags: () => Navigator.pushNamed(context, '/all_tags'),
+                        onSettings: _openSettings,
+                        rightAfterSettings: _CenterBarIcon(
+                          icon: Icons.filter_list_rounded,
+                          onTap: () => _gridKey.currentState
+                              ?.toggleFilterPanelFromHost(),
+                        ),
+                        title: 'Images',
+                        centerActions: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _CenterBarIcon(
+                              icon: Icons.grid_view_rounded,
+                              onTap: () =>
+                                  _gridKey.currentState?.toggleLayoutFromHost(),
+                            ),
+                            const SizedBox(width: 4),
+                            _CenterBarIcon(
+                              icon: Icons.swap_vert_rounded,
+                              onTap: () => _gridKey.currentState
+                                  ?.toggleSortByFileSizeFromHost(),
+                            ),
+                          ],
+                        ),
+                      )
+                    : null,
+                body: _isDesktop
+                    ? Row(
+                        children: [
+                          AnimatedContainer(
+                            width: _sidebarOpen ? 220 : 0,
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOut,
+                            child: _sidebarOpen
+                                ? MacosSidebar(
+                                    onMain: () => Navigator.of(context)
+                                        .pushAndRemoveUntil(
+                                      MaterialPageRoute(
+                                        builder: (_) => const MainScreen(),
+                                      ),
+                                      (_) => false,
+                                    ),
+                                    onAllPhotos: () {},
+                                    onCollages: () => Navigator.pushNamed(
+                                        context, '/my_collages'),
+                                    onTags: () => Navigator.pushNamed(
+                                        context, '/all_tags'),
+                                  )
+                                : const SizedBox.shrink(),
+                          ),
+                          Expanded(child: grid),
+                        ],
+                      )
+                    : grid,
               );
             } else {
               return const Center(child: Text('Failed to load images.'));
@@ -141,6 +241,29 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
           },
         );
       },
+    );
+  }
+}
+
+class _CenterBarIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _CenterBarIcon({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Icon(icon, size: 15, color: MacosPalette.text),
+      ),
     );
   }
 }

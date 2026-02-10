@@ -1299,7 +1299,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       } else {
         WakelockPlus.disable();
         await windowManager.setTitleBarStyle(
-          TitleBarStyle.normal,
+          TitleBarStyle.hidden,
           windowButtonVisibility: true,
         );
         if (!_wasMaximizedBeforeFullscreen) {

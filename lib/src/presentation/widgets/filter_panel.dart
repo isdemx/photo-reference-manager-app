@@ -53,87 +53,147 @@ class FilterPanel extends StatelessWidget {
               return cat.id.isEmpty ? 'Unknown' : cat.name;
             }
 
-            return Container
-            (
-              padding: const EdgeInsets.all(8.0),
-              color: Colors.black.withOpacity(isMacOS ? 0.9 : 0.27),
+            final panelPadding = isMacOS
+                ? const EdgeInsets.fromLTRB(12, 10, 12, 10)
+                : const EdgeInsets.all(8.0);
+
+            return Container(
+              padding: panelPadding,
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(isMacOS ? 0.82 : 0.27),
+                border: isMacOS
+                    ? Border(
+                        left: BorderSide(
+                          color: Colors.white.withOpacity(0.08),
+                          width: 1,
+                        ),
+                      )
+                    : null,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ---------------- Row: заголовок + OR / AND + Clear
-                  Row(
+                  if (isMacOS) ...[
+                    const Text(
+                      'Filters',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Tap tag to cycle include / exclude / off',
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+
+                  // Header controls
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // const Text(
-                      //   'Tags:',
-                      //   style: TextStyle(color: Colors.white),
-                      // ),
-                      // const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text('OR'),
-                        selected: !useAndMode,
-                        onSelected: (_) => onToggleLogic(),
-                        selectedColor: Colors.blueGrey.shade700,
-                        labelStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                        visualDensity: const VisualDensity(
-                          horizontal: -2,
-                          vertical: -2,
-                        ),
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                        labelPadding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 0,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      ChoiceChip(
-                        label: const Text('AND'),
-                        selected: useAndMode,
-                        onSelected: (_) => onToggleLogic(),
-                        selectedColor: Colors.blueGrey.shade700,
-                        labelStyle: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                        visualDensity: const VisualDensity(
-                          horizontal: -2,
-                          vertical: -2,
-                        ),
-                        materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                        labelPadding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 0,
-                        ),
-                      ),
-                      if (extraAction != null) ...[
-                        const SizedBox(width: 15),
-                        extraAction!,
-                      ],
-                      const Spacer(),
-                      TextButton.icon(
-                        onPressed: () {
-                          context
-                              .read<FilterBloc>()
-                              .add(const ClearFiltersEvent());
-                        },
-                        icon: const Icon(Icons.clear,
-                            size: 16, color: Colors.white70),
-                        label: const Text(
-                          'Clear',
-                          style:
-                              TextStyle(color: Colors.white70, fontSize: 12),
-                        ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Wrap(
+                              spacing: 8,
+                              runSpacing: 6,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white10,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.white12),
+                                  ),
+                                  child: ToggleButtons(
+                                    isSelected: [
+                                      useAndMode == false,
+                                      useAndMode
+                                    ],
+                                    onPressed: (index) {
+                                      final nextAnd = index == 1;
+                                      if (nextAnd != useAndMode) {
+                                        onToggleLogic();
+                                      }
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderColor: Colors.transparent,
+                                    selectedBorderColor: Colors.transparent,
+                                    fillColor: const Color(0xFF2D3542),
+                                    color: Colors.white70,
+                                    selectedColor: Colors.white,
+                                    constraints: const BoxConstraints(
+                                      minHeight: 24,
+                                      minWidth: 30,
+                                    ),
+                                    children: const [
+                                      Padding(
+                                        padding:
+                                            EdgeInsets.symmetric(horizontal: 8),
+                                        child: Text(
+                                          'OR',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding:
+                                            EdgeInsets.symmetric(horizontal: 8),
+                                        child: Text(
+                                          'AND',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (extraAction != null) extraAction!,
+                              ],
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              context
+                                  .read<FilterBloc>()
+                                  .add(const ClearFiltersEvent());
+                            },
+                            icon: const Icon(Icons.clear,
+                                size: 14, color: Colors.white70),
+                            label: const Text(
+                              'Clear',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: const Size(0, 28),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
 
-                  const SizedBox(height: 8.0),
+                  const SizedBox(height: 6.0),
 
-                  // ---------------- Список тегов, сгруппированных по категориям
                   Expanded(
                     child: SingleChildScrollView(
                       child: Column(
@@ -142,14 +202,15 @@ class FilterPanel extends StatelessWidget {
                           // Категории с заголовками
                           for (final entry in grouped.byCat.entries) ...[
                             Padding(
-                              padding: const EdgeInsets.only(
-                                  top: 8, bottom: 4),
+                              padding:
+                                  const EdgeInsets.only(top: 10, bottom: 6),
                               child: Text(
                                 catName(entry.key),
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.62),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ),
@@ -163,6 +224,7 @@ class FilterPanel extends StatelessWidget {
                                 return _TagFilterChip(
                                   tag: tag,
                                   state: tagFilterState,
+                                  isMacOS: isMacOS,
                                   onTap: () {
                                     context.read<FilterBloc>().add(
                                           ToggleFilterEvent(tagId: tag.id),
@@ -175,29 +237,30 @@ class FilterPanel extends StatelessWidget {
 
                           // Без категории
                           if (grouped.uncategorized.isNotEmpty) ...[
-                            const Padding(
+                            Padding(
                               padding:
-                                  EdgeInsets.only(top: 12, bottom: 4),
+                                  const EdgeInsets.only(top: 12, bottom: 6),
                               child: Text(
                                 'No category',
                                 style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.62),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: 0.2,
                                 ),
                               ),
                             ),
                             Wrap(
                               spacing: 8.0,
                               runSpacing: 8.0,
-                              children:
-                                  grouped.uncategorized.map((tag) {
+                              children: grouped.uncategorized.map((tag) {
                                 final tagFilterState =
                                     filterState.filters[tag.id] ??
                                         TagFilterState.undefined;
                                 return _TagFilterChip(
                                   tag: tag,
                                   state: tagFilterState,
+                                  isMacOS: isMacOS,
                                   onTap: () {
                                     context.read<FilterBloc>().add(
                                           ToggleFilterEvent(tagId: tag.id),
@@ -219,65 +282,72 @@ class FilterPanel extends StatelessWidget {
       },
     );
   }
-
-  Color _getBorderColor(TagFilterState state) {
-    switch (state) {
-      case TagFilterState.trueState:
-        return const Color(0xFF4CAF50); // зелёная рамка
-      case TagFilterState.falseState:
-        return const Color(0xFFE53935); // красная рамка
-      case TagFilterState.undefined:
-      default:
-        return Colors.transparent;
-    }
-  }
 }
 
 /// Маленький виджет одного тега-фильтра
 class _TagFilterChip extends StatelessWidget {
   final Tag tag;
   final TagFilterState state;
+  final bool isMacOS;
   final VoidCallback onTap;
 
   const _TagFilterChip({
     required this.tag,
     required this.state,
+    required this.isMacOS,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final borderColor = _borderColor(state);
+    final bgColor = Color.alphaBlend(
+      Colors.black.withOpacity(isMacOS ? 0.25 : 0.0),
+      tag.color,
+    );
+    final chipPad = isMacOS
+        ? const EdgeInsets.symmetric(horizontal: 8, vertical: 5)
+        : const EdgeInsets.symmetric(horizontal: 5, vertical: 2);
 
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 5.0,
-          vertical: 2.0,
-        ),
+      borderRadius: BorderRadius.circular(8),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 130),
+        padding: chipPad,
         decoration: BoxDecoration(
-          color: tag.color,
-          boxShadow: [
-            BoxShadow(
-              color: borderColor,
-              spreadRadius: 2.0,
-              blurRadius: 0.0,
+          color: bgColor,
+          border: Border.all(
+            color: borderColor == Colors.transparent
+                ? Colors.white.withOpacity(0.08)
+                : borderColor,
+            width: borderColor == Colors.transparent ? 0.8 : 1.2,
+          ),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (state != TagFilterState.undefined) ...[
+              Container(
+                width: 6,
+                height: 6,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: borderColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+            Text(
+              tag.name,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.95),
+                fontSize: isMacOS ? 12 : 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
-          border: Border.all(
-            color: borderColor,
-            width: 0.5,
-          ),
-          borderRadius: BorderRadius.circular(8.0),
-        ),
-        child: Text(
-          tag.name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14.0,
-            fontWeight: FontWeight.bold,
-          ),
         ),
       ),
     );
@@ -290,7 +360,6 @@ class _TagFilterChip extends StatelessWidget {
       case TagFilterState.falseState:
         return const Color(0xFFE53935);
       case TagFilterState.undefined:
-      default:
         return Colors.transparent;
     }
   }
@@ -319,10 +388,11 @@ _GroupedTags _groupTagsByCategoryId(List<Tag> all) {
 
   // сортируем по имени внутри категорий
   for (final e in byCat.entries) {
-    e.value.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    e.value
+        .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
   }
-  uncategorized.sort(
-      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+  uncategorized
+      .sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
   // опционально — сортировка по ключу категории
   final sortedByCat = Map<String?, List<Tag>>.fromEntries(

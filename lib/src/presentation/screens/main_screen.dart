@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -15,6 +17,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/categories_
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/category_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
+import 'package:photographers_reference_app/src/presentation/screens/macos_main_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -67,6 +70,9 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!kIsWeb && Platform.isMacOS) {
+      return MacosMainScreen(onOpenSettings: () => _openSettings(context));
+    }
     return Scaffold(
       appBar: AppBar(
           // Упрощённый заголовок: логотип + тройной тап для приватного режима

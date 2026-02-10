@@ -61,23 +61,36 @@ bool _ratingPromptScheduled = false;
 // --------------------- ENTRY ---------------------
 
 void main(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  // ВТОРОЙ движок (новое окно) требует ручной регистрации плагинов
-  DartPluginRegistrant.ensureInitialized();
-
-  // payload, переданный при создании окна
-  final String payload = args.isNotEmpty ? args.first : '{}';
-  final Map<String, dynamic> initialArgs = _safeDecode(payload);
-
-  // Без window_manager в дочерних окнах
-  final bool isChildWindow = ((initialArgs['route'] as String?) ?? '').isNotEmpty;
-  if (!kIsWeb &&
-      (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
-      !isChildWindow) {
-    await windowManager.ensureInitialized();
-  }
-
   runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    // ВТОРОЙ движок (новое окно) требует ручной регистрации плагинов
+    DartPluginRegistrant.ensureInitialized();
+
+    // payload, переданный при создании окна
+    final String payload = args.isNotEmpty ? args.first : '{}';
+    final Map<String, dynamic> initialArgs = _safeDecode(payload);
+
+    // Без window_manager в дочерних окнах
+    final bool isChildWindow = ((initialArgs['route'] as String?) ?? '').isNotEmpty;
+    if (!kIsWeb &&
+        (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
+        !isChildWindow) {
+      await windowManager.ensureInitialized();
+      if (Platform.isMacOS) {
+        try {
+          final windowOptions = WindowOptions(
+            titleBarStyle: TitleBarStyle.hidden,
+            windowButtonVisibility: true,
+            backgroundColor: Colors.transparent,
+          );
+          await windowManager.waitUntilReadyToShow(windowOptions, () async {
+            await windowManager.show();
+            await windowManager.focus();
+          });
+        } catch (_) {}
+      }
+    }
+
     // 1) Hive init
     await Hive.initFlutter();
 
@@ -156,6 +169,21 @@ Map<String, dynamic> _safeDecode(String s) {
   }
 }
 
+class _NoTransitionsBuilder extends PageTransitionsBuilder {
+  const _NoTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    return child;
+  }
+}
+
 // --------------------- APP ---------------------
 
 class MyApp extends StatelessWidget {
@@ -180,6 +208,8 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool noDesktopTransitions =
+        !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider(create: (_) => CategoryRepositoryImpl(categoryBox)),
@@ -224,6 +254,17 @@ class MyApp extends StatelessWidget {
             primaryColor: Colors.black,
             scaffoldBackgroundColor: Colors.black,
             appBarTheme: const AppBarTheme(color: Colors.black),
+            pageTransitionsTheme: noDesktopTransitions
+                ? const PageTransitionsTheme(
+                    builders: {
+                      TargetPlatform.android: _NoTransitionsBuilder(),
+                      TargetPlatform.iOS: _NoTransitionsBuilder(),
+                      TargetPlatform.macOS: _NoTransitionsBuilder(),
+                      TargetPlatform.windows: _NoTransitionsBuilder(),
+                      TargetPlatform.linux: _NoTransitionsBuilder(),
+                    },
+                  )
+                : const PageTransitionsTheme(),
           ),
 
           // Рейтинг-попап — только при «обычном» запуске

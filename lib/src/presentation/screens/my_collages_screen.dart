@@ -1,15 +1,22 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
+import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
+import 'package:photographers_reference_app/src/services/window_service.dart';
 
 class MyCollagesScreen extends StatefulWidget {
   const MyCollagesScreen({Key? key}) : super(key: key);
@@ -19,6 +26,8 @@ class MyCollagesScreen extends StatefulWidget {
 }
 
 class _MyCollagesScreenState extends State<MyCollagesScreen> {
+  static const _prefSidebarOpen = 'macos.sidebar.open';
+
   final _dateFormat = DateFormat('yyyy-MM-dd HH:mm');
   String? _supportDirPath;
 
@@ -26,11 +35,42 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
   double _tileWidth = 160;
   static const double _minTileWidth = 120;
   static const double _maxTileWidth = 360;
+  bool _sidebarOpen = true;
+
+  bool get _isDesktop =>
+      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
   @override
   void initState() {
     super.initState();
+    _loadSidebarPref();
     _loadSupportDir();
+  }
+
+  Future<void> _loadSidebarPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _sidebarOpen = prefs.getBool(_prefSidebarOpen) ?? true;
+    });
+  }
+
+  Future<void> _toggleSidebar() async {
+    final next = !_sidebarOpen;
+    setState(() {
+      _sidebarOpen = next;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefSidebarOpen, next);
+  }
+
+  void _openSettings() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (_) => const SettingsDialog(appVersion: null),
+    );
   }
 
   Future<void> _loadSupportDir() async {
@@ -73,21 +113,93 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
     return null;
   }
 
+  PreferredSizeWidget _desktopTopBar() {
+    return MacosTopBar(
+      onToggleSidebar: _toggleSidebar,
+      onOpenNewWindow: () {
+        WindowService.openWindow(
+          route: '/my_collages',
+          args: {},
+          title: 'Refma - Collages',
+        );
+      },
+      onBack: () => Navigator.of(context).maybePop(),
+      onForward: () {},
+      canGoBack: Navigator.of(context).canPop(),
+      canGoForward: false,
+      onUpload: () => Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const UploadScreen(),
+          transitionsBuilder: (_, __, ___, child) => child,
+        ),
+      ),
+      onAllPhotos: () => Navigator.pushNamed(context, '/all_photos'),
+      onCollages: () {},
+      onTags: () => Navigator.pushNamed(context, '/all_tags'),
+      onSettings: _openSettings,
+      title: 'Collages',
+    );
+  }
+
+  Widget _desktopBody(Widget content) {
+    return Row(
+      children: [
+        AnimatedContainer(
+          width: _sidebarOpen ? 220 : 0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+          child: _sidebarOpen
+              ? MacosSidebar(
+                  onMain: () => Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const MainScreen(),
+                    ),
+                    (_) => false,
+                  ),
+                  onAllPhotos: () =>
+                      Navigator.pushNamed(context, '/all_photos'),
+                  onCollages: () {},
+                  onTags: () => Navigator.pushNamed(context, '/all_tags'),
+                )
+              : const SizedBox.shrink(),
+        ),
+        Expanded(child: content),
+      ],
+    );
+  }
+
+  Widget _buildPageScaffold({
+    required Widget body,
+    Widget? floatingActionButton,
+  }) {
+    if (_isDesktop) {
+      return Scaffold(
+        appBar: _desktopTopBar(),
+        body: _desktopBody(body),
+        floatingActionButton: floatingActionButton,
+      );
+    }
+    return Scaffold(
+      appBar: AppBar(title: const Text('All Collages')),
+      body: body,
+      floatingActionButton: floatingActionButton,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<CollageBloc, CollageState>(
       builder: (context, state) {
         if (state is CollageLoading) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('All Collages')),
+          return _buildPageScaffold(
             body: const Center(child: CircularProgressIndicator()),
           );
         } else if (state is CollagesLoaded) {
           return BlocBuilder<PhotoBloc, PhotoState>(
             builder: (context, photoState) {
               if (photoState is PhotoLoading) {
-                return Scaffold(
-                  appBar: AppBar(title: const Text('All Collages')),
+                return _buildPageScaffold(
                   body: const Center(child: CircularProgressIndicator()),
                 );
               } else if (photoState is PhotoLoaded) {
@@ -106,8 +218,7 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
                     return bDate.compareTo(aDate); // новые первыми
                   });
 
-                return Scaffold(
-                  appBar: AppBar(title: const Text('All Collages')),
+                return _buildPageScaffold(
                   body: collages.isEmpty
                       ? const Center(
                           child: Text('No collages yet'),
@@ -255,21 +366,18 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
                   ),
                 );
               } else {
-                return Scaffold(
-                  appBar: AppBar(title: const Text('All Collages')),
+                return _buildPageScaffold(
                   body: const Center(child: Text('No photos loaded.')),
                 );
               }
             },
           );
         } else if (state is CollageError) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('All Collages')),
+          return _buildPageScaffold(
             body: Center(child: Text('Error: ${state.message}')),
           );
         } else {
-          return Scaffold(
-            appBar: AppBar(title: const Text('All Collages')),
+          return _buildPageScaffold(
             body: const Center(child: Text('No data or unknown state')),
           );
         }

@@ -43,6 +43,7 @@ class PhotoGridView extends StatefulWidget {
   final String title;
   final bool? showShareBtn;
   final bool showFilter;
+  final bool showInternalAppBar;
 
   const PhotoGridView({
     super.key,
@@ -52,13 +53,14 @@ class PhotoGridView extends StatefulWidget {
     required this.title,
     this.showShareBtn,
     this.showFilter = true,
+    this.showInternalAppBar = true,
   });
 
   @override
-  _PhotoGridViewState createState() => _PhotoGridViewState();
+  PhotoGridViewState createState() => PhotoGridViewState();
 }
 
-class _PhotoGridViewState extends State<PhotoGridView> {
+class PhotoGridViewState extends State<PhotoGridView> {
   // ---------------- Multi-select ----------------
   bool _isMultiSelect = false;
   final List<Photo> _selectedPhotos = [];
@@ -187,6 +189,14 @@ class _PhotoGridViewState extends State<PhotoGridView> {
         _fileSizesLoading = false;
       });
     }
+  }
+
+  Future<void> toggleSortByFileSizeFromHost() => _toggleSortByFileSize();
+
+  void toggleLayoutFromHost() => _togglePinterestLayout();
+
+  void toggleFilterPanelFromHost() {
+    setState(() => _showFilterPanel = !_showFilterPanel);
   }
 
   // ---------------- Фильтрация ----------------
@@ -644,86 +654,87 @@ class _PhotoGridViewState extends State<PhotoGridView> {
                   },
                   child: CustomScrollView(
                     slivers: [
-                      SliverAppBar(
-                        backgroundColor: Colors.black.withOpacity(0.5),
-                        pinned: true,
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8.0),
-                                child: GestureDetector(
-                                  onLongPress: () =>
-                                      _showFullTitleBottomSheet(currentTitle),
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const BouncingScrollPhysics(),
-                                    child: Text(
-                                      currentTitle,
-                                      softWrap: false,
-                                      overflow: TextOverflow.visible,
-                                      style: TextStyle(
-                                        color: currentTitleColor,
+                      if (widget.showInternalAppBar)
+                        SliverAppBar(
+                          backgroundColor: Colors.black.withOpacity(0.5),
+                          pinned: true,
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8.0),
+                                  child: GestureDetector(
+                                    onLongPress: () =>
+                                        _showFullTitleBottomSheet(currentTitle),
+                                    child: SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      physics: const BouncingScrollPhysics(),
+                                      child: Text(
+                                        currentTitle,
+                                        softWrap: false,
+                                        overflow: TextOverflow.visible,
+                                        style: TextStyle(
+                                          color: currentTitleColor,
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        actions: !_isMultiSelect
-                            ? [
-                                IconButton(
-                                  icon: Icon(
-                                    _isPinterestLayout
-                                        ? Icons.grid_on
-                                        : Icons.dashboard,
-                                  ),
-                                  onPressed: _togglePinterestLayout,
-                                  tooltip: _isPinterestLayout
-                                      ? 'Switch to Grid View'
-                                      : 'Switch to Masonry View',
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.swap_vert,
-                                    color: _sortByFileSize
-                                        ? Colors.yellow
-                                        : Colors.white,
-                                  ),
-                                  tooltip: 'Sort by file size',
-                                  onPressed: _toggleSortByFileSize,
-                                ),
-                                if (widget.showFilter)
+                            ],
+                          ),
+                          actions: !_isMultiSelect
+                              ? [
                                   IconButton(
                                     icon: Icon(
-                                      Icons.filter_list,
-                                      color: hasActiveFilters
+                                      _isPinterestLayout
+                                          ? Icons.grid_on
+                                          : Icons.dashboard,
+                                    ),
+                                    onPressed: _togglePinterestLayout,
+                                    tooltip: _isPinterestLayout
+                                        ? 'Switch to Grid View'
+                                        : 'Switch to Masonry View',
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.swap_vert,
+                                      color: _sortByFileSize
                                           ? Colors.yellow
                                           : Colors.white,
                                     ),
-                                    onPressed: () => setState(() =>
-                                        _showFilterPanel = !_showFilterPanel),
-                                    tooltip: 'Filters',
+                                    tooltip: 'Sort by file size',
+                                    onPressed: _toggleSortByFileSize,
                                   ),
-                                if (widget.showShareBtn == true)
-                                  IconButton(
-                                    icon: const Icon(Icons.share),
-                                    onPressed: () => ImagesHelpers.sharePhotos(
-                                      context,
-                                      _selectedPhotos,
+                                  if (widget.showFilter)
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.filter_list,
+                                        color: hasActiveFilters
+                                            ? Colors.yellow
+                                            : Colors.white,
+                                      ),
+                                      onPressed: () => setState(() =>
+                                          _showFilterPanel = !_showFilterPanel),
+                                      tooltip: 'Filters',
                                     ),
+                                  if (widget.showShareBtn == true)
+                                    IconButton(
+                                      icon: const Icon(Icons.share),
+                                      onPressed: () => ImagesHelpers.sharePhotos(
+                                        context,
+                                        _selectedPhotos,
+                                      ),
+                                    ),
+                                ]
+                              : [
+                                  IconButton(
+                                    icon: const Icon(Icons.cancel),
+                                    onPressed: _onDonePressed,
                                   ),
-                              ]
-                            : [
-                                IconButton(
-                                  icon: const Icon(Icons.cancel),
-                                  onPressed: _onDonePressed,
-                                ),
-                              ],
-                      ),
+                                ],
+                        ),
                       SliverPadding(
                         padding: EdgeInsets.only(
                           left: 8.0,

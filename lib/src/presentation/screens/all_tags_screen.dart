@@ -1,8 +1,12 @@
 // lib/src/presentation/screens/all_tags_screen.dart
 
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
@@ -14,7 +18,11 @@ import 'package:photographers_reference_app/src/presentation/bloc/tag_category_b
 import 'package:photographers_reference_app/src/presentation/screens/tag_screen.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
-import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
+import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
+import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
+import 'package:photographers_reference_app/src/services/window_service.dart';
 
 class AllTagsScreen extends StatefulWidget {
   const AllTagsScreen({super.key});
@@ -24,19 +32,274 @@ class AllTagsScreen extends StatefulWidget {
 }
 
 class _AllTagsScreenState extends State<AllTagsScreen> {
+  static const _prefSidebarOpen = 'macos.sidebar.open';
+
   Map<String, int> tagPhotoCounts = {};
   bool _manageCategoriesExpanded = true;
+  bool _sidebarOpen = true;
+
+  bool get _isDesktop =>
+      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
 
   @override
   void initState() {
     super.initState();
+    _loadSidebarPref();
     context.read<TagBloc>().add(LoadTags());
     context.read<PhotoBloc>().add(LoadPhotos());
     context.read<TagCategoryBloc>().add(const LoadTagCategories());
   }
 
+  Future<void> _loadSidebarPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _sidebarOpen = prefs.getBool(_prefSidebarOpen) ?? true;
+    });
+  }
+
+  Future<void> _toggleSidebar() async {
+    final next = !_sidebarOpen;
+    setState(() {
+      _sidebarOpen = next;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefSidebarOpen, next);
+  }
+
+  void _openSettings() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (_) => const SettingsDialog(appVersion: null),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final content = MultiBlocListener(
+      listeners: [
+        BlocListener<TagBloc, TagState>(
+          listener: (context, state) {
+            if (state is TagError) {
+              CustomSnackBar.showError(context, state.message);
+            }
+          },
+        ),
+        BlocListener<PhotoBloc, PhotoState>(
+          listener: (context, state) {
+            if (state is PhotoError) {
+              CustomSnackBar.showError(context, state.message);
+            }
+          },
+        ),
+        BlocListener<TagCategoryBloc, TagCategoryState>(
+          listener: (context, state) {
+            if (state is TagCategoryError) {
+              CustomSnackBar.showError(context, state.message);
+            }
+          },
+        ),
+      ],
+      child: BlocBuilder<TagCategoryBloc, TagCategoryState>(
+        builder: (context, catState) {
+          return BlocBuilder<TagBloc, TagState>(
+            builder: (context, tagState) {
+              return BlocBuilder<PhotoBloc, PhotoState>(
+                builder: (context, photoState) {
+                  final bool loading = tagState is TagLoading ||
+                      photoState is PhotoLoading ||
+                      catState is TagCategoryLoading;
+
+                  if (loading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (tagState is! TagLoaded ||
+                      photoState is! PhotoLoaded ||
+                      (catState is! TagCategoryLoaded &&
+                          catState is! TagCategoryInitial)) {
+                    return const Center(child: Text('Failed to load data.'));
+                  }
+
+                  final tags = (tagState as TagLoaded).tags;
+                  final photos = (photoState as PhotoLoaded).photos;
+                  final categories = catState is TagCategoryLoaded
+                      ? catState.categories
+                      : <TagCategory>[];
+
+                  // Подсчёт количества фото на тег
+                  tagPhotoCounts = _computeTagPhotoCounts(tags, photos);
+
+                  // Группировка тегов по категориям
+                  final Map<String?, List<Tag>> grouped = {};
+                  for (final t in tags) {
+                    grouped.putIfAbsent(t.tagCategoryId, () => []).add(t);
+                  }
+
+                  // Сортировка тегов внутри группы по кол-ву фото (desc), затем по имени
+                  for (final entry in grouped.entries) {
+                    entry.value.sort((a, b) {
+                      final ca = tagPhotoCounts[a.id] ?? 0;
+                      final cb = tagPhotoCounts[b.id] ?? 0;
+                      final byCount = cb.compareTo(ca);
+                      return byCount != 0
+                          ? byCount
+                          : a.name
+                              .toLowerCase()
+                              .compareTo(b.name.toLowerCase());
+                    });
+                  }
+
+                  // Порядок секций: категории по sortOrder, затем «Без категории»
+                  final List<_Section> sections = [
+                    for (final c in categories)
+                      _Section(
+                        title: c.name,
+                        categoryId: c.id,
+                        tags: grouped[c.id] ?? const [],
+                      ),
+                    _Section(
+                      title: 'No Category',
+                      categoryId: null,
+                      tags: grouped[null] ?? const [],
+                    ),
+                  ];
+
+                  return CustomScrollView(
+                    slivers: [
+                      // --- Секция управления категориями (CRUD + Reorder) ---
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+                          child: _ManageCategoriesSection(
+                            expanded: _manageCategoriesExpanded,
+                            categories: categories,
+                            onExpandedChanged: (v) =>
+                                setState(() => _manageCategoriesExpanded = v),
+                          ),
+                        ),
+                      ),
+
+                      // --- Секции тегов по категориям ---
+                      for (final s in sections) ...[
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                            child: Row(
+                              children: [
+                                Text(
+                                  s.title,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (s.tags.isEmpty)
+                          const SliverToBoxAdapter(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12.0),
+                              child: Text(
+                                '— Empty —',
+                                style: TextStyle(color: Colors.white54),
+                              ),
+                            ),
+                          )
+                        else
+                          SliverList.separated(
+                            itemCount: s.tags.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              height: 1,
+                              color: Colors.white12,
+                            ),
+                            itemBuilder: (_, i) {
+                              final tag = s.tags[i];
+                              final photoCount = tagPhotoCounts[tag.id] ?? 0;
+                              return _TagListTile(
+                                tag: tag,
+                                photoCount: photoCount,
+                              );
+                            },
+                          ),
+                      ],
+                      const SliverToBoxAdapter(
+                        child: SizedBox(height: 48),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+
+    if (_isDesktop) {
+      return Scaffold(
+        appBar: MacosTopBar(
+          onToggleSidebar: _toggleSidebar,
+          onOpenNewWindow: () {
+            WindowService.openWindow(
+              route: '/all_tags',
+              args: {},
+              title: 'Refma - Tags',
+            );
+          },
+          onBack: () => Navigator.of(context).maybePop(),
+          onForward: () {},
+          canGoBack: Navigator.of(context).canPop(),
+          canGoForward: false,
+          onUpload: () => Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const UploadScreen(),
+              transitionsBuilder: (_, __, ___, child) => child,
+            ),
+          ),
+          onAllPhotos: () => Navigator.pushNamed(context, '/all_photos'),
+          onCollages: () => Navigator.pushNamed(context, '/my_collages'),
+          onTags: () {},
+          onSettings: _openSettings,
+          title: 'Tags',
+          centerActions: _TopCenterAction(
+            icon: Iconsax.add,
+            onTap: () => TagsHelpers.showAddTagDialog(context),
+          ),
+        ),
+        body: Row(
+          children: [
+            AnimatedContainer(
+              width: _sidebarOpen ? 220 : 0,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              child: _sidebarOpen
+                  ? MacosSidebar(
+                      onMain: () => Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const MainScreen(),
+                        ),
+                        (_) => false,
+                      ),
+                      onAllPhotos: () =>
+                          Navigator.pushNamed(context, '/all_photos'),
+                      onCollages: () =>
+                          Navigator.pushNamed(context, '/my_collages'),
+                      onTags: () {},
+                    )
+                  : const SizedBox.shrink(),
+            ),
+            Expanded(child: content),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Tags & Categories'),
@@ -48,167 +311,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
           ),
         ],
       ),
-      body: MultiBlocListener(
-        listeners: [
-          BlocListener<TagBloc, TagState>(
-            listener: (context, state) {
-              if (state is TagError) {
-                CustomSnackBar.showError(context, state.message);
-              }
-            },
-          ),
-          BlocListener<PhotoBloc, PhotoState>(
-            listener: (context, state) {
-              if (state is PhotoError) {
-                CustomSnackBar.showError(context, state.message);
-              }
-            },
-          ),
-          BlocListener<TagCategoryBloc, TagCategoryState>(
-            listener: (context, state) {
-              if (state is TagCategoryError) {
-                CustomSnackBar.showError(context, state.message);
-              }
-            },
-          ),
-        ],
-        child: BlocBuilder<TagCategoryBloc, TagCategoryState>(
-          builder: (context, catState) {
-            return BlocBuilder<TagBloc, TagState>(
-              builder: (context, tagState) {
-                return BlocBuilder<PhotoBloc, PhotoState>(
-                  builder: (context, photoState) {
-                    final bool loading = tagState is TagLoading ||
-                        photoState is PhotoLoading ||
-                        catState is TagCategoryLoading;
-
-                    if (loading) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    if (tagState is! TagLoaded ||
-                        photoState is! PhotoLoaded ||
-                        (catState is! TagCategoryLoaded &&
-                            catState is! TagCategoryInitial)) {
-                      return const Center(child: Text('Failed to load data.'));
-                    }
-
-                    final tags = (tagState as TagLoaded).tags;
-                    final photos = (photoState as PhotoLoaded).photos;
-                    final categories = catState is TagCategoryLoaded
-                        ? catState.categories
-                        : <TagCategory>[];
-
-                    // Подсчёт количества фото на тег
-                    tagPhotoCounts = _computeTagPhotoCounts(tags, photos);
-
-                    // Группировка тегов по категориям
-                    final Map<String?, List<Tag>> grouped = {};
-                    for (final t in tags) {
-                      grouped.putIfAbsent(t.tagCategoryId, () => []).add(t);
-                    }
-
-                    // Сортировка тегов внутри группы по кол-ву фото (desc), затем по имени
-                    for (final entry in grouped.entries) {
-                      entry.value.sort((a, b) {
-                        final ca = tagPhotoCounts[a.id] ?? 0;
-                        final cb = tagPhotoCounts[b.id] ?? 0;
-                        final byCount = cb.compareTo(ca);
-                        return byCount != 0
-                            ? byCount
-                            : a.name
-                                .toLowerCase()
-                                .compareTo(b.name.toLowerCase());
-                      });
-                    }
-
-                    // Порядок секций: категории по sortOrder, затем «Без категории»
-                    final List<_Section> sections = [
-                      for (final c in categories)
-                        _Section(
-                          title: c.name,
-                          categoryId: c.id,
-                          tags: grouped[c.id] ?? const [],
-                        ),
-                      _Section(
-                        title: 'No Category',
-                        categoryId: null,
-                        tags: grouped[null] ?? const [],
-                      ),
-                    ];
-
-                    return CustomScrollView(
-                      slivers: [
-                        // --- Секция управления категориями (CRUD + Reorder) ---
-                        SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                            child: _ManageCategoriesSection(
-                              expanded: _manageCategoriesExpanded,
-                              categories: categories,
-                              onExpandedChanged: (v) =>
-                                  setState(() => _manageCategoriesExpanded = v),
-                            ),
-                          ),
-                        ),
-
-                        // --- Секции тегов по категориям ---
-                        for (final s in sections) ...[
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-                              child: Row(
-                                children: [
-                                  Text(
-                                    s.title,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (s.tags.isEmpty)
-                            const SliverToBoxAdapter(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 12.0),
-                                child: Text(
-                                  '— Empty —',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
-                              ),
-                            )
-                          else
-                            SliverList.separated(
-                              itemCount: s.tags.length,
-                              separatorBuilder: (_, __) => const Divider(
-                                height: 1,
-                                color: Colors.white12,
-                              ),
-                              itemBuilder: (_, i) {
-                                final tag = s.tags[i];
-                                final photoCount = tagPhotoCounts[tag.id] ?? 0;
-                                return _TagListTile(
-                                  tag: tag,
-                                  photoCount: photoCount,
-                                );
-                              },
-                            ),
-                        ],
-                        const SliverToBoxAdapter(
-                          child: SizedBox(height: 48),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-            );
-          },
-        ),
-      ),
+      body: content,
     );
   }
 
@@ -228,6 +331,29 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
   int _categoryOrder(List<TagCategory> cats, String id) {
     final idx = cats.indexWhere((c) => c.id == id);
     return idx >= 0 ? cats[idx].sortOrder : -1;
+  }
+}
+
+class _TopCenterAction extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopCenterAction({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Icon(icon, size: 15, color: MacosPalette.text),
+      ),
+    );
   }
 }
 
