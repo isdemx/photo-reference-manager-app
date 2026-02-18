@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:photographers_reference_app/src/services/biometric_auth_service.dart';
 import 'package:photographers_reference_app/src/services/biometric_settings_service.dart';
 import 'package:photographers_reference_app/src/services/storage_diagnostics_service.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/rating_prompt_handler.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/theme_cubit.dart';
+import 'package:photographers_reference_app/src/services/theme_settings_service.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 import 'package:photographers_reference_app/backup.service.dart';
 
@@ -50,7 +54,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
   Future<void> _toggleBiometric(bool enabled) async {
     if (!_biometricAvailable) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Biometrics not available on this device')),
+        const SnackBar(
+            content: Text('Biometrics not available on this device')),
       );
       return;
     }
@@ -76,6 +81,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = context.appThemeColors;
+    final bool isDark = theme.brightness == Brightness.dark;
+    final textPrimary = colors.text;
+    final textSecondary = colors.subtle;
+    final dividerColor = colors.border;
+    final tileBg = colors.surface;
+    final titleState = context.watch<ThemeCubit>().state;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.zero,
@@ -84,25 +98,25 @@ class _SettingsDialogState extends State<SettingsDialog> {
           width: double.infinity,
           height: double.infinity,
           padding: const EdgeInsets.all(16),
-          color: const Color.fromARGB(255, 10, 10, 10),
+          color: tileBg,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Settings',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                        color: textPrimary,
                       ),
                     ),
                   ),
                   IconButton(
                     tooltip: 'Close',
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    icon: Icon(Icons.close, color: textPrimary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -110,33 +124,108 @@ class _SettingsDialogState extends State<SettingsDialog> {
               const SizedBox(height: 4),
               Text(
                 'Refma: version ${widget.appVersion ?? '-'}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 13,
-                ),
+                style: TextStyle(color: textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 16),
-              const Divider(color: Colors.white12, height: 1),
+              Divider(color: dividerColor, height: 1),
               const SizedBox(height: 8),
               Expanded(
                 child: ListView(
                   children: [
+                    const SizedBox(height: 2),
                     ListTile(
-                      leading: const Icon(
-                        Iconsax.export_3,
-                        color: Colors.white70,
+                      leading: Icon(
+                        Iconsax.sun_1,
+                        color: textSecondary,
                       ),
-                      title: const Text(
-                        'Create a backup',
+                      title: Text(
+                        'Theme',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textPrimary,
                           fontSize: 15,
                         ),
                       ),
-                      subtitle: const Text(
+                      subtitle: Text(
+                        'Dark by default. Switch to Light or Auto',
+                        style: TextStyle(
+                          color: textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: dividerColor),
+                          ),
+                          child: ToggleButtons(
+                            isSelected: [
+                              titleState.preference == AppThemePreference.dark,
+                              titleState.preference == AppThemePreference.light,
+                              titleState.preference ==
+                                  AppThemePreference.system,
+                            ],
+                            onPressed: (index) {
+                              final pref = switch (index) {
+                                0 => AppThemePreference.dark,
+                                1 => AppThemePreference.light,
+                                _ => AppThemePreference.system,
+                              };
+                              context.read<ThemeCubit>().setPreference(pref);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            borderColor: Colors.transparent,
+                            selectedBorderColor: Colors.transparent,
+                            fillColor: isDark
+                                ? colors.surfaceAlt
+                                : theme.colorScheme.surfaceContainerHigh,
+                            color: textSecondary,
+                            selectedColor: textPrimary,
+                            constraints: const BoxConstraints(
+                              minHeight: 30,
+                              minWidth: 72,
+                            ),
+                            children: const [
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: Text('Dark'),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: Text('Light'),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 10),
+                                child: Text('Auto'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Divider(color: dividerColor, height: 1),
+                    ListTile(
+                      leading: Icon(
+                        Iconsax.export_3,
+                        color: textSecondary,
+                      ),
+                      title: Text(
+                        'Create a backup',
+                        style: TextStyle(
+                          color: textPrimary,
+                          fontSize: 15,
+                        ),
+                      ),
+                      subtitle: Text(
                         'Save locally all the data and database',
                         style: TextStyle(
-                          color: Colors.white54,
+                          color: textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -150,23 +239,23 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         });
                       },
                     ),
-                    const Divider(color: Colors.white10, height: 1),
+                    Divider(color: dividerColor, height: 1),
                     ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Iconsax.import_2,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Restore from backup',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textPrimary,
                           fontSize: 15,
                         ),
                       ),
-                      subtitle: const Text(
+                      subtitle: Text(
                         'Import a backup file and restore your data',
                         style: TextStyle(
-                          color: Colors.white54,
+                          color: textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -180,16 +269,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         });
                       },
                     ),
-                    const Divider(color: Colors.white10, height: 1),
+                    Divider(color: dividerColor, height: 1),
                     ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Iconsax.trash,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Clear cache',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textPrimary,
                           fontSize: 15,
                         ),
                       ),
@@ -197,8 +286,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         _cacheLoading
                             ? 'Calculating cache size...'
                             : 'Current cache: ${StorageDiagnosticsService.formatBytes(_cacheSizeBytes)}',
-                        style: const TextStyle(
-                          color: Colors.white54,
+                        style: TextStyle(
+                          color: textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -216,7 +305,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         );
                       },
                     ),
-                    const Divider(color: Colors.white10, height: 1),
+                    Divider(color: dividerColor, height: 1),
                     if (_loading)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 8),
@@ -231,14 +320,15 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     else
                       SwitchListTile(
                         value: _biometricEnabled,
-                        onChanged: _biometricAvailable ? _toggleBiometric : null,
+                        onChanged:
+                            _biometricAvailable ? _toggleBiometric : null,
                         activeColor: const Color.fromARGB(255, 35, 107, 166),
                         contentPadding:
                             const EdgeInsets.symmetric(horizontal: 4),
-                        title: const Text(
+                        title: Text(
                           'Biometric lock',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: textPrimary,
                             fontSize: 15,
                           ),
                         ),
@@ -246,28 +336,28 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           _biometricAvailable
                               ? 'Require Face ID / Touch ID to unlock the app'
                               : 'Biometrics not available on this device',
-                          style: const TextStyle(
-                            color: Colors.white54,
+                          style: TextStyle(
+                            color: textSecondary,
                             fontSize: 12,
                           ),
                         ),
                       ),
                     ListTile(
-                      leading: const Icon(
+                      leading: Icon(
                         Icons.star_rate_rounded,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
-                      title: const Text(
+                      title: Text(
                         'Rate the app',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: textPrimary,
                           fontSize: 15,
                         ),
                       ),
-                      subtitle: const Text(
+                      subtitle: Text(
                         'Leave a quick rating in the App Store',
                         style: TextStyle(
-                          color: Colors.white54,
+                          color: textSecondary,
                           fontSize: 12,
                         ),
                       ),
@@ -281,14 +371,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         });
                       },
                     ),
-                    const Divider(color: Colors.white10, height: 1),
+                    Divider(color: dividerColor, height: 1),
                     const SizedBox(height: 12),
                     Text(
                       'Have a question or feedback?',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 8),
                     Center(
@@ -299,8 +386,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           width: double.infinity,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color.fromARGB(255, 35, 107, 166),
+                              backgroundColor: colors.accent,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10),
                               ),

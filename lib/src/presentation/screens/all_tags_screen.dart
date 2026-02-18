@@ -22,7 +22,9 @@ import 'package:photographers_reference_app/src/presentation/screens/upload_scre
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 import 'package:photographers_reference_app/src/services/window_service.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 class AllTagsScreen extends StatefulWidget {
   const AllTagsScreen({super.key});
@@ -71,7 +73,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
     showDialog(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.7),
+      barrierColor: context.appThemeColors.overlay.withValues(alpha: 0.7),
       builder: (_) => const SettingsDialog(appVersion: null),
     );
   }
@@ -241,6 +243,7 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
     );
 
     if (_isDesktop) {
+      final navHistory = NavigationHistoryService.instance;
       return Scaffold(
         appBar: MacosTopBar(
           onToggleSidebar: _toggleSidebar,
@@ -251,10 +254,10 @@ class _AllTagsScreenState extends State<AllTagsScreen> {
               title: 'Refma - Tags',
             );
           },
-          onBack: () => Navigator.of(context).maybePop(),
-          onForward: () {},
-          canGoBack: Navigator.of(context).canPop(),
-          canGoForward: false,
+          onBack: () => navHistory.goBack(context),
+          onForward: () => navHistory.goForward(context),
+          canGoBack: true,
+          canGoForward: true,
           onUpload: () => Navigator.push(
             context,
             PageRouteBuilder(
@@ -351,7 +354,7 @@ class _TopCenterAction extends StatelessWidget {
       child: SizedBox(
         width: 24,
         height: 24,
-        child: Icon(icon, size: 15, color: MacosPalette.text),
+        child: Icon(icon, size: 15, color: MacosPalette.text(context)),
       ),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 class AddToFolderWidget extends StatelessWidget {
   final List<Photo> photos; // Массив фотографий
@@ -26,7 +27,7 @@ class AddToFolderWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Iconsax.folder_add  , color: Colors.white),
+      icon: Icon(Iconsax.folder_add, color: context.appThemeColors.text),
       onPressed: () => _showFoldersModal(context),
       tooltip: 'Add media to folder',
     );

@@ -17,10 +17,18 @@ import 'package:photographers_reference_app/src/presentation/widgets/photo_edito
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_action_bar.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_gallery_core.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_view.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
+import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
+import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
+import 'package:photographers_reference_app/src/services/window_service.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -32,6 +40,8 @@ class ArrowRightIntent extends Intent {}
 class EscapeIntent extends Intent {}
 
 class BackspaceIntent extends Intent {}
+
+class ToggleViewerChromeIntent extends Intent {}
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<Photo> photos;
@@ -48,6 +58,7 @@ class PhotoViewerScreen extends StatefulWidget {
 }
 
 class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
+  static const _prefSidebarOpen = 'macos.sidebar.open';
   // ---------------- Controllers и переменные ----------------
   late PageController _pageController;
   late ScrollController _thumbnailScrollController;
@@ -77,8 +88,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   // ------ Фокус для клавиатуры ------
   final FocusNode _focusNode = FocusNode(debugLabel: 'PhotoViewerFocusNode');
   bool _preventAutoScroll = false; // поле класса
+  bool _sidebarOpen = true;
 
   int _nonce(Photo p) => _reloadNonce[p.id] ?? 0;
+  bool get _isMacOSDesktop => Platform.isMacOS;
 
   void _bumpNonce(Photo p) {
     _reloadNonce[p.id] = (_reloadNonce[p.id] ?? 0) + 1;
@@ -122,6 +135,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   @override
   void initState() {
     super.initState();
+    _loadSidebarPref();
 
     _currentIndex = widget.initialIndex;
     _miniatureWidth = Platform.isIOS ? 40.0 : 20.0;
@@ -189,6 +203,23 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     }
 
     super.dispose();
+  }
+
+  Future<void> _loadSidebarPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _sidebarOpen = prefs.getBool(_prefSidebarOpen) ?? true;
+    });
+  }
+
+  Future<void> _toggleSidebar() async {
+    final next = !_sidebarOpen;
+    setState(() {
+      _sidebarOpen = next;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefSidebarOpen, next);
   }
 
   // ------------------------------------------------------------------
@@ -466,6 +497,15 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     );
   }
 
+  void _openSettings() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: context.appThemeColors.overlay.withValues(alpha: 0.7),
+      builder: (_) => const SettingsDialog(appVersion: null),
+    );
+  }
+
   Future<void> _overwriteCurrentPhoto(
     Photo photo,
     Uint8List bytes,
@@ -543,6 +583,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     final isSelected = _selectedPhotos.contains(currentPhoto);
     final sizeLabel = _fileSizeLabel(currentPhoto);
     final commentText = (currentPhoto.comment ?? '').trim();
+    final sidebarVisible = _showActions && _sidebarOpen;
     if (_showActions) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _updateBottomBarHeight();
@@ -564,6 +605,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
         LogicalKeySet(LogicalKeyboardKey.arrowRight): ArrowRightIntent(),
         LogicalKeySet(LogicalKeyboardKey.escape): EscapeIntent(),
         LogicalKeySet(LogicalKeyboardKey.backspace): BackspaceIntent(),
+        LogicalKeySet(LogicalKeyboardKey.keyF): ToggleViewerChromeIntent(),
       },
       child: Actions(
         actions: {
@@ -595,181 +637,476 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               return null;
             },
           ),
+          ToggleViewerChromeIntent: CallbackAction<ToggleViewerChromeIntent>(
+            onInvoke: (ToggleViewerChromeIntent intent) {
+              _toggleActions();
+              return null;
+            },
+          ),
         },
         child: Focus(
           focusNode: _focusNode,
           autofocus: true,
+          onKeyEvent: (_, event) {
+            if (event is! KeyDownEvent) return KeyEventResult.ignored;
+            if (event.logicalKey == LogicalKeyboardKey.keyF) {
+              _toggleActions();
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
           child: Scaffold(
-            extendBodyBehindAppBar: true,
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            extendBodyBehindAppBar: !_isMacOSDesktop,
             appBar: _showActions
-                ? AppBar(
-                    backgroundColor: Colors.black.withOpacity(0.5),
-                    elevation: 0,
-                    surfaceTintColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    title: Text(
-                      titleParts.join(' • '),
-                      style: const TextStyle(fontSize: 14.0),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    actions: [
-                      if (_selectPhotoMode)
-                        GestureDetector(
-                          onTap: () => _toggleSelection(currentPhoto),
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 16.0),
-                            child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white,
-                                border: Border.all(
-                                  color: isSelected ? Colors.blue : Colors.grey,
-                                  width: 2,
+                ? (_isMacOSDesktop
+                    ? MacosTopBar(
+                        onToggleSidebar: _toggleSidebar,
+                        onOpenNewWindow: () {
+                          WindowService.openWindow(
+                            route: '/photoById',
+                            args: {'photoId': currentPhoto.id},
+                            title: 'Refma — Viewer',
+                          );
+                        },
+                        onBack: () =>
+                            NavigationHistoryService.instance.goBack(context),
+                        onForward: () => NavigationHistoryService.instance
+                            .goForward(context),
+                        canGoBack: true,
+                        canGoForward: true,
+                        onUpload: () => Navigator.push(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (_, __, ___) => const UploadScreen(),
+                            transitionsBuilder: (_, __, ___, child) => child,
+                          ),
+                        ),
+                        onAllPhotos: () =>
+                            Navigator.pushNamed(context, '/all_photos'),
+                        onCollages: () =>
+                            Navigator.pushNamed(context, '/my_collages'),
+                        onTags: () => Navigator.pushNamed(context, '/all_tags'),
+                        onSettings: _openSettings,
+                        title: 'Viewer',
+                        centerActions: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 380),
+                              child: Text(
+                                titleParts.join(' • '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: MacosPalette.subtle(context),
                                 ),
                               ),
-                              child: isSelected
-                                  ? const Center(
-                                      child: Icon(
-                                        Icons.check,
-                                        size: 16,
-                                        color: Colors.blue,
+                            ),
+                            if (_selectPhotoMode) ...[
+                              const SizedBox(width: 8),
+                              _ViewerTopCircle(
+                                selected: isSelected,
+                                onTap: () => _toggleSelection(currentPhoto),
+                              ),
+                            ],
+                            if (currentPhoto.mediaType == 'image') ...[
+                              const SizedBox(width: 8),
+                              _ViewerTopIcon(
+                                icon: Iconsax.arrange_circle,
+                                onTap: _flipPhoto,
+                              ),
+                            ],
+                          ],
+                        ),
+                      )
+                    : AppBar(
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .surface
+                            .withValues(alpha: 0.75),
+                        elevation: 0,
+                        surfaceTintColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        title: Text(
+                          titleParts.join(' • '),
+                          style: const TextStyle(fontSize: 14.0),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        actions: [
+                          if (_selectPhotoMode)
+                            GestureDetector(
+                              onTap: () => _toggleSelection(currentPhoto),
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 16.0),
+                                child: Container(
+                                  width: 32,
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(
+                                      color: isSelected
+                                          ? Colors.blue
+                                          : Colors.grey,
+                                      width: 2,
+                                    ),
+                                  ),
+                                  child: isSelected
+                                      ? const Center(
+                                          child: Icon(
+                                            Icons.check,
+                                            size: 16,
+                                            color: Colors.blue,
+                                          ),
+                                        )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          if (currentPhoto.mediaType == 'image')
+                            IconButton(
+                              icon: const Icon(Iconsax.arrange_circle),
+                              onPressed: _flipPhoto,
+                            ),
+                        ],
+                      ))
+                : null,
+            body: _isMacOSDesktop
+                ? Row(
+                    children: [
+                      AnimatedContainer(
+                        width: sidebarVisible ? 220 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeOut,
+                        child: sidebarVisible
+                            ? MacosSidebar(
+                                onMain: () =>
+                                    Navigator.of(context).pushAndRemoveUntil(
+                                  MaterialPageRoute(
+                                    builder: (_) => const MainScreen(),
+                                  ),
+                                  (_) => false,
+                                ),
+                                onAllPhotos: () =>
+                                    Navigator.pushNamed(context, '/all_photos'),
+                                onCollages: () => Navigator.pushNamed(
+                                    context, '/my_collages'),
+                                onTags: () =>
+                                    Navigator.pushNamed(context, '/all_tags'),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: _toggleActions,
+                          onTapDown: (_) {
+                            if (!_focusNode.hasFocus) {
+                              _focusNode.requestFocus();
+                            }
+                          },
+                          onLongPress: () {
+                            vibrate();
+                            _enableSelectPhotoMode(!_selectPhotoMode);
+                          },
+                          onVerticalDragEnd: (details) {
+                            if (Platform.isMacOS) return;
+
+                            const double velocityThreshold = 1000;
+                            if (details.primaryVelocity != null &&
+                                details.primaryVelocity!.abs() >
+                                    velocityThreshold) {
+                              _closeWithAnimation(context);
+                            }
+                          },
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: Padding(
+                                  padding: EdgeInsets.only(
+                                    top: _showActions && !_isMacOSDesktop
+                                        ? kToolbarHeight +
+                                            MediaQuery.of(context).padding.top
+                                        : 0,
+                                    bottom: _galleryBottomPadding(
+                                        widget.photos[_currentIndex]),
+                                  ),
+                                  child: PhotoGalleryCore(
+                                    photos: widget.photos,
+                                    initialIndex: _currentIndex,
+                                    pageViewScrollable: _pageViewScrollable,
+                                    miniatureWidth: _miniatureWidth,
+                                    thumbnailWidth: _thumbnailWidth,
+                                    nonceOf: _nonce,
+                                    isFlipped: _isFlipped,
+                                    enableKeyboardNavigation: false,
+                                    pageController: _pageController,
+                                    thumbnailController:
+                                        _thumbnailScrollController,
+                                    thumbnailsKey: _thumbnailsKey,
+                                    showThumbnails:
+                                        _showActions && !Platform.isMacOS,
+                                    scaleStateController: _scaleStateController,
+                                    onTap: _toggleActions,
+                                    onIndexChanged: (index) {
+                                      if (!_preventAutoScroll) {
+                                        _scrollThumbnailsToCenter(index);
+                                      }
+                                      setState(() {
+                                        _currentIndex = index;
+                                        _isFlipped = false;
+                                        _preventAutoScroll = false;
+                                      });
+                                    },
+                                    onThumbnailTap: _onThumbnailTap,
+                                    onThumbnailScrollUpdate: () {
+                                      setState(() {
+                                        _preventAutoScroll = true;
+                                      });
+                                      _onThumbnailScroll();
+                                    },
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: _showActions
+                                    ? (_bottomBarHeightPx > 0
+                                            ? _bottomBarHeightPx + 8
+                                            : 200) -
+                                        (Platform.isIOS ? -50.0 : 0.0)
+                                    : 24,
+                                child: IgnorePointer(
+                                  ignoring: true,
+                                  child: Opacity(
+                                    opacity: commentText.isEmpty ? 0.0 : 1.0,
+                                    child: FractionallySizedBox(
+                                      widthFactor: 0.7,
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 8,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.3),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          commentText,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 13,
+                                            shadows: [
+                                              Shadow(
+                                                color: Colors.black54,
+                                                blurRadius: 6,
+                                                offset: Offset(0, 1),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
                                       ),
-                                    )
-                                  : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              if (_showActions)
+                                Positioned(
+                                  bottom: 0,
+                                  left: 0,
+                                  right: 0,
+                                  child: KeyedSubtree(
+                                    key: _bottomBarKey,
+                                    child: _buildBottomBar(currentPhoto),
+                                  ),
+                                ),
+                              if (_showActions && _isMacOSDesktop)
+                                Positioned(
+                                  top: MacosTopBar.barHeight + 8,
+                                  right: 12,
+                                  child: Material(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .surface
+                                        .withValues(alpha: 0.9),
+                                    borderRadius: BorderRadius.circular(999),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(999),
+                                      onTap: () =>
+                                          Navigator.of(context).maybePop(),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8),
+                                        child: Icon(
+                                          Icons.close,
+                                          size: 16,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : GestureDetector(
+                    onTap: _toggleActions,
+                    onTapDown: (_) {
+                      if (!_focusNode.hasFocus) {
+                        _focusNode.requestFocus();
+                      }
+                    },
+                    onLongPress: () {
+                      vibrate();
+                      _enableSelectPhotoMode(!_selectPhotoMode);
+                    },
+                    onVerticalDragEnd: (details) {
+                      if (Platform.isMacOS) return;
+
+                      const double velocityThreshold = 1000;
+                      if (details.primaryVelocity != null &&
+                          details.primaryVelocity!.abs() > velocityThreshold) {
+                        _closeWithAnimation(context);
+                      }
+                    },
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              top: _showActions && !_isMacOSDesktop
+                                  ? kToolbarHeight +
+                                      MediaQuery.of(context).padding.top
+                                  : 0,
+                              bottom: _galleryBottomPadding(
+                                  widget.photos[_currentIndex]),
+                            ),
+                            child: PhotoGalleryCore(
+                              photos: widget.photos,
+                              initialIndex: _currentIndex,
+                              pageViewScrollable: _pageViewScrollable,
+                              miniatureWidth: _miniatureWidth,
+                              thumbnailWidth: _thumbnailWidth,
+                              nonceOf: _nonce,
+                              isFlipped: _isFlipped,
+                              enableKeyboardNavigation: false,
+                              pageController: _pageController,
+                              thumbnailController: _thumbnailScrollController,
+                              thumbnailsKey: _thumbnailsKey,
+                              showThumbnails: _showActions && !Platform.isMacOS,
+                              scaleStateController: _scaleStateController,
+                              onTap: _toggleActions,
+                              onIndexChanged: (index) {
+                                if (!_preventAutoScroll) {
+                                  _scrollThumbnailsToCenter(index);
+                                }
+                                setState(() {
+                                  _currentIndex = index;
+                                  _isFlipped = false;
+                                  _preventAutoScroll = false;
+                                });
+                              },
+                              onThumbnailTap: _onThumbnailTap,
+                              onThumbnailScrollUpdate: () {
+                                setState(() {
+                                  _preventAutoScroll = true;
+                                });
+                                _onThumbnailScroll();
+                              },
                             ),
                           ),
                         ),
-                      if (currentPhoto.mediaType == 'image')
-                        IconButton(
-                          icon: const Icon(Iconsax.arrange_circle),
-                          onPressed: _flipPhoto,
-                        ),
-                    ],
-                  )
-                : null,
-            body: GestureDetector(
-              onTap: _toggleActions,
-              onLongPress: () {
-                vibrate();
-                _enableSelectPhotoMode(!_selectPhotoMode);
-              },
-              onVerticalDragEnd: (details) {
-                if (Platform.isMacOS) return;
-
-                const double velocityThreshold = 1000;
-                if (details.primaryVelocity != null &&
-                    details.primaryVelocity!.abs() > velocityThreshold) {
-                  _closeWithAnimation(context);
-                }
-              },
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        top: _showActions
-                            ? kToolbarHeight +
-                                MediaQuery.of(context).padding.top
-                            : 0,
-                        bottom:
-                            _galleryBottomPadding(widget.photos[_currentIndex]),
-                      ),
-                      child: PhotoGalleryCore(
-                        photos: widget.photos,
-                        initialIndex: _currentIndex,
-                        pageViewScrollable: _pageViewScrollable,
-                        miniatureWidth: _miniatureWidth,
-                        thumbnailWidth: _thumbnailWidth,
-                        nonceOf: _nonce,
-                        isFlipped: _isFlipped,
-                        enableKeyboardNavigation: false,
-                        pageController: _pageController,
-                        thumbnailController: _thumbnailScrollController,
-                        thumbnailsKey: _thumbnailsKey,
-                        showThumbnails:
-                            _showActions && !Platform.isMacOS,
-                        scaleStateController: _scaleStateController,
-                        onTap: _toggleActions,
-                        onIndexChanged: (index) {
-                          if (!_preventAutoScroll) {
-                            _scrollThumbnailsToCenter(index);
-                          }
-                          setState(() {
-                            _currentIndex = index;
-                            _isFlipped = false;
-                            _preventAutoScroll = false;
-                          });
-                        },
-                        onThumbnailTap: _onThumbnailTap,
-                        onThumbnailScrollUpdate: () {
-                          setState(() {
-                            _preventAutoScroll = true;
-                          });
-                          _onThumbnailScroll();
-                        },
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: _showActions
-                        ? (_bottomBarHeightPx > 0
-                            ? _bottomBarHeightPx + 8
-                            : 200) -
-                            (Platform.isIOS ? -50.0 : 0.0)
-                        : 24,
-                    child: IgnorePointer(
-                      ignoring: true,
-                      child: Opacity(
-                        opacity: commentText.isEmpty ? 0.0 : 1.0,
-                        child: FractionallySizedBox(
-                          widthFactor: 0.7,
-                          alignment: Alignment.centerLeft,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              commentText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black54,
-                                    blurRadius: 6,
-                                    offset: Offset(0, 1),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: _showActions
+                              ? (_bottomBarHeightPx > 0
+                                      ? _bottomBarHeightPx + 8
+                                      : 200) -
+                                  (Platform.isIOS ? -50.0 : 0.0)
+                              : 24,
+                          child: IgnorePointer(
+                            ignoring: true,
+                            child: Opacity(
+                              opacity: commentText.isEmpty ? 0.0 : 1.0,
+                              child: FractionallySizedBox(
+                                widthFactor: 0.7,
+                                alignment: Alignment.centerLeft,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
                                   ),
-                                ],
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    commentText,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      shadows: [
+                                        Shadow(
+                                          color: Colors.black54,
+                                          blurRadius: 6,
+                                          offset: Offset(0, 1),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
+                        if (_showActions)
+                          Positioned(
+                            bottom: 0,
+                            left: 0,
+                            right: 0,
+                            child: KeyedSubtree(
+                              key: _bottomBarKey,
+                              child: _buildBottomBar(currentPhoto),
+                            ),
+                          ),
+                        if (_showActions && _isMacOSDesktop)
+                          Positioned(
+                            top: MacosTopBar.barHeight + 8,
+                            right: 12,
+                            child: Material(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .surface
+                                  .withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(999),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(999),
+                                onTap: () => Navigator.of(context).maybePop(),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Icon(
+                                    Icons.close,
+                                    size: 16,
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  if (_showActions)
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: KeyedSubtree(
-                        key: _bottomBarKey,
-                        child: _buildBottomBar(currentPhoto),
-                      ),
-                    ),
-                ],
-              ),
-            ),
           ),
         ),
       ),
@@ -827,4 +1164,66 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   // Photo gallery and thumbnail rendering are handled by PhotoGalleryCore.
+}
+
+class _ViewerTopIcon extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _ViewerTopIcon({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 24,
+        height: 24,
+        child: Icon(icon, size: 15, color: MacosPalette.text(context)),
+      ),
+    );
+  }
+}
+
+class _ViewerTopCircle extends StatelessWidget {
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ViewerTopCircle({
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        width: 22,
+        height: 22,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Theme.of(context).colorScheme.surface,
+          border: Border.all(
+            color: selected
+                ? Theme.of(context).colorScheme.primary
+                : MacosPalette.subtle(context),
+            width: 1.4,
+          ),
+        ),
+        child: selected
+            ? Icon(
+                Icons.check,
+                size: 12,
+                color: Theme.of(context).colorScheme.primary,
+              )
+            : null,
+      ),
+    );
+  }
 }

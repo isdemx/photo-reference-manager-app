@@ -8,6 +8,7 @@ import 'package:photographers_reference_app/src/domain/entities/tag_category.dar
 
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 class FilterPanel extends StatelessWidget {
   final List<Tag> tags;
@@ -29,6 +30,8 @@ class FilterPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final appColors = context.appThemeColors;
     return BlocBuilder<TagCategoryBloc, TagCategoryState>(
       builder: (context, catState) {
         final categories = catState is TagCategoryLoaded
@@ -60,11 +63,13 @@ class FilterPanel extends StatelessWidget {
             return Container(
               padding: panelPadding,
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(isMacOS ? 0.82 : 0.27),
+                color: isMacOS
+                    ? appColors.surface.withValues(alpha: 0.94)
+                    : appColors.overlay.withValues(alpha: 0.27),
                 border: isMacOS
                     ? Border(
                         left: BorderSide(
-                          color: Colors.white.withOpacity(0.08),
+                          color: appColors.border,
                           width: 1,
                         ),
                       )
@@ -74,19 +79,19 @@ class FilterPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   if (isMacOS) ...[
-                    const Text(
+                    Text(
                       'Filters',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: appColors.text,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 2),
-                    const Text(
+                    Text(
                       'Tap tag to cycle include / exclude / off',
                       style: TextStyle(
-                        color: Colors.white54,
+                        color: appColors.subtle,
                         fontSize: 11,
                         fontWeight: FontWeight.w400,
                       ),
@@ -109,9 +114,10 @@ class FilterPanel extends StatelessWidget {
                               children: [
                                 DecoratedBox(
                                   decoration: BoxDecoration(
-                                    color: Colors.white10,
+                                    color: theme
+                                        .colorScheme.surfaceContainerHighest,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.white12),
+                                    border: Border.all(color: appColors.border),
                                   ),
                                   child: ToggleButtons(
                                     isSelected: [
@@ -128,8 +134,8 @@ class FilterPanel extends StatelessWidget {
                                     borderColor: Colors.transparent,
                                     selectedBorderColor: Colors.transparent,
                                     fillColor: const Color(0xFF2D3542),
-                                    color: Colors.white70,
-                                    selectedColor: Colors.white,
+                                    color: appColors.subtle,
+                                    selectedColor: appColors.text,
                                     constraints: const BoxConstraints(
                                       minHeight: 24,
                                       minWidth: 30,
@@ -170,12 +176,15 @@ class FilterPanel extends StatelessWidget {
                                   .read<FilterBloc>()
                                   .add(const ClearFiltersEvent());
                             },
-                            icon: const Icon(Icons.clear,
-                                size: 14, color: Colors.white70),
-                            label: const Text(
+                            icon: Icon(
+                              Icons.clear,
+                              size: 14,
+                              color: appColors.subtle,
+                            ),
+                            label: Text(
                               'Clear',
                               style: TextStyle(
-                                color: Colors.white70,
+                                color: appColors.subtle,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w400,
                               ),
@@ -207,7 +216,7 @@ class FilterPanel extends StatelessWidget {
                               child: Text(
                                 catName(entry.key),
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.62),
+                                  color: appColors.subtle,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w400,
                                   letterSpacing: 0.2,
@@ -243,7 +252,7 @@ class FilterPanel extends StatelessWidget {
                               child: Text(
                                 'No category',
                                 style: TextStyle(
-                                  color: Colors.white.withOpacity(0.62),
+                                  color: appColors.subtle,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w400,
                                   letterSpacing: 0.2,
@@ -301,8 +310,10 @@ class _TagFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderColor = _borderColor(state);
+    final textColor = context.appThemeColors.text;
+    final borderIdleColor = context.appThemeColors.border;
     final bgColor = Color.alphaBlend(
-      Colors.black.withOpacity(isMacOS ? 0.25 : 0.0),
+      context.appThemeColors.overlay.withValues(alpha: isMacOS ? 0.25 : 0.0),
       tag.color,
     );
     final chipPad = isMacOS
@@ -319,7 +330,7 @@ class _TagFilterChip extends StatelessWidget {
           color: bgColor,
           border: Border.all(
             color: borderColor == Colors.transparent
-                ? Colors.white.withOpacity(0.08)
+                ? borderIdleColor
                 : borderColor,
             width: borderColor == Colors.transparent ? 0.8 : 1.2,
           ),
@@ -342,7 +353,7 @@ class _TagFilterChip extends StatelessWidget {
             Text(
               tag.name,
               style: TextStyle(
-                color: Colors.white.withOpacity(0.95),
+                color: textColor.withValues(alpha: 0.96),
                 fontSize: isMacOS ? 12 : 14,
                 fontWeight: FontWeight.w500,
               ),

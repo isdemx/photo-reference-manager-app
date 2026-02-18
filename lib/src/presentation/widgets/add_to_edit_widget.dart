@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 class AddToEditWidget extends StatelessWidget {
   final VoidCallback onEdit;
@@ -12,10 +13,9 @@ class AddToEditWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(
-      icon: const Icon(Iconsax.edit, color: Colors.white),
+      icon: Icon(Iconsax.edit, color: context.appThemeColors.text),
       onPressed: onEdit,
       tooltip: 'Edit photo',
     );
   }
-
 }

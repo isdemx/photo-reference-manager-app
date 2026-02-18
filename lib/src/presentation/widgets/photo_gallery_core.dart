@@ -131,7 +131,9 @@ class _PhotoGalleryCoreState extends State<PhotoGalleryCore> {
   }
 
   Widget _buildGallery() {
+    final bg = Theme.of(context).scaffoldBackgroundColor;
     return PhotoViewGallery.builder(
+      backgroundDecoration: BoxDecoration(color: bg),
       pageController: _pageController,
       scrollPhysics: widget.pageViewScrollable
           ? const ClampingScrollPhysics()
@@ -189,6 +191,7 @@ class _PhotoGalleryCoreState extends State<PhotoGalleryCore> {
                       )
                     : PhotoView(
                         imageProvider: FileImage(File(fullPath)),
+                        backgroundDecoration: BoxDecoration(color: bg),
                         gaplessPlayback: true,
                         scaleStateController: widget.scaleStateController,
                         loadingBuilder: (context, progress) =>
@@ -253,7 +256,8 @@ class _PhotoGalleryCoreState extends State<PhotoGalleryCore> {
                     margin: const EdgeInsets.symmetric(horizontal: 0.0),
                     child: Image.file(
                       File(thumbPath),
-                      key: ValueKey('thumb_${photo.id}_${widget.nonceOf(photo)}'),
+                      key: ValueKey(
+                          'thumb_${photo.id}_${widget.nonceOf(photo)}'),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -280,8 +284,7 @@ class _PhotoGalleryCoreState extends State<PhotoGalleryCore> {
     if (!_pageController.hasClients) return;
     final current =
         (_pageController.page ?? widget.initialIndex.toDouble()).round();
-    final target =
-        (current + delta).clamp(0, widget.photos.length - 1).toInt();
+    final target = (current + delta).clamp(0, widget.photos.length - 1).toInt();
     if (target == current) return;
     _pageController.animateToPage(
       target,

@@ -35,6 +35,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/presentation/bloc/session_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/bloc/theme_cubit.dart';
 
 import 'package:photographers_reference_app/src/presentation/screens/all_photos_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/all_tags_screen.dart';
@@ -54,6 +55,9 @@ import 'package:photographers_reference_app/src/services/shared_folders_sync_ser
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
+import 'package:photographers_reference_app/src/services/theme_settings_service.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _ratingPromptScheduled = false;
@@ -71,7 +75,8 @@ void main(List<String> args) async {
     final Map<String, dynamic> initialArgs = _safeDecode(payload);
 
     // Без window_manager в дочерних окнах
-    final bool isChildWindow = ((initialArgs['route'] as String?) ?? '').isNotEmpty;
+    final bool isChildWindow =
+        ((initialArgs['route'] as String?) ?? '').isNotEmpty;
     if (!kIsWeb &&
         (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
         !isChildWindow) {
@@ -107,7 +112,8 @@ void main(List<String> args) async {
 
     final tagRepository = TagRepositoryImpl(tagBox);
     await tagRepository.initializeDefaultTags();
-    await TagCategoryRepositoryImpl(tagCategoryBox, tagBox).initializeDefaultTagCategory();
+    await TagCategoryRepositoryImpl(tagCategoryBox, tagBox)
+        .initializeDefaultTagCategory();
     await SharedTagsSyncService().syncTags(await tagRepository.getTags());
     await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
     await SharedFoldersSyncService().syncFolders(folderBox.values.toList());
@@ -151,12 +157,16 @@ void _registerAdaptersSafely() {
   safeRegister(() => Hive.registerAdapter(CategoryAdapter()));
   safeRegister(() => Hive.registerAdapter(FolderAdapter()));
   safeRegister(() => Hive.registerAdapter(PhotoAdapter()));
-  safeRegister(() => Hive.registerAdapter(TagAdapter()));          // @HiveType(typeId: 3)
+  safeRegister(
+      () => Hive.registerAdapter(TagAdapter())); // @HiveType(typeId: 3)
   safeRegister(() => Hive.registerAdapter(UserSettingsAdapter()));
-  safeRegister(() => Hive.registerAdapter(CollageAdapter()));      // typeId = 100
-  safeRegister(() => Hive.registerAdapter(CollageItemAdapter()));  // typeId = 101
-  safeRegister(() => Hive.registerAdapter(CollageViewZoneEntryAdapter())); // typeId = 102
-  safeRegister(() => Hive.registerAdapter(TagCategoryAdapter()));  // typeId = 200
+  safeRegister(() => Hive.registerAdapter(CollageAdapter())); // typeId = 100
+  safeRegister(
+      () => Hive.registerAdapter(CollageItemAdapter())); // typeId = 101
+  safeRegister(() =>
+      Hive.registerAdapter(CollageViewZoneEntryAdapter())); // typeId = 102
+  safeRegister(
+      () => Hive.registerAdapter(TagCategoryAdapter())); // typeId = 200
 }
 
 Map<String, dynamic> _safeDecode(String s) {
@@ -217,7 +227,8 @@ class MyApp extends StatelessWidget {
         RepositoryProvider(create: (_) => PhotoRepositoryImpl(photoBox)),
         RepositoryProvider(create: (_) => TagRepositoryImpl(tagBox)),
         RepositoryProvider(create: (_) => CollageRepositoryImpl(collageBox)),
-        RepositoryProvider(create: (_) => TagCategoryRepositoryImpl(tagCategoryBox, tagBox)),
+        RepositoryProvider(
+            create: (_) => TagCategoryRepositoryImpl(tagCategoryBox, tagBox)),
         RepositoryProvider(
           create: (_) => DragDropImportService(),
           dispose: (service) => service.dispose(),
@@ -225,36 +236,47 @@ class MyApp extends StatelessWidget {
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider(create: (ctx) => CategoryBloc(
-            categoryRepository: RepositoryProvider.of<CategoryRepositoryImpl>(ctx),
-          )..add(LoadCategories())),
-          BlocProvider(create: (ctx) => FolderBloc(
-            folderRepository: RepositoryProvider.of<FolderRepositoryImpl>(ctx),
-          )..add(LoadFolders())),
-          BlocProvider(create: (ctx) => PhotoBloc(
-            photoRepository: RepositoryProvider.of<PhotoRepositoryImpl>(ctx),
-          )..add(LoadPhotos())),
-          BlocProvider(create: (ctx) => TagBloc(
-            tagRepository: RepositoryProvider.of<TagRepositoryImpl>(ctx),
-          )..add(LoadTags())),
+          BlocProvider(
+              create: (ctx) => CategoryBloc(
+                    categoryRepository:
+                        RepositoryProvider.of<CategoryRepositoryImpl>(ctx),
+                  )..add(LoadCategories())),
+          BlocProvider(
+              create: (ctx) => FolderBloc(
+                    folderRepository:
+                        RepositoryProvider.of<FolderRepositoryImpl>(ctx),
+                  )..add(LoadFolders())),
+          BlocProvider(
+              create: (ctx) => PhotoBloc(
+                    photoRepository:
+                        RepositoryProvider.of<PhotoRepositoryImpl>(ctx),
+                  )..add(LoadPhotos())),
+          BlocProvider(
+              create: (ctx) => TagBloc(
+                    tagRepository:
+                        RepositoryProvider.of<TagRepositoryImpl>(ctx),
+                  )..add(LoadTags())),
           BlocProvider(create: (_) => SessionBloc()),
           BlocProvider(create: (_) => FilterBloc()),
-          BlocProvider(create: (ctx) => CollageBloc(
-            collageRepository: RepositoryProvider.of<CollageRepositoryImpl>(ctx),
-          )..add(LoadCollages())),
-          BlocProvider(create: (ctx) => TagCategoryBloc(
-            tagCategoryRepository: RepositoryProvider.of<TagCategoryRepositoryImpl>(ctx),
-          )..add(const LoadTagCategories())),
+          BlocProvider(
+              create: (ctx) => CollageBloc(
+                    collageRepository:
+                        RepositoryProvider.of<CollageRepositoryImpl>(ctx),
+                  )..add(LoadCollages())),
+          BlocProvider(
+              create: (ctx) => TagCategoryBloc(
+                    tagCategoryRepository:
+                        RepositoryProvider.of<TagCategoryRepositoryImpl>(ctx),
+                  )..add(const LoadTagCategories())),
+          BlocProvider(
+            create: (_) => ThemeCubit(
+              settingsService: ThemeSettingsService(),
+            )..load(),
+          ),
         ],
-        child: MaterialApp(
-          navigatorKey: navigatorKey,
-          title: 'Photographers Reference',
-          theme: ThemeData(
-            brightness: Brightness.dark,
-            primaryColor: Colors.black,
-            scaffoldBackgroundColor: Colors.black,
-            appBarTheme: const AppBarTheme(color: Colors.black),
-            pageTransitionsTheme: noDesktopTransitions
+        child: BlocBuilder<ThemeCubit, ThemeState>(
+          builder: (context, themeState) {
+            final transitionsTheme = noDesktopTransitions
                 ? const PageTransitionsTheme(
                     builders: {
                       TargetPlatform.android: _NoTransitionsBuilder(),
@@ -264,119 +286,148 @@ class MyApp extends StatelessWidget {
                       TargetPlatform.linux: _NoTransitionsBuilder(),
                     },
                   )
-                : const PageTransitionsTheme(),
-          ),
+                : const PageTransitionsTheme();
+            return MaterialApp(
+              navigatorKey: navigatorKey,
+              navigatorObservers: [NavigationHistoryService.instance.observer],
+              title: 'Photographers Reference',
+              themeMode: themeState.themeMode,
+              theme: AppThemes.lightTheme(transitions: transitionsTheme),
+              darkTheme: AppThemes.darkTheme(transitions: transitionsTheme),
 
-          // Рейтинг-попап — только при «обычном» запуске
-          builder: (context, child) {
-            final hasCustomRoute = ((initialArgs['route'] as String?) ?? '').isNotEmpty;
-            if (!hasCustomRoute && !_ratingPromptScheduled) {
-              _ratingPromptScheduled = true;
-              WidgetsBinding.instance.addPostFrameCallback((_) async {
-                final navContext = navigatorKey.currentContext;
-                if (navContext == null) return;
-                if (await RatingPromptHandler.shouldShowPrompt()) {
-                  RatingPromptHandler.showRatingDialog(navContext);
+              // Рейтинг-попап — только при «обычном» запуске
+              builder: (context, child) {
+                final hasCustomRoute =
+                    ((initialArgs['route'] as String?) ?? '').isNotEmpty;
+                if (!hasCustomRoute && !_ratingPromptScheduled) {
+                  _ratingPromptScheduled = true;
+                  WidgetsBinding.instance.addPostFrameCallback((_) async {
+                    final navContext = navigatorKey.currentContext;
+                    if (navContext == null) return;
+                    if (await RatingPromptHandler.shouldShowPrompt()) {
+                      RatingPromptHandler.showRatingDialog(navContext);
+                    }
+                  });
                 }
-              });
-            }
-            final content = child ?? const SizedBox.shrink();
-            return DragDropImportOverlay(
-              child: AppLockHost(
-                child: MigrationOverlayHost(child: content),
-              ),
-            );
-          },
+                final content = child ?? const SizedBox.shrink();
+                return DragDropImportOverlay(
+                  child: AppLockHost(
+                    child: MigrationOverlayHost(child: content),
+                  ),
+                );
+              },
 
-          // Стартовый стек — сразу, без чёрного кадра
-          onGenerateInitialRoutes: (_) {
-            final String route = (initialArgs['route'] as String?) ?? '';
-            final Map<String, dynamic> args =
-                Map<String, dynamic>.from(initialArgs)..remove('route');
+              // Стартовый стек — сразу, без чёрного кадра
+              onGenerateInitialRoutes: (_) {
+                final String route = (initialArgs['route'] as String?) ?? '';
+                final Map<String, dynamic> args =
+                    Map<String, dynamic>.from(initialArgs)..remove('route');
 
-            if (route == '/photoById') {
-              final String? photoId = args['photoId'] as String?;
-              if (photoId != null && photoId.isNotEmpty) {
-                Photo? target;
-                for (final p in photoBox.values) {
-                  if (p.id == photoId) {
-                    target = p;
-                    break;
+                if (route == '/photoById') {
+                  final String? photoId = args['photoId'] as String?;
+                  if (photoId != null && photoId.isNotEmpty) {
+                    Photo? target;
+                    for (final p in photoBox.values) {
+                      if (p.id == photoId) {
+                        target = p;
+                        break;
+                      }
+                    }
+                    if (target != null) {
+                      return [
+                        MaterialPageRoute(
+                          builder: (_) => PhotoViewerScreen(
+                            photos: [target!], // без "!"
+                            initialIndex: 0,
+                          ),
+                        ),
+                      ];
+                    }
                   }
+                  return [
+                    MaterialPageRoute(builder: (_) => const MainScreen())
+                  ];
                 }
-                if (target != null) {
+
+                if (route == '/my_collages') {
+                  return [
+                    MaterialPageRoute(builder: (_) => const MyCollagesScreen())
+                  ];
+                }
+                if (route == '/all_photos') {
+                  return [
+                    MaterialPageRoute(builder: (_) => const AllPhotosScreen())
+                  ];
+                }
+                if (route == '/all_tags') {
+                  return [
+                    MaterialPageRoute(builder: (_) => const AllTagsScreen())
+                  ];
+                }
+                if (route == '/folder') {
+                  final folder = args['folder'] as Folder;
+                  return [
+                    MaterialPageRoute(
+                        builder: (_) => FolderScreen(folder: folder))
+                  ];
+                }
+                if (route == '/upload') {
+                  final folder = args['folder'] as Folder?;
+                  return [
+                    MaterialPageRoute(
+                        builder: (_) => UploadScreen(folder: folder))
+                  ];
+                }
+                if (route == '/photo') {
+                  final photos = args['photos'] as List<Photo>;
+                  final index = args['index'] as int;
                   return [
                     MaterialPageRoute(
                       builder: (_) => PhotoViewerScreen(
-                        photos: [target!], // без "!"
-                        initialIndex: 0,
-                      ),
-                    ),
+                          photos: photos, initialIndex: index),
+                    )
                   ];
                 }
-              }
-              return [MaterialPageRoute(builder: (_) => const MainScreen())];
-            }
+                if (route == '/tag') {
+                  final tag = args['tag'] as Tag;
+                  return [
+                    MaterialPageRoute(builder: (_) => TagScreen(tag: tag))
+                  ];
+                }
 
-            if (route == '/my_collages') {
-              return [MaterialPageRoute(builder: (_) => const MyCollagesScreen())];
-            }
-            if (route == '/all_photos') {
-              return [MaterialPageRoute(builder: (_) => const AllPhotosScreen())];
-            }
-            if (route == '/all_tags') {
-              return [MaterialPageRoute(builder: (_) => const AllTagsScreen())];
-            }
-            if (route == '/folder') {
-              final folder = args['folder'] as Folder;
-              return [MaterialPageRoute(builder: (_) => FolderScreen(folder: folder))];
-            }
-            if (route == '/upload') {
-              final folder = args['folder'] as Folder?;
-              return [MaterialPageRoute(builder: (_) => UploadScreen(folder: folder))];
-            }
-            if (route == '/photo') {
-              final photos = args['photos'] as List<Photo>;
-              final index = args['index'] as int;
-              return [
-                MaterialPageRoute(
-                  builder: (_) => PhotoViewerScreen(photos: photos, initialIndex: index),
-                )
-              ];
-            }
-            if (route == '/tag') {
-              final tag = args['tag'] as Tag;
-              return [MaterialPageRoute(builder: (_) => TagScreen(tag: tag))];
-            }
+                // дефолт: полное приложение
+                return [MaterialPageRoute(builder: (_) => const MainScreen())];
+              },
 
-            // дефолт: полное приложение
-            return [MaterialPageRoute(builder: (_) => const MainScreen())];
-          },
-
-          routes: {
-            '/all_tags': (_) => const AllTagsScreen(),
-            '/all_photos': (_) => const AllPhotosScreen(),
-            '/my_collages': (_) => const MyCollagesScreen(),
-          },
-          onGenerateRoute: (settings) {
-            if (settings.name == '/folder') {
-              final folder = settings.arguments as Folder;
-              return MaterialPageRoute(builder: (_) => FolderScreen(folder: folder));
-            } else if (settings.name == '/upload') {
-              final folder = settings.arguments as Folder?;
-              return MaterialPageRoute(builder: (_) => UploadScreen(folder: folder));
-            } else if (settings.name == '/photo') {
-              final args = settings.arguments as Map<String, dynamic>;
-              final photos = args['photos'] as List<Photo>;
-              final index = args['index'] as int;
-              return MaterialPageRoute(
-                builder: (_) => PhotoViewerScreen(photos: photos, initialIndex: index),
-              );
-            } else if (settings.name == '/tag') {
-              final tag = settings.arguments as Tag;
-              return MaterialPageRoute(builder: (_) => TagScreen(tag: tag));
-            }
-            return null;
+              routes: {
+                '/all_tags': (_) => const AllTagsScreen(),
+                '/all_photos': (_) => const AllPhotosScreen(),
+                '/my_collages': (_) => const MyCollagesScreen(),
+              },
+              onGenerateRoute: (settings) {
+                if (settings.name == '/folder') {
+                  final folder = settings.arguments as Folder;
+                  return MaterialPageRoute(
+                      builder: (_) => FolderScreen(folder: folder));
+                } else if (settings.name == '/upload') {
+                  final folder = settings.arguments as Folder?;
+                  return MaterialPageRoute(
+                      builder: (_) => UploadScreen(folder: folder));
+                } else if (settings.name == '/photo') {
+                  final args = settings.arguments as Map<String, dynamic>;
+                  final photos = args['photos'] as List<Photo>;
+                  final index = args['index'] as int;
+                  return MaterialPageRoute(
+                    builder: (_) =>
+                        PhotoViewerScreen(photos: photos, initialIndex: index),
+                  );
+                } else if (settings.name == '/tag') {
+                  final tag = settings.arguments as Tag;
+                  return MaterialPageRoute(builder: (_) => TagScreen(tag: tag));
+                }
+                return null;
+              },
+            );
           },
         ),
       ),

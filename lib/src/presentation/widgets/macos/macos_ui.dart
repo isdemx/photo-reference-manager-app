@@ -5,38 +5,41 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 
 class MacosPalette {
-  static const Color canvas = Color(0xFF0B0C0F);
-  static const Color surface = Color(0xFF121318);
-  static const Color surfaceAlt = Color(0xFF161820);
-  static const Color border = Color(0x16FFFFFF);
-  static const Color subtle = Color(0xFF8A8F98);
-  static const Color text = Color(0xFFE7E9ED);
-  static const Color accent = Color(0xFF58C1FF);
+  static Color canvas(BuildContext context) => context.appThemeColors.canvas;
+  static Color surface(BuildContext context) => context.appThemeColors.surface;
+  static Color surfaceAlt(BuildContext context) =>
+      context.appThemeColors.surfaceAlt;
+  static Color border(BuildContext context) => context.appThemeColors.border;
+  static Color subtle(BuildContext context) => context.appThemeColors.subtle;
+  static Color text(BuildContext context) => context.appThemeColors.text;
+  static Color accent(BuildContext context) => context.appThemeColors.accent;
 }
 
 class MacosTypography {
-  static const TextStyle title = TextStyle(
-    fontSize: 18,
-    fontWeight: FontWeight.w600,
-    color: MacosPalette.text,
-    letterSpacing: 0.2,
-  );
+  static TextStyle title(BuildContext context) => TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: MacosPalette.text(context),
+        letterSpacing: 0.2,
+      );
 
-  static const TextStyle section = TextStyle(
-    fontSize: 15,
-    fontWeight: FontWeight.w600,
-    color: MacosPalette.text,
-    letterSpacing: 0.2,
-  );
+  static TextStyle section(BuildContext context) => TextStyle(
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: MacosPalette.text(context),
+        letterSpacing: 0.2,
+      );
 
-  static const TextStyle caption = TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w500,
-    color: MacosPalette.subtle,
-    letterSpacing: 0.2,
-  );
+  static TextStyle caption(BuildContext context) => TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: MacosPalette.subtle(context),
+        letterSpacing: 0.2,
+      );
 }
 
 class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
@@ -77,6 +80,7 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final leftInset = _macosLeftInset();
+    final navHistory = NavigationHistoryService.instance;
     return SafeArea(
       bottom: false,
       child: GestureDetector(
@@ -86,8 +90,8 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
           children: [
             DragToMoveArea(
               child: DecoratedBox(
-                decoration: const BoxDecoration(
-                  color: MacosPalette.surface,
+                decoration: BoxDecoration(
+                  color: MacosPalette.surface(context),
                   boxShadow: [
                     BoxShadow(
                       color: Color(0x26000000),
@@ -115,16 +119,22 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
                       onTap: onOpenNewWindow,
                     ),
                     const SizedBox(width: 8),
-                    _TopBarIcon(
-                      icon: Icons.arrow_back_rounded,
-                      onTap: onBack,
-                      enabled: canGoBack,
+                    ValueListenableBuilder<int>(
+                      valueListenable: navHistory.revision,
+                      builder: (_, __, ___) => _TopBarIcon(
+                        icon: Icons.arrow_back_rounded,
+                        onTap: onBack,
+                        enabled: canGoBack && navHistory.canGoBack(context),
+                      ),
                     ),
                     const SizedBox(width: 8),
-                    _TopBarIcon(
-                      icon: Icons.arrow_forward_rounded,
-                      onTap: onForward,
-                      enabled: canGoForward,
+                    ValueListenableBuilder<int>(
+                      valueListenable: navHistory.revision,
+                      builder: (_, __, ___) => _TopBarIcon(
+                        icon: Icons.arrow_forward_rounded,
+                        onTap: onForward,
+                        enabled: canGoForward && navHistory.canGoForward(),
+                      ),
                     ),
                     const Spacer(),
                     _TopBarIcon(icon: Iconsax.import_1, onTap: onUpload),
@@ -150,7 +160,7 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(title, style: MacosTypography.title),
+                    Text(title, style: MacosTypography.title(context)),
                     if (centerActions != null) ...[
                       const SizedBox(width: 10),
                       centerActions!,
@@ -191,7 +201,9 @@ class _TopBarIcon extends StatelessWidget {
         child: Icon(
           icon,
           size: 17,
-          color: enabled ? MacosPalette.text : MacosPalette.subtle,
+          color: enabled
+              ? MacosPalette.text(context)
+              : MacosPalette.subtle(context),
         ),
       ),
     );
@@ -248,23 +260,23 @@ class MacosSectionHeader extends StatelessWidget {
                 Icon(
                   expanded ? Iconsax.arrow_down_1 : Iconsax.arrow_right_3,
                   size: 14,
-                  color: MacosPalette.text,
+                  color: MacosPalette.text(context),
                 ),
                 const SizedBox(width: 6),
               ],
-              Text(title, style: MacosTypography.section),
+              Text(title, style: MacosTypography.section(context)),
               if (count != null) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: MacosPalette.surfaceAlt,
+                    color: MacosPalette.surfaceAlt(context),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     count.toString(),
-                    style: MacosTypography.caption,
+                    style: MacosTypography.caption(context),
                   ),
                 ),
               ],
@@ -301,8 +313,8 @@ class MacosSidebar extends StatelessWidget {
 
     return Container(
       width: 220,
-      decoration: const BoxDecoration(
-        color: MacosPalette.surface,
+      decoration: BoxDecoration(
+        color: MacosPalette.surface(context),
         boxShadow: [
           BoxShadow(
             color: Color(0x22000000),
@@ -317,7 +329,7 @@ class MacosSidebar extends StatelessWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text('Navigate', style: MacosTypography.section),
+                Text('Navigate', style: MacosTypography.section(context)),
                 const SizedBox(height: 12),
                 _SidebarItem(
                   icon: Iconsax.gallery,
@@ -335,11 +347,11 @@ class MacosSidebar extends StatelessWidget {
                   onTap: onTags,
                 ),
                 const SizedBox(height: 24),
-                const Text('Workspace', style: MacosTypography.section),
+                Text('Workspace', style: MacosTypography.section(context)),
                 const SizedBox(height: 8),
                 Text(
                   'Use Categories and Folders in the main view. Drag files anywhere to import.',
-                  style: MacosTypography.caption,
+                  style: MacosTypography.caption(context),
                 ),
               ],
             ),
@@ -348,7 +360,7 @@ class MacosSidebar extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
             child: Column(
               children: [
-                const Divider(height: 1, color: MacosPalette.border),
+                Divider(height: 1, color: MacosPalette.border(context)),
                 const SizedBox(height: 8),
                 _SidebarItem(
                   icon: Iconsax.home,
@@ -384,9 +396,9 @@ class _SidebarItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: MacosPalette.text),
+            Icon(icon, size: 16, color: MacosPalette.text(context)),
             const SizedBox(width: 10),
-            Text(label, style: MacosTypography.caption),
+            Text(label, style: MacosTypography.caption(context)),
           ],
         ),
       ),

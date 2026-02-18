@@ -12,7 +12,9 @@ import 'package:photographers_reference_app/src/presentation/widgets/macos/macos
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 import 'package:photographers_reference_app/src/services/window_service.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 class AllPhotosScreen extends StatefulWidget {
   const AllPhotosScreen({Key? key}) : super(key: key);
@@ -58,7 +60,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
     showDialog(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.7),
+      barrierColor: context.appThemeColors.overlay.withValues(alpha: 0.7),
       builder: (_) => const SettingsDialog(appVersion: null),
     );
   }
@@ -166,10 +168,12 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                             title: 'Refma — Images',
                           );
                         },
-                        onBack: () => Navigator.of(context).maybePop(),
-                        onForward: () {},
-                        canGoBack: Navigator.of(context).canPop(),
-                        canGoForward: false,
+                        onBack: () =>
+                            NavigationHistoryService.instance.goBack(context),
+                        onForward: () => NavigationHistoryService.instance
+                            .goForward(context),
+                        canGoBack: true,
+                        canGoForward: true,
                         onUpload: () => Navigator.push(
                           context,
                           PageRouteBuilder(
@@ -262,7 +266,7 @@ class _CenterBarIcon extends StatelessWidget {
       child: SizedBox(
         width: 24,
         height: 24,
-        child: Icon(icon, size: 15, color: MacosPalette.text),
+        child: Icon(icon, size: 15, color: MacosPalette.text(context)),
       ),
     );
   }

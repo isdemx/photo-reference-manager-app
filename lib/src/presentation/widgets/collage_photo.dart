@@ -342,7 +342,7 @@ class CollagePrefsService {
 
 class CollagePersistService {
   /// Сохранить/обновить коллаж в БД через Bloc + перерендерить превью.
-  Future<void> saveToDb({
+  Future<Collage> saveToDb({
     required BuildContext context,
     required GlobalKey boundaryKey,
     required Collage? existing,
@@ -429,6 +429,7 @@ class CollagePersistService {
       );
 
       context.read<CollageBloc>().add(AddCollage(newCollage));
+      return newCollage;
     } else {
       String previewPath = existing.previewPath ?? '';
       try {
@@ -455,6 +456,7 @@ class CollagePersistService {
       );
 
       context.read<CollageBloc>().add(UpdateCollage(updated));
+      return updated;
     }
   }
 }
@@ -658,7 +660,29 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   double _collageScale = 1.0;
   static const double _minCollageScale = 0.9;
   static const double _maxCollageScale = 60.0;
-  static const double _canvasSizeMultiplier = 10.0;
+  static const double _defaultCanvasSizeMultiplier = 144.0;
+  static const List<double> _canvasSizePresets = <double>[
+    144.0,
+    120.0,
+    80.0,
+    64.0,
+    48.0,
+    40.0,
+    32.0,
+    24.0,
+    16.0,
+    12.0,
+    10.0,
+    8.0,
+    6.0,
+    4.0,
+    3.0,
+    2.0,
+    1.5,
+    1.0,
+    0.5,
+  ];
+  double _canvasSizeMultiplier = _defaultCanvasSizeMultiplier;
   static const int _maxViewZones = 10;
   static const List<Color> _viewZonePalette = [
     Colors.redAccent,
@@ -751,8 +775,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _arrowRepeatDelay?.cancel();
     _arrowRepeatTick?.cancel();
     _arrowRepeatDelay = Timer(const Duration(milliseconds: 250), () {
-      _arrowRepeatTick =
-          Timer.periodic(const Duration(milliseconds: 200), (_) {
+      _arrowRepeatTick = Timer.periodic(const Duration(milliseconds: 200), (_) {
         if (_heldArrowKey == LogicalKeyboardKey.arrowRight) {
           _switchPhotoInActiveContainer(next: true);
         } else if (_heldArrowKey == LogicalKeyboardKey.arrowLeft) {
@@ -788,11 +811,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Size _canvasViewportSize = Size.zero;
   static const double _videoControlsHeight = 34.0;
   final ScrollController _overviewScrollController = ScrollController();
+  Collage? _currentCollage;
 
   @override
   void initState() {
     super.initState();
 
+    _currentCollage = widget.initialCollage;
     _isPrivate = widget.initialCollage?.isPrivate ?? false;
     _importService = context.read<DragDropImportService>();
     _importService.registerCollageHandler(_handleImportedPhotos);
@@ -1218,7 +1243,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   void _zoomByStep(double multiplier) {
     final current = _collageScale;
-    final next = (current * multiplier).clamp(_minCollageScale, _maxCollageScale);
+    final next =
+        (current * multiplier).clamp(_minCollageScale, _maxCollageScale);
     final focal = _canvasViewportSize == Size.zero
         ? Offset.zero
         : _canvasViewportSize.center(Offset.zero);
@@ -1547,16 +1573,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     await CollageSaveHelper.saveCollage(_collageKey, context);
   }
 
-  Future<void> _onSaveCollageToDb() async {
-    final now = DateTime.now();
-    final formattedDate =
-        "My_collage_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
-
-    final titleController = TextEditingController(text: formattedDate);
-
-    String? newTitle;
-    if (widget.initialCollage == null) {
-      newTitle = await showDialog<String>(
+  Future<String?> _showSaveTitleDialog(String initialTitle) async {
+    final titleController = TextEditingController(text: initialTitle);
+    try {
+      return await showDialog<String>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Save Collage'),
@@ -1564,8 +1584,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             controller: titleController,
             autofocus: true,
             textInputAction: TextInputAction.done,
-            onSubmitted: (_) =>
-                Navigator.of(ctx).pop(titleController.text),
+            onSubmitted: (_) => Navigator.of(ctx).pop(titleController.text),
             decoration: const InputDecoration(hintText: 'Collage Title'),
           ),
           actions: [
@@ -1580,19 +1599,43 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ],
         ),
       );
+    } finally {
+      titleController.dispose();
+    }
+  }
 
-      if (newTitle == null || newTitle.trim().isEmpty) return;
+  Future<void> _saveCollageToDb({required bool forceAskTitle}) async {
+    final existing = _currentCollage;
+    final now = DateTime.now();
+    final defaultTitle =
+        "My_collage_${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final initialTitle = (existing?.title.trim().isNotEmpty ?? false)
+        ? existing!.title
+        : defaultTitle;
+
+    String? title;
+    bool saveAsNew = false;
+
+    if (forceAskTitle || existing == null) {
+      final enteredTitle = await _showSaveTitleDialog(initialTitle);
+      title = enteredTitle?.trim();
+      if (title == null || title.isEmpty) return;
+      final existingTitle = existing?.title.trim();
+      saveAsNew = existing == null || title != existingTitle;
+    } else {
+      title = existing.title;
+      saveAsNew = false;
     }
 
     // Перед сохранением выключаем edit mode
     _controller.clearEditing();
     setState(() {});
 
-    await _persist.saveToDb(
+    final savedCollage = await _persist.saveToDb(
       context: context,
       boundaryKey: _collageKey,
-      existing: widget.initialCollage,
-      titleForNew: newTitle ?? widget.initialCollage?.title ?? 'Collage',
+      existing: saveAsNew ? null : existing,
+      titleForNew: title,
       backgroundColorValue: _backgroundColor.value,
       items: _items,
       videoStates: _videoStates,
@@ -1606,9 +1649,29 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
 
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Collage saved to DB!')),
+    setState(() {
+      _currentCollage = savedCollage;
+    });
+    final messenger =
+        ScaffoldMessenger.maybeOf(_scaffoldKey.currentContext ?? context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        content: Text(
+          saveAsNew ? 'Collage saved as "$title"' : 'Collage saved',
+        ),
+      ),
     );
+  }
+
+  Future<void> _onSaveCollageToDb() async {
+    await _saveCollageToDb(forceAskTitle: false);
+  }
+
+  Future<void> _onSaveAsCollageToDb() async {
+    await _saveCollageToDb(forceAskTitle: true);
   }
 
   // ----------------------------
@@ -1646,8 +1709,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
 
     final currentPhoto = item.photo;
-    final allIndex = _allPhotosLocal
-        .indexWhere((p) => p.fileName == currentPhoto.fileName);
+    final allIndex =
+        _allPhotosLocal.indexWhere((p) => p.fileName == currentPhoto.fileName);
     if (allIndex == -1) return;
 
     int newIndex = next ? allIndex + 1 : allIndex - 1;
@@ -1683,8 +1746,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
     final maxAllowedCanvasSide = maxScreenSide / screenScale;
 
-    final targetMaxSide =
-        math.min(math.max(oldW, oldH), maxAllowedCanvasSide);
+    final targetMaxSide = math.min(math.max(oldW, oldH), maxAllowedCanvasSide);
     final naturalMax = math.max(naturalWidth, naturalHeight);
     final scale =
         naturalMax == 0 ? 1.0 : (targetMaxSide / naturalMax).clamp(0.001, 1000);
@@ -1692,8 +1754,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     item.baseWidth = naturalWidth * scale;
     item.baseHeight = naturalHeight * scale;
     item.scale = 1.0;
-    item.offset =
-        oldCenter - Offset(item.baseWidth / 2, item.baseHeight / 2);
+    item.offset = oldCenter - Offset(item.baseWidth / 2, item.baseHeight / 2);
     _clampItemOffset(item);
 
     // Если заменили на видео — гарантируем VideoUi
@@ -1711,6 +1772,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       base.width * _canvasSizeMultiplier,
       base.height * _canvasSizeMultiplier,
     );
+  }
+
+  String _canvasPresetLabel(double value) {
+    if (value == value.roundToDouble()) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(1);
+  }
+
+  void _setCanvasSizeMultiplier(double value) {
+    if (value <= 0 || _canvasSizeMultiplier == value) return;
+    setState(() {
+      _canvasSizeMultiplier = value;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      // Make canvas size change immediately visible.
+      _setTransform(_fitCanvasToViewportMatrix());
+      _updateDeleteRect();
+    });
   }
 
   double _containScaleForCanvas() {
@@ -1851,8 +1932,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         return Size(vw * scale, vh * scale);
       }
       if (photo.videoPreview != null && photo.videoPreview!.isNotEmpty) {
-        final previewPath =
-            PhotoPathHelper().getFullPath(photo.videoPreview!);
+        final previewPath = PhotoPathHelper().getFullPath(photo.videoPreview!);
         final previewFile = File(previewPath);
         if (previewFile.existsSync()) {
           final decoded = img.decodeImage(previewFile.readAsBytesSync());
@@ -1908,14 +1988,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     final videoOverlays = _overviewMode
         ? const <Widget>[]
-        : sorted
-            .where((it) => it.isVideo)
-            .map((item) {
-              final uiState = _videoStates[item.id];
-              if (uiState == null) return const SizedBox.shrink();
-              return _buildVideoControlsViewportOverlay(item, uiState);
-            })
-            .toList(growable: false);
+        : sorted.where((it) => it.isVideo).map((item) {
+            final uiState = _videoStates[item.id];
+            if (uiState == null) return const SizedBox.shrink();
+            return _buildVideoControlsViewportOverlay(item, uiState);
+          }).toList(growable: false);
 
     final rotationOverlays = _overviewMode
         ? const <Widget>[]
@@ -2074,363 +2151,354 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         return KeyEventResult.ignored;
       },
       child: Scaffold(
-          key: _scaffoldKey,
-          body: Stack(
-            children: [
-              Column(
-                children: [
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        _canvasViewportSize =
-                            Size(constraints.maxWidth, constraints.maxHeight);
-                        final canvasSize = _currentCanvasSize();
-                        final topInset =
-                            isIOS && !_isFullscreen ? MediaQuery.of(context).padding.top : 0.0;
+        key: _scaffoldKey,
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      _canvasViewportSize =
+                          Size(constraints.maxWidth, constraints.maxHeight);
+                      final canvasSize = _currentCanvasSize();
+                      final topInset = isIOS && !_isFullscreen
+                          ? MediaQuery.of(context).padding.top
+                          : 0.0;
 
-                        return Listener(
-                          behavior: HitTestBehavior.opaque,
-                          onPointerPanZoomStart: (_) {
+                      return Listener(
+                        behavior: HitTestBehavior.opaque,
+                        onPointerPanZoomStart: (_) {
+                          if (_overviewMode) return;
+                          _isTrackpadPanZoomActive = true;
+                        },
+                        onPointerPanZoomUpdate: (e) {
+                          if (_overviewMode) return;
+                          if (_isItemScaleGestureActive &&
+                              !_isTrackpadPanZoomActive) {
+                            return;
+                          }
+                          _isTrackpadPanZoomActive = true;
+                          if (e.panDelta != Offset.zero) {
+                            final next = _transformationController.value.clone()
+                              ..translate(e.panDelta.dx, e.panDelta.dy);
+                            _setTransform(next);
+                          }
+                        },
+                        onPointerPanZoomEnd: (_) {
+                          if (_overviewMode) return;
+                          _isTrackpadPanZoomActive = false;
+                          _saveCollageScale(_collageScale);
+                        },
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.translucent,
+                          onTap: () {
                             if (_overviewMode) return;
-                            _isTrackpadPanZoomActive = true;
+                            _exitEditingMode();
                           },
-                          onPointerPanZoomUpdate: (e) {
-                            if (_overviewMode) return;
-                            if (_isItemScaleGestureActive &&
-                                !_isTrackpadPanZoomActive) {
-                              return;
-                            }
-                            _isTrackpadPanZoomActive = true;
-                            if (e.panDelta != Offset.zero) {
-                              final next = _transformationController.value
-                                  .clone()
-                                ..translate(e.panDelta.dx, e.panDelta.dy);
-                              _setTransform(next);
-                            }
-                          },
-                          onPointerPanZoomEnd: (_) {
-                            if (_overviewMode) return;
-                            _isTrackpadPanZoomActive = false;
-                            _saveCollageScale(_collageScale);
-                          },
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.translucent,
-                            onTap: () {
-                              if (_overviewMode) return;
-                              _exitEditingMode();
-                            },
-                            child: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: Container(color: Colors.grey[900]),
-                                ),
-                                Positioned.fill(
-                                  child: Padding(
-                                    padding: EdgeInsets.only(top: topInset),
-                                    child: InteractiveViewer(
-                                      transformationController:
-                                          _transformationController,
-                                      boundaryMargin:
-                                          const EdgeInsets.all(999999),
-                                      minScale: _minCollageScale,
-                                      maxScale: _maxCollageScale,
-                                      scaleEnabled: false,
-                                      panEnabled: false,
-                                      clipBehavior: Clip.none,
-                                      onInteractionEnd: (_) {
-                                        _setTransform(
-                                            _transformationController.value);
-                                        _saveCollageScale(_collageScale);
-                                      },
-                                      child: IgnorePointer(
-                                        ignoring: _overviewMode,
-                                        child: RepaintBoundary(
-                                          key: _collageKey,
-                                          child: SizedBox(
-                                            width: canvasSize.width,
-                                            height: canvasSize.height,
-                                            child: Stack(
-                                              clipBehavior: Clip.none,
-                                              children: [
+                          child: Stack(
+                            children: [
+                              Positioned.fill(
+                                child: Container(color: Colors.grey[900]),
+                              ),
+                              Positioned.fill(
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: topInset),
+                                  child: InteractiveViewer(
+                                    transformationController:
+                                        _transformationController,
+                                    boundaryMargin:
+                                        const EdgeInsets.all(999999),
+                                    minScale: _minCollageScale,
+                                    maxScale: _maxCollageScale,
+                                    scaleEnabled: false,
+                                    panEnabled: false,
+                                    clipBehavior: Clip.none,
+                                    onInteractionEnd: (_) {
+                                      _setTransform(
+                                          _transformationController.value);
+                                      _saveCollageScale(_collageScale);
+                                    },
+                                    child: IgnorePointer(
+                                      ignoring: _overviewMode,
+                                      child: RepaintBoundary(
+                                        key: _collageKey,
+                                        child: SizedBox(
+                                          width: canvasSize.width,
+                                          height: canvasSize.height,
+                                          child: Stack(
+                                            clipBehavior: Clip.none,
+                                            children: [
+                                              Positioned.fill(
+                                                  child: Container(
+                                                      color: _backgroundColor)),
+                                              for (final item in sorted)
+                                                _buildPhotoItem(item),
+                                              if (_showViewZoneOverlay)
                                                 Positioned.fill(
-                                                    child: Container(
-                                                        color:
-                                                            _backgroundColor)),
-                                                for (final item in sorted)
-                                                  _buildPhotoItem(item),
-                                                if (_showViewZoneOverlay)
-                                                  Positioned.fill(
-                                                    child: CustomPaint(
-                                                      painter: _ViewZonesPainter(
-                                                        zones: _viewZones,
-                                                        colors: _viewZoneColors,
-                                                        viewportSize:
-                                                            _viewportSize(),
-                                                        strokeWidth: math.max(
-                                                          1.0,
-                                                          2 / (_collageScale ==
-                                                                  0
-                                                              ? 1
-                                                              : _collageScale),
-                                                        ),
+                                                  child: CustomPaint(
+                                                    painter: _ViewZonesPainter(
+                                                      zones: _viewZones,
+                                                      colors: _viewZoneColors,
+                                                      viewportSize:
+                                                          _viewportSize(),
+                                                      strokeWidth: math.max(
+                                                        1.0,
+                                                        2 /
+                                                            (_collageScale == 0
+                                                                ? 1
+                                                                : _collageScale),
                                                       ),
                                                     ),
                                                   ),
-                                                if (_showViewZoneOverlay)
-                                                  Positioned.fill(
-                                                    child: GestureDetector(
-                                                      behavior: HitTestBehavior
-                                                          .translucent,
-                                                      onTap:
-                                                          _exitViewZoneOverlay,
-                                                    ),
-                                                  ),
-                                                if (_showViewZoneOverlay)
-                                                  ..._buildViewZoneHandles(),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                ...videoOverlays,
-                                ...rotationOverlays,
-                                if (_overviewMode)
-                                  const Positioned.fill(
-                                    child: ModalBarrier(
-                                      dismissible: false,
-                                      color: Colors.black,
-                                    ),
-                                  ),
-                                if (_overviewMode) _buildOverviewGrid(_items),
-                                if (!isSomePhotoInEditMode &&
-                                    (_showForInitDeleteIcon ||
-                                        _draggingIndex != null))
-                                  Positioned(
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 50,
-                                    child: Center(
-                                      child: Container(
-                                        key: _deleteIconKey,
-                                        width: 64,
-                                        height: 64,
-                                        decoration: BoxDecoration(
-                                          color: _deleteHover
-                                              ? Colors.red
-                                              : Colors.white30,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(Icons.delete,
-                                            color: Colors.black),
-                                      ),
-                                    ),
-                                  ),
-                                if (_showTutorial)
-                                  Positioned.fill(
-                                    child: Container(
-                                      color: Colors.black.withOpacity(0.8),
-                                      child: Center(
-                                        child: SingleChildScrollView(
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Icon(Icons.touch_app,
-                                                  size: 60,
-                                                  color: Colors.white),
-                                              const SizedBox(height: 20),
-                                              const Text(
-                                                'Move with one finger\n'
-                                                'Zoom with two fingers\n'
-                                                'Long Press to toggle Edit Mode\n'
-                                                'Rotate + Brightness + Saturation + Temperature + Hue\n'
-                                                'Crop corners when in Edit Mode\n'
-                                                'Tap to bring to front\n'
-                                                'Press check to save image',
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 15,
-                                                  fontWeight: FontWeight.bold,
                                                 ),
-                                              ),
-                                              const SizedBox(height: 20),
-                                              ElevatedButton(
-                                                onPressed: () async {
-                                                  if (!mounted) return;
-                                                  setState(() =>
-                                                      _showTutorial = false);
-                                                  await _markTutorialPassed();
-                                                },
-                                                child: const Text('Got it'),
-                                              ),
+                                              if (_showViewZoneOverlay)
+                                                Positioned.fill(
+                                                  child: GestureDetector(
+                                                    behavior: HitTestBehavior
+                                                        .translucent,
+                                                    onTap: _exitViewZoneOverlay,
+                                                  ),
+                                                ),
+                                              if (_showViewZoneOverlay)
+                                                ..._buildViewZoneHandles(),
                                             ],
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                              ],
-                            ),
+                                ),
+                              ),
+                              ...videoOverlays,
+                              ...rotationOverlays,
+                              if (_overviewMode)
+                                const Positioned.fill(
+                                  child: ModalBarrier(
+                                    dismissible: false,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              if (_overviewMode) _buildOverviewGrid(_items),
+                              if (!isSomePhotoInEditMode &&
+                                  (_showForInitDeleteIcon ||
+                                      _draggingIndex != null))
+                                Positioned(
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 50,
+                                  child: Center(
+                                    child: Container(
+                                      key: _deleteIconKey,
+                                      width: 64,
+                                      height: 64,
+                                      decoration: BoxDecoration(
+                                        color: _deleteHover
+                                            ? Colors.red
+                                            : Colors.white30,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(Icons.delete,
+                                          color: Colors.black),
+                                    ),
+                                  ),
+                                ),
+                              if (_showTutorial)
+                                Positioned.fill(
+                                  child: Container(
+                                    color: Colors.black.withOpacity(0.8),
+                                    child: Center(
+                                      child: SingleChildScrollView(
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.touch_app,
+                                                size: 60, color: Colors.white),
+                                            const SizedBox(height: 20),
+                                            const Text(
+                                              'Move with one finger\n'
+                                              'Zoom with two fingers\n'
+                                              'Long Press to toggle Edit Mode\n'
+                                              'Rotate + Brightness + Saturation + Temperature + Hue\n'
+                                              'Crop corners when in Edit Mode\n'
+                                              'Tap to bring to front\n'
+                                              'Press check to save image',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 20),
+                                            ElevatedButton(
+                                              onPressed: () async {
+                                                if (!mounted) return;
+                                                setState(() =>
+                                                    _showTutorial = false);
+                                                await _markTutorialPassed();
+                                              },
+                                              child: const Text('Got it'),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        );
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            if (isSomePhotoInEditMode && editingPhoto != null)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12 + (isIOS ? bottomInset : 0.0),
+                child: PhotoAdjustmentsPanel(
+                  onRotateLeft: () =>
+                      setState(() => editingPhoto.rotation -= math.pi / 2),
+                  onRotateRight: () =>
+                      setState(() => editingPhoto.rotation += math.pi / 2),
+                  onFlipX: () =>
+                      setState(() => editingPhoto.flipX = !editingPhoto.flipX),
+                  onSendBackward: () => _sendItemBackward(editingPhoto),
+                  onBringForward: () => _sendItemForward(editingPhoto),
+                  onFlipY: null,
+                  onDone: () => _exitEditingMode(),
+                  brightness: editingPhoto.brightness,
+                  saturation: editingPhoto.saturation,
+                  temp: editingPhoto.temp,
+                  hue: editingPhoto.hue,
+                  contrast: editingPhoto.contrast,
+                  opacity: editingPhoto.opacity,
+                  onBrightnessChanged: (v) =>
+                      setState(() => editingPhoto.brightness = v),
+                  onSaturationChanged: (v) =>
+                      setState(() => editingPhoto.saturation = v),
+                  onTempChanged: (v) => setState(() => editingPhoto.temp = v),
+                  onHueChanged: (v) => setState(() => editingPhoto.hue = v),
+                  onContrastChanged: (v) =>
+                      setState(() => editingPhoto.contrast = v),
+                  onOpacityChanged: (v) =>
+                      setState(() => editingPhoto.opacity = v),
+                ),
+              )
+            else if (_draggingIndex == null) ...[
+              if (_isFullscreen) ...[
+                if (Platform.isMacOS)
+                  Positioned(
+                    left: 12,
+                    bottom: 12 + (isIOS ? bottomInset : 0.0),
+                    child: MouseRegion(
+                      onEnter: (_) {
+                        if (!_fullscreenBottomHoverLeft) {
+                          setState(() => _fullscreenBottomHoverLeft = true);
+                        }
                       },
+                      onExit: (_) {
+                        if (_fullscreenBottomHoverLeft) {
+                          setState(() => _fullscreenBottomHoverLeft = false);
+                        }
+                      },
+                      child: AnimatedOpacity(
+                        opacity: (_fullscreenBottomHoverLeft ||
+                                _fullscreenBottomHoverRight)
+                            ? 1.0
+                            : 0.0,
+                        duration: const Duration(milliseconds: 150),
+                        child: IgnorePointer(
+                          ignoring: !(_fullscreenBottomHoverLeft ||
+                              _fullscreenBottomHoverRight),
+                          child: _buildFloatingZoomControl(),
+                        ),
+                      ),
                     ),
                   ),
-                ],
-              ),
-              if (isSomePhotoInEditMode && editingPhoto != null)
                 Positioned(
-                  left: 12,
                   right: 12,
                   bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: PhotoAdjustmentsPanel(
-                    onRotateLeft: () =>
-                        setState(() => editingPhoto.rotation -= math.pi / 2),
-                    onRotateRight: () =>
-                        setState(() => editingPhoto.rotation += math.pi / 2),
-                    onFlipX: () =>
-                        setState(() => editingPhoto.flipX = !editingPhoto.flipX),
-                    onSendBackward: () => _sendItemBackward(editingPhoto),
-                    onBringForward: () => _sendItemForward(editingPhoto),
-                    onFlipY: null,
-                    onDone: () =>
-                        _exitEditingMode(),
-                    brightness: editingPhoto.brightness,
-                    saturation: editingPhoto.saturation,
-                    temp: editingPhoto.temp,
-                    hue: editingPhoto.hue,
-                    contrast: editingPhoto.contrast,
-                    opacity: editingPhoto.opacity,
-                    onBrightnessChanged: (v) =>
-                        setState(() => editingPhoto.brightness = v),
-                    onSaturationChanged: (v) =>
-                        setState(() => editingPhoto.saturation = v),
-                    onTempChanged: (v) =>
-                        setState(() => editingPhoto.temp = v),
-                    onHueChanged: (v) => setState(() => editingPhoto.hue = v),
-                    onContrastChanged: (v) =>
-                        setState(() => editingPhoto.contrast = v),
-                    onOpacityChanged: (v) =>
-                        setState(() => editingPhoto.opacity = v),
+                  child: MouseRegion(
+                    onEnter: (_) {
+                      if (!_fullscreenBottomHoverRight) {
+                        setState(() => _fullscreenBottomHoverRight = true);
+                      }
+                    },
+                    onExit: (_) {
+                      if (_fullscreenBottomHoverRight) {
+                        setState(() => _fullscreenBottomHoverRight = false);
+                      }
+                    },
+                    child: AnimatedOpacity(
+                      opacity: (_fullscreenBottomHoverLeft ||
+                              _fullscreenBottomHoverRight)
+                          ? 1.0
+                          : 0.0,
+                      duration: const Duration(milliseconds: 150),
+                      child: IgnorePointer(
+                        ignoring: !(_fullscreenBottomHoverLeft ||
+                            _fullscreenBottomHoverRight),
+                        child: _buildFloatingActionButtons(),
+                      ),
+                    ),
                   ),
-                )
-              else if (_draggingIndex == null) ...[
-                if (_isFullscreen)
-                  ...[
-                    if (Platform.isMacOS)
-                      Positioned(
-                        left: 12,
-                        bottom: 12 + (isIOS ? bottomInset : 0.0),
-                        child: MouseRegion(
-                          onEnter: (_) {
-                            if (!_fullscreenBottomHoverLeft) {
-                              setState(() => _fullscreenBottomHoverLeft = true);
-                            }
-                          },
-                          onExit: (_) {
-                            if (_fullscreenBottomHoverLeft) {
-                              setState(() => _fullscreenBottomHoverLeft = false);
-                            }
-                          },
-                          child: AnimatedOpacity(
-                            opacity: (_fullscreenBottomHoverLeft ||
-                                    _fullscreenBottomHoverRight)
-                                ? 1.0
-                                : 0.0,
-                            duration: const Duration(milliseconds: 150),
-                            child: IgnorePointer(
-                              ignoring: !(_fullscreenBottomHoverLeft ||
-                                  _fullscreenBottomHoverRight),
-                              child: _buildFloatingZoomControl(),
-                            ),
-                          ),
-                        ),
-                      ),
-                    Positioned(
-                      right: 12,
-                      bottom: 12 + (isIOS ? bottomInset : 0.0),
-                      child: MouseRegion(
-                        onEnter: (_) {
-                          if (!_fullscreenBottomHoverRight) {
-                            setState(() =>
-                                _fullscreenBottomHoverRight = true);
-                          }
-                        },
-                        onExit: (_) {
-                          if (_fullscreenBottomHoverRight) {
-                            setState(() =>
-                                _fullscreenBottomHoverRight = false);
-                          }
-                        },
-                        child: AnimatedOpacity(
-                          opacity: (_fullscreenBottomHoverLeft ||
-                                  _fullscreenBottomHoverRight)
-                              ? 1.0
-                              : 0.0,
-                          duration: const Duration(milliseconds: 150),
-                          child: IgnorePointer(
-                            ignoring: !(_fullscreenBottomHoverLeft ||
-                                _fullscreenBottomHoverRight),
-                            child: _buildFloatingActionButtons(),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ]
-                else ...[
-                  if (Platform.isMacOS)
-                    Positioned(
-                      left: 12,
-                      bottom: 12 + (isIOS ? bottomInset : 0.0),
-                      child: _buildFloatingZoomControl(),
-                    ),
+                ),
+              ] else ...[
+                if (Platform.isMacOS)
                   Positioned(
-                    right: 12,
+                    left: 12,
                     bottom: 12 + (isIOS ? bottomInset : 0.0),
-                    child: _buildFloatingActionButtons(),
+                    child: _buildFloatingZoomControl(),
                   ),
-                ],
-              ],
-              if (_isFullscreen && _draggingIndex == null)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: IconButton(
-                        icon: const Icon(Icons.fullscreen_exit,
-                            color: Colors.white),
-                        onPressed: _toggleFullscreen,
-                      ),
-                    ),
-                  ),
-                ),
-              if (!_isFullscreen && _draggingIndex == null) ...[
-                Positioned(
-                  left: 12,
-                  top: 12,
-                  child: SafeArea(
-                    bottom: false,
-                    child: _buildFloatingHeader(),
-                  ),
-                ),
                 Positioned(
                   right: 12,
-                  top: 12,
-                  child: SafeArea(
-                    bottom: false,
-                    child: _buildTopRightActions(),
-                  ),
+                  bottom: 12 + (isIOS ? bottomInset : 0.0),
+                  child: _buildFloatingActionButtons(),
                 ),
               ],
             ],
-          ),
+            if (_isFullscreen && _draggingIndex == null)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: IconButton(
+                      icon: const Icon(Icons.fullscreen_exit,
+                          color: Colors.white),
+                      onPressed: _toggleFullscreen,
+                    ),
+                  ),
+                ),
+              ),
+            if (!_isFullscreen && _draggingIndex == null) ...[
+              Positioned(
+                left: 12,
+                top: 12,
+                child: SafeArea(
+                  bottom: false,
+                  child: _buildFloatingHeader(),
+                ),
+              ),
+              Positioned(
+                right: 12,
+                top: 12,
+                child: SafeArea(
+                  bottom: false,
+                  child: _buildTopRightActions(),
+                ),
+              ),
+            ],
+          ],
         ),
-      );
+      ),
+    );
   }
 
   // ----------------------------
@@ -2483,8 +2551,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       min: 0.0,
                       max: 1.0,
                       value: _scaleToSliderValue(
-                        _collageScale
-                            .clamp(_minCollageScale, _maxCollageScale),
+                        _collageScale.clamp(_minCollageScale, _maxCollageScale),
                       ),
                       onChanged: (t) {
                         final next = _sliderValueToScale(t);
@@ -2550,8 +2617,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           shadowColor: Colors.transparent,
           surfaceTintColor: Colors.transparent,
         ),
-        icon:
-            const Icon(Icons.grid_view, color: Colors.white, shadows: iconShadow),
+        icon: const Icon(Icons.grid_view,
+            color: Colors.white, shadows: iconShadow),
         tooltip: 'Overview mode (O)',
         onPressed: _toggleOverviewMode,
       ),
@@ -2566,15 +2633,37 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         tooltip: 'Change background color (B)',
         onPressed: _showColorPickerDialog,
       ),
-      IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+      PopupMenuButton<double>(
+        tooltip: 'Canvas size',
+        initialValue: _canvasSizeMultiplier,
+        onSelected: _setCanvasSizeMultiplier,
+        itemBuilder: (_) => _canvasSizePresets
+            .map(
+              (v) => PopupMenuItem<double>(
+                value: v,
+                child: Text('Canvas x${_canvasPresetLabel(v)}'),
+              ),
+            )
+            .toList(),
+        icon: const Icon(
+          Icons.straighten,
+          color: Colors.white,
+          shadows: iconShadow,
         ),
-        icon: const Icon(Iconsax.save_2, color: Colors.white, shadows: iconShadow),
-        tooltip: 'Save collage (S)',
-        onPressed: _onSaveCollageToDb,
+      ),
+      GestureDetector(
+        onLongPress: _onSaveAsCollageToDb,
+        child: IconButton(
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            shadowColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+          ),
+          icon: const Icon(Iconsax.save_2,
+              color: Colors.white, shadows: iconShadow),
+          tooltip: 'Save collage (S, hold for Save As)',
+          onPressed: _onSaveCollageToDb,
+        ),
       ),
       IconButton(
         style: IconButton.styleFrom(
@@ -2587,8 +2676,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           color: _isPrivate ? Colors.amber : Colors.white,
           shadows: iconShadow,
         ),
-        tooltip:
-            _isPrivate ? 'Private collage (P)' : 'Public collage (P)',
+        tooltip: _isPrivate ? 'Private collage (P)' : 'Public collage (P)',
         onPressed: () => setState(() => _isPrivate = !_isPrivate),
       ),
       IconButton(
@@ -2644,7 +2732,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     ];
 
     final title =
-        '${widget.initialCollage?.title ?? "Collage"} (${_items.length} images)';
+        '${_currentCollage?.title ?? "Collage"} (${_items.length} images)';
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -2655,7 +2743,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             shadowColor: Colors.transparent,
             surfaceTintColor: Colors.transparent,
           ),
-          icon: const Icon(Icons.arrow_back, color: Colors.white, shadows: textShadow),
+          icon: const Icon(Icons.arrow_back,
+              color: Colors.white, shadows: textShadow),
           tooltip: 'Back',
           onPressed: () => Navigator.pop(context),
         ),
@@ -2692,7 +2781,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             surfaceTintColor: Colors.transparent,
           ),
           tooltip: 'Help / Info',
-          icon: const Icon(Icons.info_outline, color: Colors.white, shadows: iconShadow),
+          icon: const Icon(Icons.info_outline,
+              color: Colors.white, shadows: iconShadow),
           onPressed: _showHelp,
         ),
         const SizedBox(width: 6),
@@ -2704,8 +2794,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
               surfaceTintColor: Colors.transparent,
             ),
             tooltip: 'Open New Window',
-            icon:
-                const Icon(Icons.window, color: Colors.white, shadows: iconShadow),
+            icon: const Icon(Icons.window,
+                color: Colors.white, shadows: iconShadow),
             onPressed: () {
               WindowService.openWindow(
                 route: '/my_collages',
@@ -2723,8 +2813,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             surfaceTintColor: Colors.transparent,
           ),
           tooltip: 'Toggle Fullscreen',
-          icon:
-              const Icon(Icons.fullscreen, color: Colors.white, shadows: iconShadow),
+          icon: const Icon(Icons.fullscreen,
+              color: Colors.white, shadows: iconShadow),
           onPressed: _toggleFullscreen,
         ),
       ],
@@ -2808,8 +2898,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   if (_controlsHover[item.id] == true) return;
 
                   const double scaleEps = 0.002;
-                  final bool isScaling = (details.scale - 1.0).abs() > scaleEps ||
-                      details.pointerCount >= 2;
+                  final bool isScaling =
+                      (details.scale - 1.0).abs() > scaleEps ||
+                          details.pointerCount >= 2;
 
                   setState(() {
                     if (isScaling) {
@@ -2827,7 +2918,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       final baseScale = item.baseScaleOnGesture ?? item.scale;
                       final nextScale =
                           math.max(0.001, baseScale * details.scale);
-                      final baseOffset = item.baseOffsetOnGesture ?? item.offset;
+                      final baseOffset =
+                          item.baseOffsetOnGesture ?? item.offset;
                       final focalCanvas = baseOffset + localFocal;
                       final basePoint = (focalCanvas - baseOffset) / baseScale;
                       final nextOffset = focalCanvas - basePoint * nextScale;
@@ -3012,7 +3104,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           Positioned.fill(
             child: CustomPaint(
               painter: _CropBorderPainter(
-                strokeWidth: math.max(0.5, 2 / (_collageScale == 0 ? 1 : _collageScale)),
+                strokeWidth:
+                    math.max(0.5, 2 / (_collageScale == 0 ? 1 : _collageScale)),
               ),
             ),
           ),
@@ -3040,7 +3133,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           final rawColumns =
               ((availableWidth + spacing) / (targetCell + spacing)).floor();
           final columns = rawColumns.clamp(1, 6);
-          final cellWidth = (availableWidth - spacing * (columns - 1)) / columns;
+          final cellWidth =
+              (availableWidth - spacing * (columns - 1)) / columns;
           final cellSize = cellWidth;
           final rows = (items.length / columns).ceil();
           final totalHeight =
@@ -3062,8 +3156,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             final overviewScale = item.scale * fitScale;
             final w = item.baseWidth * overviewScale;
             final h = item.baseHeight * overviewScale;
-            final offset = Offset(dx + (cellSize - w) / 2,
-                dy + (cellSize - h) / 2);
+            final offset =
+                Offset(dx + (cellSize - w) / 2, dy + (cellSize - h) / 2);
 
             children.add(
               Positioned(
@@ -3441,8 +3535,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Rect _getItemScreenRect(CollagePhotoState item) {
     final w = item.baseWidth * item.scale;
     final h = item.baseHeight * item.scale;
-    final topLeft =
-        MatrixUtils.transformPoint(_transformationController.value, item.offset);
+    final topLeft = MatrixUtils.transformPoint(
+        _transformationController.value, item.offset);
     final bottomRight = MatrixUtils.transformPoint(
       _transformationController.value,
       item.offset + Offset(w, h),
@@ -3553,8 +3647,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           final show = baseVisible || controlsHover;
 
           return MouseRegion(
-            onEnter: (_) =>
-                setState(() => _controlsHover[item.id] = true),
+            onEnter: (_) => setState(() => _controlsHover[item.id] = true),
             onExit: (_) => setState(() => _controlsHover[item.id] = false),
             child: AnimatedOpacity(
               duration: const Duration(milliseconds: 150),
@@ -3586,10 +3679,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         uiState.startFrac = rv.start;
                         uiState.endFrac = rv.end;
                       }),
-                      onChangeVolume: (v) =>
-                          setState(() => uiState.volume = v),
-                      onChangeSpeed: (s) =>
-                          setState(() => uiState.speed = s),
+                      onChangeVolume: (v) => setState(() => uiState.volume = v),
+                      onChangeSpeed: (s) => setState(() => uiState.speed = s),
                       totalDuration: uiState.duration,
                     ),
                   ),
@@ -3684,9 +3775,7 @@ class _ViewZonesPainter extends CustomPainter {
     for (int i = 0; i < zones.length; i++) {
       final zone = zones[i];
       if (zone == null) continue;
-      final color = colors.isEmpty
-          ? Colors.white
-          : colors[i % colors.length];
+      final color = colors.isEmpty ? Colors.white : colors[i % colors.length];
       final rect = _canvasRectForZone(zone, viewportSize);
       if (rect.isEmpty) continue;
       final paint = Paint()
@@ -3794,8 +3883,7 @@ class _RotationSliderState extends State<_RotationSlider> {
                 max: _RotationSlider._max,
                 value: widget.value
                     .clamp(_RotationSlider._min, _RotationSlider._max),
-                onChangeStart: (v) =>
-                    setState(() => _isDragging = true),
+                onChangeStart: (v) => setState(() => _isDragging = true),
                 onChangeEnd: (v) => setState(() => _isDragging = false),
                 onChanged: (v) {
                   setState(() => _lastValue = v);
@@ -3851,7 +3939,9 @@ class _ViewZoneChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: isSet
-                ? ((isActive && isSet) ? color.withOpacity(0.35) : Colors.white10)
+                ? ((isActive && isSet)
+                    ? color.withOpacity(0.35)
+                    : Colors.white10)
                 : Colors.grey.shade800,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(

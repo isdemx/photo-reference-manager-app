@@ -17,6 +17,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/folders_hel
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 import 'package:photographers_reference_app/src/services/window_service.dart';
 
 class MacosMainScreen extends StatefulWidget {
@@ -61,9 +62,9 @@ class _MacosMainScreenState extends State<MacosMainScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final canGoBack = Navigator.of(context).canPop();
+    final navHistory = NavigationHistoryService.instance;
     return Scaffold(
-      backgroundColor: MacosPalette.canvas,
+      backgroundColor: MacosPalette.canvas(context),
       appBar: MacosTopBar(
         onToggleSidebar: _toggleSidebar,
         onOpenNewWindow: () {
@@ -73,14 +74,10 @@ class _MacosMainScreenState extends State<MacosMainScreen> {
             title: 'Refma — Collage',
           );
         },
-        onBack: () {
-          if (Navigator.of(context).canPop()) {
-            Navigator.of(context).maybePop();
-          }
-        },
-        onForward: () {},
-        canGoBack: canGoBack,
-        canGoForward: false,
+        onBack: () => navHistory.goBack(context),
+        onForward: () => navHistory.goForward(context),
+        canGoBack: true,
+        canGoForward: true,
         onUpload: () => Navigator.push(
           context,
           PageRouteBuilder(
@@ -187,9 +184,12 @@ class _MacosMainContent extends StatelessWidget {
                     categories.isEmpty && folders.isEmpty && photos.isEmpty;
 
                 return Container(
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF0B0C0F), Color(0xFF0F1116)],
+                      colors: [
+                        MacosPalette.canvas(context),
+                        MacosPalette.surface(context),
+                      ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                     ),
@@ -269,7 +269,7 @@ class _MacosMainContent extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: MacosPalette.surface,
+          color: MacosPalette.surface(context),
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(
@@ -281,12 +281,12 @@ class _MacosMainContent extends StatelessWidget {
         ),
         child: Row(
           children: [
-            const Icon(Iconsax.folder, size: 28, color: MacosPalette.text),
+            Icon(Iconsax.folder, size: 28, color: MacosPalette.text(context)),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 'Start by importing photos or creating your first category.',
-                style: MacosTypography.caption.copyWith(fontSize: 12),
+                style: MacosTypography.caption(context).copyWith(fontSize: 12),
               ),
             ),
             const SizedBox(width: 8),
@@ -379,7 +379,7 @@ class _CategorySection extends StatelessWidget {
                           ? Iconsax.arrow_right_3
                           : Iconsax.arrow_down_1,
                       size: 14,
-                      color: MacosPalette.text,
+                      color: MacosPalette.text(context),
                     ),
                   ),
                 ),
@@ -387,7 +387,7 @@ class _CategorySection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     '${category.name} · $photoCount photos',
-                    style: MacosTypography.section,
+                    style: MacosTypography.section(context),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -408,12 +408,12 @@ class _CategorySection extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
                   decoration: BoxDecoration(
-                    color: MacosPalette.surfaceAlt,
+                    color: MacosPalette.surfaceAlt(context),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: const Text(
+                  child: Text(
                     'No folders in this category',
-                    style: MacosTypography.caption,
+                    style: MacosTypography.caption(context),
                   ),
                 )
               else
@@ -487,7 +487,7 @@ class _FolderCard extends StatelessWidget {
       onLongPress: () => FoldersHelpers.showEditFolderDialog(context, folder),
       child: Container(
         decoration: BoxDecoration(
-          color: MacosPalette.surfaceAlt,
+          color: MacosPalette.surfaceAlt(context),
           borderRadius: BorderRadius.circular(16),
         ),
         clipBehavior: Clip.antiAlias,
@@ -500,11 +500,11 @@ class _FolderCard extends StatelessWidget {
                       fit: BoxFit.cover,
                     )
                   : Container(
-                      color: MacosPalette.surfaceAlt,
-                      child: const Icon(
+                      color: MacosPalette.surfaceAlt(context),
+                      child: Icon(
                         Iconsax.folder,
                         size: 36,
-                        color: MacosPalette.text,
+                        color: MacosPalette.text(context),
                       ),
                     ),
             ),
@@ -584,18 +584,18 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 14, color: MacosPalette.text),
+      icon: Icon(icon, size: 14, color: MacosPalette.text(context)),
       label: Text(
         label,
-        style: const TextStyle(
-          color: MacosPalette.text,
+        style: TextStyle(
+          color: MacosPalette.text(context),
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
       ),
       style: TextButton.styleFrom(
-        backgroundColor: const Color(0xFF232C3A),
-        foregroundColor: MacosPalette.text,
+        backgroundColor: MacosPalette.surfaceAlt(context),
+        foregroundColor: MacosPalette.text(context),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
