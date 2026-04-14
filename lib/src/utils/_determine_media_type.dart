@@ -2,7 +2,18 @@ import 'package:path/path.dart' as path_package;
 
 String determineMediaType(String path) {
   final extension = path_package.extension(path).toLowerCase();
-  if (['.jpg', '.jpeg', '.png', '.gif'].contains(extension)) {
+  if ([
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.gif',
+    '.heic',
+    '.heif',
+    '.webp',
+    '.tiff',
+    '.tif',
+    '.bmp',
+  ].contains(extension)) {
     return 'image';
   } else if ([
     '.mp4',

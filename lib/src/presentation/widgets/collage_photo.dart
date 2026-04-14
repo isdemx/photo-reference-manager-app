@@ -31,10 +31,15 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/collage_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/collage_preview_helper.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/collage_save_helper.dart';
+import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
+import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 
 import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_picker_widget.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_surface_widget.dart';
 
@@ -745,6 +750,48 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Timer? _arrowRepeatDelay;
   Timer? _arrowRepeatTick;
   LogicalKeyboardKey? _heldArrowKey;
+
+  bool get _showDesktopTopBar =>
+      !kIsWeb && Platform.isMacOS && !_isFullscreen;
+
+  void _openSettings() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: context.appThemeColors.overlay.withValues(alpha: 0.7),
+      builder: (_) => const SettingsDialog(appVersion: null),
+    );
+  }
+
+  PreferredSizeWidget _desktopTopBar() {
+    final navHistory = NavigationHistoryService.instance;
+    return MacosTopBar(
+      onToggleSidebar: () {},
+      onOpenNewWindow: () {
+        WindowService.openWindow(
+          route: '/my_collages',
+          args: {},
+          title: 'Refma - Collage',
+        );
+      },
+      onBack: () => navHistory.goBack(context),
+      onForward: () => navHistory.goForward(context),
+      canGoBack: true,
+      canGoForward: true,
+      onUpload: () => Navigator.push(
+        context,
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => const UploadScreen(),
+          transitionsBuilder: (_, __, ___, child) => child,
+        ),
+      ),
+      onAllPhotos: () => Navigator.pushNamed(context, '/all_photos'),
+      onCollages: () => Navigator.pushNamed(context, '/my_collages'),
+      onTags: () => Navigator.pushNamed(context, '/all_tags'),
+      onSettings: _openSettings,
+      title: _currentCollage?.title ?? 'Collage',
+    );
+  }
 
   void _exitEditingMode({bool keepActiveSelection = true}) {
     setState(() {
@@ -2152,6 +2199,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       },
       child: Scaffold(
         key: _scaffoldKey,
+        appBar: _showDesktopTopBar ? _desktopTopBar() : null,
         body: Stack(
           children: [
             Column(
@@ -2477,7 +2525,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   ),
                 ),
               ),
-            if (!_isFullscreen && _draggingIndex == null) ...[
+            if (!_isFullscreen &&
+                !_showDesktopTopBar &&
+                _draggingIndex == null) ...[
               Positioned(
                 left: 12,
                 top: 12,

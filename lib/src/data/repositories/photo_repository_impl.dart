@@ -9,6 +9,7 @@ import 'package:photographers_reference_app/src/data/utils/compress_photo_isolat
 import 'package:photographers_reference_app/src/data/utils/get_ios_temporary_directory.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/repositories/photo_repository.dart';
+import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 
 class PhotoRepositoryImpl implements PhotoRepository {
   final Box<Photo> photoBox;
@@ -76,6 +77,19 @@ class PhotoRepositoryImpl implements PhotoRepository {
   @override
   Future<List<Photo>> getPhotos() async {
     final photos = photoBox.values.toList();
+    for (final photo in photos) {
+      if (photo.mediaType == 'image' || photo.mediaType == 'video') {
+        continue;
+      }
+
+      final inferredType = determineMediaType(photo.fileName);
+      if (inferredType == 'unknown') {
+        continue;
+      }
+
+      photo.mediaType = inferredType;
+      await photoBox.put(photo.id, photo);
+    }
     photos.sort((a, b) => b.dateAdded.compareTo(a.dateAdded));
     return photos;
   }

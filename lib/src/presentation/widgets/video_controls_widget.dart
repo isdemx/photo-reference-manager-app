@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'triangle_volume_slider_widget.dart';
 
 class VideoControls extends StatelessWidget {
   /// значения в долях длительности (0..1)
   final double startFrac; // где начинается диапазон
-  final double endFrac;   // где заканчивается диапазон
+  final double endFrac; // где заканчивается диапазон
   final double positionFrac; // текущая позиция
 
   /// колбэки времени
-  final ValueChanged<double> onSeekFrac;          // изменение текущей позиции
-  final ValueChanged<RangeValues>? onChangeRange;  // изменение диапазона (start/end)
+  final ValueChanged<double> onSeekFrac; // изменение текущей позиции
+  final ValueChanged<RangeValues>?
+      onChangeRange; // изменение диапазона (start/end)
 
   /// громкость / скорость
   final ValueChanged<double>? onChangeVolume; // 0..1
-  final ValueChanged<double>? onChangeSpeed;  // 0.1..4.0
+  final ValueChanged<double>? onChangeSpeed; // 0.1..4.0
 
   final double volume; // 0..1
-  final double speed;  // 0.1..4.0
+  final double speed; // 0.1..4.0
 
   final bool showLoopRange;
   final bool showVolume;
@@ -46,6 +48,10 @@ class VideoControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appColors = context.appThemeColors;
+    final accentColor = appColors.accent;
+    final trackColor = appColors.border.withValues(alpha: 0.75);
+    final tailColor = appColors.subtle.withValues(alpha: 0.26);
     final showVol = showVolume && onChangeVolume != null;
     final showSpd = showSpeed && onChangeSpeed != null;
     const speedMin = 0.1;
@@ -70,6 +76,9 @@ class VideoControls extends StatelessWidget {
                 position: pos,
                 loopStart: start,
                 loopEnd: end,
+                trackColor: trackColor,
+                tailColor: tailColor,
+                accentColor: accentColor,
                 onPositionChanged: onSeekFrac,
                 onLoopChanged: showLoopRange ? onChangeRange : null,
                 enableLoopHandles: showLoopRange,
@@ -87,6 +96,10 @@ class VideoControls extends StatelessWidget {
                     child: TriangleVolumeSlider(
                       value: volume.clamp(0, 1),
                       onChanged: onChangeVolume!,
+                      trackColor: trackColor,
+                      fillColor: accentColor,
+                      outlineColor: appColors.border,
+                      showOutline: true,
                       width: 20,
                       height: 16,
                       hitHeight: 22,
@@ -104,6 +117,10 @@ class VideoControls extends StatelessWidget {
                     height: 22,
                     child: TriangleVolumeSlider(
                       value: speed01,
+                      trackColor: trackColor,
+                      fillColor: accentColor,
+                      outlineColor: appColors.border,
+                      showOutline: true,
                       labelBuilder: (v01) {
                         final value =
                             _fracToSpeed(v01, speedMin, speedMid, speedMax);
@@ -160,6 +177,9 @@ class _VideoLoopTimeline extends StatefulWidget {
   final double position;
   final double loopStart;
   final double loopEnd;
+  final Color trackColor;
+  final Color tailColor;
+  final Color accentColor;
   final double minLoopSpan;
   final ValueChanged<double>? onPositionChanged;
   final ValueChanged<RangeValues>? onLoopChanged;
@@ -170,6 +190,9 @@ class _VideoLoopTimeline extends StatefulWidget {
     required this.position,
     required this.loopStart,
     required this.loopEnd,
+    required this.trackColor,
+    required this.tailColor,
+    required this.accentColor,
     this.onPositionChanged,
     this.onLoopChanged,
     this.minLoopSpan = 0.001,
@@ -337,6 +360,9 @@ class _VideoLoopTimelineState extends State<_VideoLoopTimeline> {
                 loopStart: _loopStart,
                 loopEnd: _loopEnd,
                 showLoopHandles: widget.enableLoopHandles,
+                trackColor: widget.trackColor,
+                tailColor: widget.tailColor,
+                accentColor: widget.accentColor,
               ),
             ),
           ),
@@ -351,12 +377,18 @@ class _VideoLoopTimelinePainter extends CustomPainter {
   final double loopStart;
   final double loopEnd;
   final bool showLoopHandles;
+  final Color trackColor;
+  final Color tailColor;
+  final Color accentColor;
 
   _VideoLoopTimelinePainter({
     required this.position,
     required this.loopStart,
     required this.loopEnd,
     required this.showLoopHandles,
+    required this.trackColor,
+    required this.tailColor,
+    required this.accentColor,
   });
 
   @override
@@ -365,17 +397,17 @@ class _VideoLoopTimelinePainter extends CustomPainter {
     final centerY = size.height / 2;
 
     final trackPaint = Paint()
-      ..color = Colors.white.withOpacity(0.7)
+      ..color = trackColor
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
 
     final tailPaint = Paint()
-      ..color = Colors.black.withOpacity(0.4)
+      ..color = tailColor
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
 
     final handlePaint = Paint()
-      ..color = Colors.redAccent
+      ..color = accentColor
       ..style = PaintingStyle.fill;
 
     // Общий трек: белый, сверху рисуем прогресс красным.
@@ -389,7 +421,7 @@ class _VideoLoopTimelinePainter extends CustomPainter {
     final loopEndX = loopEnd * width;
     final progressEndX = posX < loopEndX ? posX : loopEndX;
     final progressPaint = Paint()
-      ..color = Colors.redAccent
+      ..color = accentColor
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
     canvas.drawLine(
@@ -433,7 +465,7 @@ class _VideoLoopTimelinePainter extends CustomPainter {
 
     // Текущая позиция — вертикальная линия.
     final posPaint = Paint()
-      ..color = Colors.redAccent
+      ..color = accentColor
       ..style = PaintingStyle.fill;
     const posW = 2.0;
     const posH = 3.0; // равен толщине линии, чтобы не выступал
@@ -450,6 +482,9 @@ class _VideoLoopTimelinePainter extends CustomPainter {
     return oldDelegate.position != position ||
         oldDelegate.loopStart != loopStart ||
         oldDelegate.loopEnd != loopEnd ||
-        oldDelegate.showLoopHandles != showLoopHandles;
+        oldDelegate.showLoopHandles != showLoopHandles ||
+        oldDelegate.trackColor != trackColor ||
+        oldDelegate.tailColor != tailColor ||
+        oldDelegate.accentColor != accentColor;
   }
 }

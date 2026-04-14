@@ -10,6 +10,7 @@ import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_editor/image_editor.dart';
@@ -48,8 +49,7 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
   final int w = job['w'] as int;
   final int h = job['h'] as int;
   final int quality = job['quality'] as int? ?? 95;
-  final double rotationDeg =
-      (job['rotationDeg'] as double? ?? 0.0) % 360.0;
+  final double rotationDeg = (job['rotationDeg'] as double? ?? 0.0) % 360.0;
   final bool flipX = job['flipX'] as bool? ?? false;
   final bool flipY = job['flipY'] as bool? ?? false;
   final double brightness = job['brightness'] as double? ?? 1.0;
@@ -86,8 +86,10 @@ Uint8List cropEncodeJpgIsolate(Map<String, dynamic> job) {
     working = img.flipVertical(working);
   }
 
-  final bool needsColorAdjustments =
-      brightness != 1.0 || saturation != 1.0 || contrast != 1.0 || hueDeg != 0.0;
+  final bool needsColorAdjustments = brightness != 1.0 ||
+      saturation != 1.0 ||
+      contrast != 1.0 ||
+      hueDeg != 0.0;
   if (needsColorAdjustments) {
     working = img.adjustColor(
       working,
@@ -320,10 +322,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   }) async {
     debugPrint(
         '[EditSave] nativeCrop: needCrop=$needCrop rot=$rotationDeg flipX=$flipX flipY=$flipY rect=$cropRect');
-    if (!needCrop &&
-        rotationDeg.abs() < 0.1 &&
-        !flipX &&
-        !flipY) {
+    if (!needCrop && rotationDeg.abs() < 0.1 && !flipX && !flipY) {
       return null;
     }
 
@@ -367,8 +366,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       image: state.rawImageData,
       imageEditorOption: option,
     );
-    debugPrint(
-        '[EditSave] nativeCrop: out=${result?.length ?? 0} bytes');
+    debugPrint('[EditSave] nativeCrop: out=${result?.length ?? 0} bytes');
     return result;
   }
 
@@ -433,8 +431,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     final duration = c.value.duration;
     if (duration == Duration.zero) return;
     final pos = c.value.position;
-    final frac =
-        (pos.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    final frac = (pos.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
 
     if (frac > _trimEndFrac) {
       c.pause();
@@ -469,9 +466,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     });
 
     final inputPath = _resolveVideoPath(widget.photo);
-    final ext = p.extension(inputPath).isNotEmpty
-        ? p.extension(inputPath)
-        : '.mp4';
+    final ext =
+        p.extension(inputPath).isNotEmpty ? p.extension(inputPath) : '.mp4';
     final appDir = await getApplicationDocumentsDirectory();
     final photosDir = Directory(p.join(appDir.path, 'photos'));
     if (!await photosDir.exists()) {
@@ -573,8 +569,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     final endMs = (duration.inMilliseconds * _trimEndFrac).round();
 
     final args = <String>[];
-    if (endMs > startMs + 200 &&
-        (_trimStartFrac > 0.0 || _trimEndFrac < 1.0)) {
+    if (endMs > startMs + 200 && (_trimStartFrac > 0.0 || _trimEndFrac < 1.0)) {
       args.addAll(['-ss', (startMs / 1000).toStringAsFixed(3)]);
       args.addAll(['-to', (endMs / 1000).toStringAsFixed(3)]);
     }
@@ -589,7 +584,9 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         _ => 0,
       };
       if (maxW > 0) {
-        filters.add('scale=min($maxW,iw):-2');
+        filters.add(
+          'scale=$maxW:-2:force_original_aspect_ratio=decrease:force_divisible_by=2',
+        );
       }
     }
     if (_videoExportFps != _VideoExportFps.original) {
@@ -738,11 +735,9 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       final editAction = editorState.editAction;
       final bool needCrop = editAction?.needCrop ?? false;
       if (uiImage != null) {
-        debugPrint(
-            '[EditSave] uiImageSize=${uiImage.width}x${uiImage.height}');
+        debugPrint('[EditSave] uiImageSize=${uiImage.width}x${uiImage.height}');
       }
-      final bool noTransform =
-          _rotation == 0.0 &&
+      final bool noTransform = _rotation == 0.0 &&
           !_flipX &&
           !_flipY &&
           _brightness == 1.0 &&
@@ -801,8 +796,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
           'saturation:$_saturation temp:$_temp hueDeg:${_hue * 180 / math.pi} '
           'contrast:$_contrast opacity:$_opacity');
 
-      final bool hasColorAdjustments =
-          _brightness != 1.0 ||
+      final bool hasColorAdjustments = _brightness != 1.0 ||
           _saturation != 1.0 ||
           _contrast != 1.0 ||
           _temp != 0.0 ||
@@ -875,12 +869,23 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         ? PhotoPathHelper().getFullPath(widget.photo.fileName)
         : widget.photo.path;
     final double safeBottom = MediaQuery.of(context).padding.bottom;
+    final theme = Theme.of(context);
+    final appColors = context.appThemeColors;
+    final colorScheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+    final editorBackground = _isVideo ? appColors.surface : appColors.canvas;
+    final panelColor =
+        appColors.surface.withValues(alpha: isDark ? 0.94 : 0.98);
+    final panelAltColor =
+        appColors.surfaceAlt.withValues(alpha: isDark ? 0.78 : 0.92);
+    final textColor = appColors.text;
+    final subtleTextColor = appColors.subtle;
+    final accentColor = appColors.accent;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: editorBackground,
       appBar: AppBar(
         title: const Text('Edit Photo'),
-        backgroundColor: Colors.black,
         actions: [
           IconButton(
             icon: const Icon(Icons.close),
@@ -909,8 +914,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                             alignment: Alignment.center,
                             transform: Matrix4.identity()
                               ..rotateZ(_rotation)
-                              ..scale(_flipX ? -1.0 : 1.0,
-                                  _flipY ? -1.0 : 1.0),
+                              ..scale(_flipX ? -1.0 : 1.0, _flipY ? -1.0 : 1.0),
                             child: ExtendedImage.file(
                               File(path),
                               fit: BoxFit.contain,
@@ -929,8 +933,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                                   24 + _bottomBarHeight + safeBottom,
                                 ),
                                 hitTestSize: 20,
-                                cornerColor: Colors.white,
-                                lineColor: Colors.white70,
+                                cornerColor: textColor,
+                                lineColor: subtleTextColor,
                                 initCropRectType: InitCropRectType.imageRect,
                                 cropLayerPainter:
                                     const EditorCropLayerPainter(),
@@ -987,8 +991,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                               Text(
                                 'Size: ${_formatBytes(_currentSizeBytes!)}'
                                 '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
+                                style: TextStyle(
+                                  color: subtleTextColor,
                                   fontSize: 12,
                                 ),
                               ),
@@ -1000,13 +1004,13 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _compressOnSave
                                         ? Colors.green.shade600
-                                        : Colors.blueGrey.shade700,
+                                        : accentColor,
+                                    foregroundColor: colorScheme.onPrimary,
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 12,
                                       vertical: 6,
                                     ),
-                                    textStyle:
-                                        const TextStyle(fontSize: 12),
+                                    textStyle: const TextStyle(fontSize: 12),
                                   ),
                                   child: Text(
                                     _compressOnSave
@@ -1027,13 +1031,12 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                           maxLines: 3,
                           minLines: 2,
                           textInputAction: TextInputAction.newline,
-                          style: const TextStyle(color: Colors.white),
+                          style: TextStyle(color: textColor),
                           decoration: InputDecoration(
                             hintText: 'Comment',
-                            hintStyle:
-                                TextStyle(color: Colors.white.withOpacity(0.5)),
+                            hintStyle: TextStyle(color: subtleTextColor),
                             filled: true,
-                            fillColor: Colors.white12,
+                            fillColor: panelAltColor,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide.none,
@@ -1099,13 +1102,13 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 12),
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              Colors.black87,
+                              panelColor,
                             ],
                           ),
                         ),
@@ -1165,12 +1168,14 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
               ),
             ],
           ),
-
           if (_saving) ...[
             Positioned.fill(
               child: AbsorbPointer(
                 absorbing: true,
-                child: Container(color: Colors.black.withOpacity(0.55)),
+                child: Container(
+                  color:
+                      appColors.overlay.withValues(alpha: isDark ? 0.62 : 0.38),
+                ),
               ),
             ),
             Positioned.fill(
@@ -1180,9 +1185,9 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.75),
+                    color: panelColor,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: appColors.border),
                   ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -1196,8 +1201,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                       Text(
                         _savingText,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: textColor,
                           fontSize: 14,
                           height: 1.2,
                         ),
@@ -1206,8 +1211,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                         const SizedBox(height: 6),
                         Text(
                           '${(_exportProgress! * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            color: Colors.white70,
+                          style: TextStyle(
+                            color: subtleTextColor,
                             fontSize: 12,
                           ),
                         ),
@@ -1225,10 +1230,10 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
   Widget _buildVideoEditor() {
     if (_videoInit == null) {
-      return const Center(
+      return Center(
         child: Text(
           'Video unavailable',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: context.appThemeColors.subtle),
         ),
       );
     }
@@ -1241,18 +1246,34 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         }
         final controller = _videoController;
         if (controller == null || !controller.value.isInitialized) {
-          return const Center(
+          return Center(
             child: Text(
               'Failed to load video',
-              style: TextStyle(color: Colors.white70),
+              style: TextStyle(color: context.appThemeColors.subtle),
             ),
           );
         }
 
         return Center(
-          child: AspectRatio(
-            aspectRatio: controller.value.aspectRatio,
-            child: VideoPlayer(controller),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: context.appThemeColors.surfaceAlt,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.appThemeColors.border),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: AspectRatio(
+                aspectRatio: controller.value.aspectRatio,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: ColoredBox(
+                    color: Colors.black,
+                    child: VideoPlayer(controller),
+                  ),
+                ),
+              ),
+            ),
           ),
         );
       },
@@ -1261,23 +1282,24 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
   Widget _buildVideoExportSettingsPanel() {
     final est = _estimateVideoExportSizeBytes();
+    final appColors = context.appThemeColors;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white10,
+        color: appColors.surface,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white12),
+        border: Border.all(color: appColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Text(
+              Text(
                 'Export settings',
                 style: TextStyle(
-                  color: Colors.white70,
+                  color: appColors.text,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -1286,8 +1308,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
               if (est != null)
                 Text(
                   'Est. ${_formatBytes(est)}',
-                  style: const TextStyle(
-                    color: Colors.white54,
+                  style: TextStyle(
+                    color: appColors.subtle,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1396,6 +1418,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   }
 
   Widget _buildVideoInfoRow() {
+    final appColors = context.appThemeColors;
     final sizeBytes = _currentSizeBytes;
     final duration = _videoController?.value.duration;
     String? durationLabel;
@@ -1424,8 +1447,8 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         alignment: Alignment.centerLeft,
         child: Text(
           parts.join(' • '),
-          style: const TextStyle(
-            color: Colors.white70,
+          style: TextStyle(
+            color: appColors.subtle,
             fontSize: 12,
             fontWeight: FontWeight.w600,
           ),
@@ -1478,17 +1501,29 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     required ValueChanged<T> onSelected,
   }) {
     final selected = value == groupValue;
+    final appColors = context.appThemeColors;
+    final theme = Theme.of(context);
     return ChoiceChip(
       label: Text(label),
       selected: selected,
       onSelected: (_) => onSelected(value),
-      selectedColor: Colors.blueGrey.shade700,
-      backgroundColor: Colors.white10,
+      selectedColor: appColors.accent.withValues(alpha: 0.18),
+      backgroundColor: appColors.surfaceAlt,
+      side: BorderSide(
+        color: selected ? appColors.accent : appColors.border,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+      ),
       labelStyle: TextStyle(
-        color: selected ? Colors.white : Colors.white70,
+        color: selected ? appColors.text : appColors.subtle,
         fontSize: 11,
         fontWeight: FontWeight.w600,
       ),
+      iconTheme: IconThemeData(
+        color: selected ? appColors.text : appColors.subtle,
+      ),
+      checkmarkColor: theme.colorScheme.primary,
       visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
     );
   }
