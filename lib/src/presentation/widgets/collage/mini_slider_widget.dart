@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -15,6 +14,7 @@ class MiniSlider extends StatelessWidget {
   final String Function(double v)? format;
 
   const MiniSlider({
+    super.key,
     required this.label,
     required this.value,
     required this.min,
@@ -29,34 +29,29 @@ class MiniSlider extends StatelessWidget {
   Widget build(BuildContext context) {
     final txt = (format ?? ((v) => v.toStringAsFixed(2)))(value);
 
-    final bool isIOS = Platform.isIOS;
-    final double bottomInset = MediaQuery.of(context).padding.bottom;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Заголовок + значение
         Row(
           children: [
             Text(label,
-                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                style: const TextStyle(color: Colors.white70, fontSize: 11)),
             const Spacer(),
             Text(txt,
                 style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 12,
+                    fontSize: 11,
                     fontFeatures: [ui.FontFeature.tabularFigures()])),
           ],
         ),
-        const SizedBox(height: 2),
-        // Сам слайдер + «магнит» к центру
+        const SizedBox(height: 1),
         GestureDetector(
           onDoubleTap: () => onChanged(centerValue),
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              trackHeight: 1.5,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5.5),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
               activeTrackColor: Colors.white,
               inactiveTrackColor: Colors.white24,
               thumbColor: Colors.white,

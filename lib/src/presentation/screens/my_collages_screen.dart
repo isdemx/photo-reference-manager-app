@@ -350,22 +350,61 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
                             ),
                           ],
                         ),
-                  floatingActionButton: FloatingActionButton.extended(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => PhotoCollageWidget(
-                            key: const ValueKey('new_photo_collage_widget'),
-                            photos: [allPhotos.first],
-                            allPhotos: allPhotos,
+                  floatingActionButton: Padding(
+                    padding: const EdgeInsets.only(right: 8, bottom: 4),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: context.appThemeColors.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: context.appThemeColors.border,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 18,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
+                      ),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PhotoCollageWidget(
+                                key: const ValueKey(
+                                  'new_photo_collage_widget',
+                                ),
+                                photos: [allPhotos.first],
+                                allPhotos: allPhotos,
+                              ),
+                            ),
+                          );
+                        },
+                        style: TextButton.styleFrom(
+                          foregroundColor: context.appThemeColors.text,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.1,
                           ),
                         ),
-                      );
-                    },
-                    icon: const Icon(Iconsax.add),
-                    label: const Text('Create New Collage'),
-                    backgroundColor: Colors.black,
+                        icon: Icon(
+                          Iconsax.add,
+                          size: 16,
+                          color: context.appThemeColors.text,
+                        ),
+                        label: const Text('New Collage'),
+                      ),
+                    ),
                   ),
                 );
               } else {

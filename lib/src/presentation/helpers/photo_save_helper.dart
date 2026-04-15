@@ -14,6 +14,28 @@ import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 
 class PhotoSaveHelper {
+  static Future<String> _ensureUniqueFileName(String fileName) async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final photosDir = Directory(p.join(appDir.path, 'photos'));
+    if (!photosDir.existsSync()) {
+      await photosDir.create(recursive: true);
+    }
+
+    final base = p.basenameWithoutExtension(fileName).trim();
+    final ext = p.extension(fileName);
+    final safeBase = base.isEmpty ? 'media' : base;
+
+    var candidate = '$safeBase$ext';
+    var counter = 1;
+
+    while (File(p.join(photosDir.path, candidate)).existsSync()) {
+      candidate = '$safeBase ($counter)$ext';
+      counter++;
+    }
+
+    return candidate;
+  }
+
   /// Сохраняет файл из байтов [bytes] с именем [fileName] в папку "photos" приложения,
   /// создаёт объект [Photo], добавляет его в базу данных и возвращает.
   /// Если это видео — генерирует videoPreview + videoDuration и обновляет запись.
@@ -25,6 +47,9 @@ class PhotoSaveHelper {
     void Function(String status)? onStatus,
   }) async {
     try {
+      final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
+      final photoBloc = context.read<PhotoBloc>();
+
       // 1) Получаем директорию приложения и создаём папку "photos".
       final appDir = await getApplicationDocumentsDirectory();
       final photosDir = Directory(p.join(appDir.path, 'photos'));
@@ -33,7 +58,8 @@ class PhotoSaveHelper {
       }
 
       // 2) Создаём путь для сохранения файла.
-      final outPath = p.join(photosDir.path, fileName);
+      final uniqueFileName = await _ensureUniqueFileName(fileName);
+      final outPath = p.join(photosDir.path, uniqueFileName);
       final outFile = File(outPath);
 
       // 3) Записываем байты в файл.
@@ -83,7 +109,6 @@ class PhotoSaveHelper {
       );
 
       // 5) Добавляем в базу (сразу), чтобы объект был в Hive.
-      final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
       await repo.addPhoto(newPhoto);
 
       // 6) Если это видео — генерируем превью и обновляем запись.
@@ -92,23 +117,82 @@ class PhotoSaveHelper {
         if (videoResult != null) {
           newPhoto.videoPreview = videoResult['videoPreview'] as String?;
           newPhoto.videoDuration = videoResult['videoDuration'] as String?;
-          newPhoto.videoWidth =
-              (videoResult['videoWidth'] as num?)?.toDouble();
+          newPhoto.videoWidth = (videoResult['videoWidth'] as num?)?.toDouble();
           newPhoto.videoHeight =
               (videoResult['videoHeight'] as num?)?.toDouble();
           await repo.updatePhoto(newPhoto);
         } else {
-          debugPrint('[PhotoSaveHelper] video thumbnail generation returned null');
+          debugPrint(
+              '[PhotoSaveHelper] video thumbnail generation returned null');
         }
       }
 
       // 7) Обновляем список.
-      context.read<PhotoBloc>().add(LoadPhotos());
+      photoBloc.add(LoadPhotos());
 
       return newPhoto;
     } catch (e, st) {
       debugPrint('Ошибка сохранения файла: $e\n$st');
       throw Exception('Не удалось сохранить файл');
+    }
+  }
+
+  static Future<Photo> importExternalFile({
+    required String sourcePath,
+    required BuildContext context,
+  }) async {
+    try {
+      final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
+      final photoBloc = context.read<PhotoBloc>();
+      final file = File(sourcePath);
+      if (!await file.exists()) {
+        throw Exception('Файл не найден');
+      }
+
+      final mediaType = determineMediaType(sourcePath);
+      if (mediaType == 'unknown') {
+        throw Exception('Неподдерживаемый тип файла');
+      }
+
+      final uniqueFileName =
+          await _ensureUniqueFileName(p.basename(sourcePath));
+
+      final photo = Photo(
+        id: const Uuid().v4(),
+        path: sourcePath,
+        fileName: uniqueFileName,
+        mediaType: mediaType,
+        dateAdded: DateTime.now(),
+        folderIds: [],
+        comment: '',
+        tagIds: [],
+        sortOrder: 0,
+        isStoredInApp: true,
+        geoLocation: null,
+        videoPreview: null,
+        videoDuration: null,
+        videoWidth: null,
+        videoHeight: null,
+      );
+
+      await repo.addPhoto(photo);
+
+      if (photo.mediaType == 'video') {
+        final videoResult = await generateVideoThumbnail(photo);
+        if (videoResult != null) {
+          photo.videoPreview = videoResult['videoPreview'] as String?;
+          photo.videoDuration = videoResult['videoDuration'] as String?;
+          photo.videoWidth = (videoResult['videoWidth'] as num?)?.toDouble();
+          photo.videoHeight = (videoResult['videoHeight'] as num?)?.toDouble();
+          await repo.updatePhoto(photo);
+        }
+      }
+
+      photoBloc.add(LoadPhotos());
+      return photo;
+    } catch (e, st) {
+      debugPrint('Ошибка импорта файла: $e\n$st');
+      throw Exception('Не удалось импортировать файл');
     }
   }
 }

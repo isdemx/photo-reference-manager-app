@@ -10,6 +10,9 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    if let appDelegate = NSApp.delegate as? AppDelegate {
+      appDelegate.configureOpenFilesChannel(with: flutterViewController)
+    }
 
     FlutterMultiWindowPlugin.setOnWindowCreatedCallback { controller in
       RegisterGeneratedPlugins(registry: controller)

@@ -7,6 +7,7 @@ class ActionIcon extends StatelessWidget {
   final VoidCallback onPressed;
 
   const ActionIcon({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
@@ -21,14 +22,14 @@ class ActionIcon extends StatelessWidget {
         onTap: onPressed,
         radius: 18,
         child: Container(
-          width: 28,
-          height: 28,
+          width: 24,
+          height: 24,
           decoration: BoxDecoration(
             color: Colors.white10,
             borderRadius: BorderRadius.circular(6),
           ),
           alignment: Alignment.center,
-          child: Icon(icon, size: 16, color: Colors.white),
+          child: Icon(icon, size: 14, color: Colors.white),
         ),
       ),
     );

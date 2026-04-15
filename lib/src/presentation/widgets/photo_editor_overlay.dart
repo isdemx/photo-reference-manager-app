@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:async';
-import 'dart:typed_data';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
@@ -10,6 +9,9 @@ import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_adjustments_panel.dart';
 import 'package:image/image.dart' as img;
@@ -28,14 +30,23 @@ import 'package:video_player/video_player.dart';
 
 class PhotoEditorOverlay extends StatefulWidget {
   final Photo photo;
-  final void Function(Uint8List bytes, bool overwrite, String comment) onSave;
+  final Future<void> Function(Uint8List bytes, bool overwrite, String comment)
+      onSave;
   final void Function(Photo newPhoto)? onAddNewPhoto;
+  final bool hasPrevious;
+  final bool hasNext;
+  final VoidCallback? onOpenPrevious;
+  final VoidCallback? onOpenNext;
 
   const PhotoEditorOverlay({
     super.key,
     required this.photo,
     required this.onSave,
     this.onAddNewPhoto,
+    this.hasPrevious = false,
+    this.hasNext = false,
+    this.onOpenPrevious,
+    this.onOpenNext,
   });
 
   @override
@@ -201,6 +212,31 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
   double _opacity = 1.0;
 
   static const double _bottomBarHeight = 72.0;
+
+  void _openPrevious() {
+    if (_saving || widget.onOpenPrevious == null) return;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onOpenPrevious?.call();
+    });
+  }
+
+  void _openNext() {
+    if (_saving || widget.onOpenNext == null) return;
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      widget.onOpenNext?.call();
+    });
+  }
+
+  void _openSettings() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: context.appThemeColors.overlay.withValues(alpha: 0.7),
+      builder: (_) => const SettingsDialog(appVersion: null),
+    );
+  }
 
   @override
   void initState() {
@@ -760,9 +796,26 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
       if (noTransform && noCrop) {
         debugPrint('[EditSave] fast path: save original bytes');
-        widget.onSave(originBytes, overwrite, _commentController.text.trim());
+        await widget.onSave(
+          originBytes,
+          overwrite,
+          _commentController.text.trim(),
+        );
         if (!mounted) return;
-        Navigator.of(context).pop();
+        if (overwrite) {
+          setState(() {
+            _saving = false;
+            _compressedPreviewBytes = null;
+            _compressOnSave = false;
+          });
+          await _loadCurrentSize();
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Changes saved')),
+          );
+        } else {
+          Navigator.of(context).pop();
+        }
         return;
       }
 
@@ -849,11 +902,24 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         debugPrint('[EditSave] after sizeCap bytes=${outBytes.length}');
       }
 
-      widget.onSave(outBytes, overwrite, _commentController.text.trim());
+      await widget.onSave(outBytes, overwrite, _commentController.text.trim());
       debugPrint('[EditSave] done bytes=${outBytes.length}');
 
       if (!mounted) return;
-      Navigator.of(context).pop();
+      if (overwrite) {
+        setState(() {
+          _saving = false;
+          _compressedPreviewBytes = null;
+          _compressOnSave = false;
+        });
+        await _loadCurrentSize();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Changes saved')),
+        );
+      } else {
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
@@ -863,173 +929,130 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final String path = widget.photo.isStoredInApp
-        ? PhotoPathHelper().getFullPath(widget.photo.fileName)
-        : widget.photo.path;
-    final double safeBottom = MediaQuery.of(context).padding.bottom;
-    final theme = Theme.of(context);
-    final appColors = context.appThemeColors;
-    final colorScheme = theme.colorScheme;
-    final bool isDark = theme.brightness == Brightness.dark;
-    final editorBackground = _isVideo ? appColors.surface : appColors.canvas;
-    final panelColor =
-        appColors.surface.withValues(alpha: isDark ? 0.94 : 0.98);
-    final panelAltColor =
-        appColors.surfaceAlt.withValues(alpha: isDark ? 0.78 : 0.92);
-    final textColor = appColors.text;
-    final subtleTextColor = appColors.subtle;
-    final accentColor = appColors.accent;
-
-    return Scaffold(
-      backgroundColor: editorBackground,
-      appBar: AppBar(
-        title: const Text('Edit Photo'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          )
-        ],
-      ),
-      body: Stack(
+  Widget _buildEditorPanels({
+    required bool isMacOSDesktop,
+    required Color panelAltColor,
+    required Color textColor,
+    required Color subtleTextColor,
+    required Color accentColor,
+    required ColorScheme colorScheme,
+  }) {
+    if (_isVideo) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Column(
-            children: [
-              Expanded(
-                child: _isVideo
-                    ? _buildVideoEditor()
-                    : Opacity(
-                        opacity: _opacity.clamp(0.0, 1.0),
-                        child: ColorFiltered(
-                          colorFilter: combinedColorFilter(
-                            _brightness,
-                            _saturation,
-                            _contrast,
-                            _temp,
-                            _hue,
-                          ),
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()
-                              ..rotateZ(_rotation)
-                              ..scale(_flipX ? -1.0 : 1.0, _flipY ? -1.0 : 1.0),
-                            child: ExtendedImage.file(
-                              File(path),
-                              fit: BoxFit.contain,
-                              mode: ExtendedImageMode.editor,
-                              cacheRawData: true,
-                              extendedImageEditorKey: _editorKey,
-                              initEditorConfigHandler: (_) => EditorConfig(
-                                maxScale: 5.0,
-                                speed: 1.0,
-                                animationDuration:
-                                    const Duration(milliseconds: 200),
-                                cropRectPadding: EdgeInsets.fromLTRB(
-                                  24,
-                                  24,
-                                  24,
-                                  24 + _bottomBarHeight + safeBottom,
-                                ),
-                                hitTestSize: 20,
-                                cornerColor: textColor,
-                                lineColor: subtleTextColor,
-                                initCropRectType: InitCropRectType.imageRect,
-                                cropLayerPainter:
-                                    const EditorCropLayerPainter(),
-                              ),
-                            ),
-                          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: VideoControls(
+              startFrac: _trimStartFrac,
+              endFrac: _trimEndFrac,
+              positionFrac: _videoPositionFrac,
+              onSeekFrac: (value) async {
+                final c = _videoController;
+                if (c == null || !c.value.isInitialized) return;
+                final duration = c.value.duration;
+                final ms = (duration.inMilliseconds * value).round();
+                await c.seekTo(Duration(milliseconds: ms));
+              },
+              onChangeRange: (range) {
+                final start = range.start.clamp(0.0, 1.0);
+                final end = range.end.clamp(0.0, 1.0);
+                if (end <= start) return;
+                setState(() {
+                  _trimStartFrac = start;
+                  _trimEndFrac = end;
+                });
+              },
+              volume: _videoVolume,
+              speed: 1.0,
+              showLoopRange: true,
+              showVolume: true,
+              showSpeed: false,
+              totalDuration: _videoController?.value.duration,
+              onChangeVolume: (v) {
+                final c = _videoController;
+                setState(() => _videoVolume = v);
+                c?.setVolume(_videoVolume);
+              },
+            ),
+          ),
+          _buildVideoInfoRow(),
+          _buildVideoExportSettingsPanel(),
+        ],
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 2),
+          child: PhotoAdjustmentsPanel(
+            onRotateLeft: () => setState(() => _rotation -= math.pi / 2),
+            onRotateRight: () => setState(() => _rotation += math.pi / 2),
+            onFlipX: () => setState(() => _flipX = !_flipX),
+            onFlipY: () => setState(() => _flipY = !_flipY),
+            onSendBackward: null,
+            onBringForward: null,
+            brightness: _brightness,
+            saturation: _saturation,
+            temp: _temp,
+            hue: _hue,
+            contrast: _contrast,
+            opacity: _opacity,
+            onBrightnessChanged: (v) => setState(() => _brightness = v),
+            onSaturationChanged: (v) => setState(() => _saturation = v),
+            onTempChanged: (v) => setState(() => _temp = v),
+            onHueChanged: (v) => setState(() => _hue = v),
+            onContrastChanged: (v) => setState(() => _contrast = v),
+            onOpacityChanged: (v) => setState(() => _opacity = v),
+          ),
+        ),
+        if (_currentSizeBytes != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+            child: isMacOSDesktop
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Size: ${_formatBytes(_currentSizeBytes!)}'
+                        '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
+                        style: TextStyle(
+                          color: subtleTextColor,
+                          fontSize: 12,
                         ),
                       ),
-              ),
-              Flexible(
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.zero,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (!_isVideo)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: PhotoAdjustmentsPanel(
-                            onRotateLeft: () =>
-                                setState(() => _rotation -= math.pi / 2),
-                            onRotateRight: () =>
-                                setState(() => _rotation += math.pi / 2),
-                            onFlipX: () => setState(() => _flipX = !_flipX),
-                            onFlipY: () => setState(() => _flipY = !_flipY),
-                            onSendBackward: null,
-                            onBringForward: null,
-                            brightness: _brightness,
-                            saturation: _saturation,
-                            temp: _temp,
-                            hue: _hue,
-                            contrast: _contrast,
-                            opacity: _opacity,
-                            onBrightnessChanged: (v) =>
-                                setState(() => _brightness = v),
-                            onSaturationChanged: (v) =>
-                                setState(() => _saturation = v),
-                            onTempChanged: (v) => setState(() => _temp = v),
-                            onHueChanged: (v) => setState(() => _hue = v),
-                            onContrastChanged: (v) =>
-                                setState(() => _contrast = v),
-                            onOpacityChanged: (v) =>
-                                setState(() => _opacity = v),
+                      if (_currentSizeBytes! > 300 * 1024) ...[
+                        const SizedBox(width: 12),
+                        ElevatedButton(
+                          onPressed: _compressing ? null : _prepareCompression,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _compressOnSave
+                                ? Colors.green.shade600
+                                : accentColor,
+                            foregroundColor: colorScheme.onPrimary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                          child: Text(
+                            _compressOnSave
+                                ? 'Compressed'
+                                : _compressing
+                                    ? 'Compressing...'
+                                    : 'Compress',
                           ),
                         ),
-                      if (!_isVideo && _currentSizeBytes != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Size: ${_formatBytes(_currentSizeBytes!)}'
-                                '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
-                                style: TextStyle(
-                                  color: subtleTextColor,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const Spacer(),
-                              if (_currentSizeBytes! > 300 * 1024)
-                                ElevatedButton(
-                                  onPressed:
-                                      _compressing ? null : _prepareCompression,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: _compressOnSave
-                                        ? Colors.green.shade600
-                                        : accentColor,
-                                    foregroundColor: colorScheme.onPrimary,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
-                                    ),
-                                    textStyle: const TextStyle(fontSize: 12),
-                                  ),
-                                  child: Text(
-                                    _compressOnSave
-                                        ? 'Compressed'
-                                        : _compressing
-                                            ? 'Compressing...'
-                                            : 'Compress',
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 8),
+                      ],
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: TextField(
                           controller: _commentController,
-                          maxLines: 3,
-                          minLines: 2,
+                          maxLines: 1,
+                          minLines: 1,
                           textInputAction: TextInputAction.newline,
                           style: TextStyle(color: textColor),
                           decoration: InputDecoration(
@@ -1048,124 +1071,300 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                           ),
                         ),
                       ),
-                      if (_isVideo)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: VideoControls(
-                            startFrac: _trimStartFrac,
-                            endFrac: _trimEndFrac,
-                            positionFrac: _videoPositionFrac,
-                            onSeekFrac: (value) async {
-                              final c = _videoController;
-                              if (c == null || !c.value.isInitialized) return;
-                              final duration = c.value.duration;
-                              final ms =
-                                  (duration.inMilliseconds * value).round();
-                              await c.seekTo(Duration(milliseconds: ms));
-                            },
-                            onChangeRange: (range) {
-                              final start = range.start.clamp(0.0, 1.0);
-                              final end = range.end.clamp(0.0, 1.0);
-                              if (end <= start) return;
-                              setState(() {
-                                _trimStartFrac = start;
-                                _trimEndFrac = end;
-                              });
-                            },
-                            volume: _videoVolume,
-                            speed: 1.0,
-                            showLoopRange: true,
-                            showVolume: true,
-                            showSpeed: false,
-                            totalDuration: _videoController?.value.duration,
-                            onChangeVolume: (v) {
-                              final c = _videoController;
-                              setState(() => _videoVolume = v);
-                              c?.setVolume(_videoVolume);
-                            },
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Size: ${_formatBytes(_currentSizeBytes!)}'
+                            '${_compressedPreviewBytes == null ? '' : ' → ${_formatBytes(_compressedPreviewBytes!)}'}',
+                            style: TextStyle(
+                              color: subtleTextColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_currentSizeBytes! > 300 * 1024)
+                            ElevatedButton(
+                              onPressed:
+                                  _compressing ? null : _prepareCompression,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _compressOnSave
+                                    ? Colors.green.shade600
+                                    : accentColor,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                textStyle: const TextStyle(fontSize: 12),
+                              ),
+                              child: Text(
+                                _compressOnSave
+                                    ? 'Compressed'
+                                    : _compressing
+                                        ? 'Compressing...'
+                                        : 'Compress',
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _commentController,
+                        maxLines: 3,
+                        minLines: 2,
+                        textInputAction: TextInputAction.newline,
+                        style: TextStyle(color: textColor),
+                        decoration: InputDecoration(
+                          hintText: 'Comment',
+                          hintStyle: TextStyle(color: subtleTextColor),
+                          filled: true,
+                          fillColor: panelAltColor,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide.none,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
                           ),
                         ),
-                      if (_isVideo) _buildVideoInfoRow(),
-                      if (_isVideo) _buildVideoExportSettingsPanel(),
+                      ),
                     ],
+                  ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildBottomActionBar(Color panelColor) {
+    return SafeArea(
+      top: false,
+      child: SizedBox(
+        height: _bottomBarHeight,
+        child: IgnorePointer(
+          ignoring: _saving,
+          child: Opacity(
+            opacity: _saving ? 0.6 : 1.0,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    panelColor,
+                  ],
+                ),
+              ),
+              child: Row(
+                children: [
+                  if (_isVideo)
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _saving ? null : _trimVideoToNewFile,
+                              child: const Text('Cut video'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _saving ? null : _exportVideoToNewFile,
+                              child: const Text('Save new file'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  else ...[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => _save(false),
+                        child: const Text('Save as New'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => _save(true),
+                        child: const Text('Overwrite'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String path = widget.photo.isStoredInApp
+        ? PhotoPathHelper().getFullPath(widget.photo.fileName)
+        : widget.photo.path;
+    final bool isMacOSDesktop = !kIsWeb && Platform.isMacOS;
+    final theme = Theme.of(context);
+    final appColors = context.appThemeColors;
+    final colorScheme = theme.colorScheme;
+    final bool isDark = theme.brightness == Brightness.dark;
+    final editorBackground = _isVideo ? appColors.surface : appColors.canvas;
+    final panelColor =
+        appColors.surface.withValues(alpha: isDark ? 0.94 : 0.98);
+    final panelAltColor =
+        appColors.surfaceAlt.withValues(alpha: isDark ? 0.78 : 0.92);
+    final textColor = appColors.text;
+    final subtleTextColor = appColors.subtle;
+    final accentColor = appColors.accent;
+
+    return Scaffold(
+      backgroundColor: editorBackground,
+      appBar: isMacOSDesktop
+          ? MacosTopBar(
+              onToggleSidebar: () {},
+              onOpenNewWindow: () {},
+              onBack: () => Navigator.of(context).pop(),
+              onForward: () {},
+              canGoBack: true,
+              canGoForward: false,
+              onUpload: () => Navigator.push(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (_, __, ___) => const UploadScreen(),
+                  transitionsBuilder: (_, __, ___, child) => child,
+                ),
+              ),
+              onAllPhotos: () => Navigator.pushNamed(context, '/all_photos'),
+              onCollages: () => Navigator.pushNamed(context, '/my_collages'),
+              onTags: () => Navigator.pushNamed(context, '/all_tags'),
+              onSettings: _openSettings,
+              title: 'Edit Photo',
+              rightAfterSettings: IconButton(
+                tooltip: 'Close editor',
+                onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 18,
+                  color: MacosPalette.subtle(context),
+                ),
+                splashRadius: 16,
+                visualDensity: VisualDensity.compact,
+              ),
+              centerActions: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Text(
+                  widget.photo.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: MacosPalette.subtle(context),
                   ),
                 ),
               ),
-              SafeArea(
-                top: false,
-                child: SizedBox(
-                  height: _bottomBarHeight,
-                  child: IgnorePointer(
-                    ignoring: _saving,
-                    child: Opacity(
-                      opacity: _saving ? 0.6 : 1.0,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.transparent,
-                              panelColor,
-                            ],
+            )
+          : AppBar(
+              title: const Text('Edit Photo'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                )
+              ],
+            ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildEditorPanels(
+            isMacOSDesktop: isMacOSDesktop,
+            panelAltColor: panelAltColor,
+            textColor: textColor,
+            subtleTextColor: subtleTextColor,
+            accentColor: accentColor,
+            colorScheme: colorScheme,
+          ),
+          _buildBottomActionBar(panelColor),
+        ],
+      ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Stack(
+            children: [
+              Positioned.fill(
+                child: _isVideo
+                    ? _buildVideoEditor()
+                    : Opacity(
+                        opacity: _opacity.clamp(0.0, 1.0),
+                        child: ColorFiltered(
+                          colorFilter: combinedColorFilter(
+                            _brightness,
+                            _saturation,
+                            _contrast,
+                            _temp,
+                            _hue,
+                          ),
+                          child: ExtendedImage.file(
+                            File(path),
+                            fit: BoxFit.contain,
+                            mode: ExtendedImageMode.editor,
+                            cacheRawData: true,
+                            extendedImageEditorKey: _editorKey,
+                            initEditorConfigHandler: (_) => EditorConfig(
+                              maxScale: 5.0,
+                              speed: 1.0,
+                              animationDuration:
+                                  const Duration(milliseconds: 200),
+                              cropRectPadding: const EdgeInsets.fromLTRB(
+                                20,
+                                20,
+                                20,
+                                20,
+                              ),
+                              hitTestSize: 20,
+                              cornerColor: textColor,
+                              lineColor: subtleTextColor,
+                              initCropRectType: InitCropRectType.imageRect,
+                              cropLayerPainter:
+                                  const EditorCropLayerPainter(),
+                            ),
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            if (_isVideo)
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: OutlinedButton(
-                                            onPressed: _saving
-                                                ? null
-                                                : _trimVideoToNewFile,
-                                            child: const Text('Cut video'),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: ElevatedButton(
-                                            onPressed: _saving
-                                                ? null
-                                                : _exportVideoToNewFile,
-                                            child: const Text('Save new file'),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              )
-                            else ...[
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _save(false),
-                                  child: const Text('Save as New'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () => _save(true),
-                                  child: const Text('Overwrite'),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
                       ),
+              ),
+              if (widget.hasPrevious)
+                Positioned(
+                  left: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: _EditorNavButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onTap: _openPrevious,
                     ),
                   ),
                 ),
-              ),
+              if (widget.hasNext)
+                Positioned(
+                  right: 12,
+                  top: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: _EditorNavButton(
+                      icon: Icons.arrow_forward_ios_rounded,
+                      onTap: _openNext,
+                    ),
+                  ),
+                ),
             ],
           ),
           if (_saving) ...[
@@ -1525,6 +1724,37 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       ),
       checkmarkColor: theme.colorScheme.primary,
       visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+    );
+  }
+}
+
+class _EditorNavButton extends StatelessWidget {
+  const _EditorNavButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final appColors = context.appThemeColors;
+    return Material(
+      color: appColors.surface.withValues(alpha: 0.9),
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            icon,
+            size: 16,
+            color: appColors.subtle,
+          ),
+        ),
+      ),
     );
   }
 }

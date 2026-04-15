@@ -5,6 +5,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 class StorageDiagnosticsService {
+  static void _log(String message) {
+    debugPrint('[SettingsSize] $message');
+  }
+
   static Future<void> logStorage() async {
     try {
       final docs = await getApplicationDocumentsDirectory();
@@ -34,14 +38,16 @@ class StorageDiagnosticsService {
       if (library != null) {
         final cacheDir = Directory(p.join(library.path, 'Caches'));
         final prefsDir = Directory(p.join(library.path, 'Preferences'));
-        final appSupportDir = Directory(p.join(library.path, 'Application Support'));
+        final appSupportDir =
+            Directory(p.join(library.path, 'Application Support'));
         final cacheSize = await _dirSize(cacheDir);
         final prefsSize = await _dirSize(prefsDir);
         final appSupportSize = await _dirSize(appSupportDir);
 
         debugPrint('[Storage] Library/Caches: ${_formatBytes(cacheSize)}');
         debugPrint('[Storage] Library/Preferences: ${_formatBytes(prefsSize)}');
-        debugPrint('[Storage] Library/Application Support: ${_formatBytes(appSupportSize)}');
+        debugPrint(
+            '[Storage] Library/Application Support: ${_formatBytes(appSupportSize)}');
 
         final cacheChildren = await _listDirSizes(cacheDir, limit: 12);
         if (cacheChildren.isNotEmpty) {
@@ -77,37 +83,85 @@ class StorageDiagnosticsService {
   }
 
   static Future<int> getCacheSizeBytes() async {
+    _log('getCacheSizeBytes start');
     final tmp = await getTemporaryDirectory();
+    _log('tmp dir=${tmp.path}');
+    final support = await getApplicationSupportDirectory();
+    final appId = p.basename(support.path);
     Directory? library;
     try {
       library = await getLibraryDirectory();
+      _log('library dir=${library.path}');
     } catch (_) {
       library = null;
+      _log('library dir unavailable');
     }
-    final cacheDir = library == null
-        ? null
-        : Directory(p.join(library.path, 'Caches'));
+    final cacheDir =
+        library == null ? null : Directory(p.join(library.path, 'Caches'));
 
-    final tmpSize = await _dirSize(tmp);
-    final cacheSize = cacheDir == null ? 0 : await _dirSize(cacheDir);
+    final tmpSize = await _scopedTempSize(tmp, appId: appId);
+    final cacheSize = cacheDir == null
+        ? 0
+        : await _scopedCacheSize(cacheDir, appId: appId);
+    _log(
+      'getCacheSizeBytes done tmp=${_formatBytes(tmpSize)} cache=${_formatBytes(cacheSize)} total=${_formatBytes(tmpSize + cacheSize)}',
+    );
     return tmpSize + cacheSize;
+  }
+
+  static Future<int> getAppFootprintBytes() async {
+    _log('getAppFootprintBytes start');
+    final docs = await getApplicationDocumentsDirectory();
+    final tmp = await getTemporaryDirectory();
+    final support = await getApplicationSupportDirectory();
+    final appId = p.basename(support.path);
+    _log('docs dir=${docs.path}');
+    _log('tmp dir=${tmp.path}');
+    _log('support dir=${support.path}');
+    Directory? library;
+    try {
+      library = await getLibraryDirectory();
+      _log('library dir=${library.path}');
+    } catch (_) {
+      library = null;
+      _log('library dir unavailable');
+    }
+
+    final docsSize = await _managedDocumentsSize(docs);
+    final tmpSize = await _scopedTempSize(tmp, appId: appId);
+    final supportSize = await _dirSizeSafe(support);
+
+    var cacheSize = 0;
+    var prefsSize = 0;
+    if (library != null) {
+      final cacheDir = Directory(p.join(library.path, 'Caches'));
+      final prefsDir = Directory(p.join(library.path, 'Preferences'));
+      cacheSize = await _scopedCacheSize(cacheDir, appId: appId);
+      prefsSize = await _scopedPrefsSize(prefsDir, appId: appId);
+    }
+
+    _log(
+      'getAppFootprintBytes done docs=${_formatBytes(docsSize)} tmp=${_formatBytes(tmpSize)} support=${_formatBytes(supportSize)} cache=${_formatBytes(cacheSize)} prefs=${_formatBytes(prefsSize)} total=${_formatBytes(docsSize + tmpSize + supportSize + cacheSize + prefsSize)}',
+    );
+    return docsSize + tmpSize + supportSize + cacheSize + prefsSize;
   }
 
   static Future<void> clearCache() async {
     final tmp = await getTemporaryDirectory();
+    final support = await getApplicationSupportDirectory();
+    final appId = p.basename(support.path);
     Directory? library;
     try {
       library = await getLibraryDirectory();
     } catch (_) {
       library = null;
     }
-    final cacheDir = library == null
-        ? null
-        : Directory(p.join(library.path, 'Caches'));
+    final cacheDir =
+        library == null ? null : Directory(p.join(library.path, 'Caches'));
 
-    await _clearDirectory(tmp);
+    await _clearScopedTemp(tmp, appId: appId);
     if (cacheDir != null) {
-      await _clearDirectory(cacheDir);
+      await _clearScopedCache(cacheDir, appId: appId);
     }
   }
 
@@ -115,8 +169,10 @@ class StorageDiagnosticsService {
 
   static Future<int> _dirSize(Directory dir) async {
     if (!await dir.exists()) {
+      _log('dir missing ${dir.path}');
       return 0;
     }
+    _log('dir scan start ${dir.path}');
     var total = 0;
     await for (final entity in dir.list(recursive: true, followLinks: false)) {
       if (entity is File) {
@@ -127,6 +183,122 @@ class StorageDiagnosticsService {
         }
       }
     }
+    _log('dir scan done ${dir.path} => ${_formatBytes(total)}');
+    return total;
+  }
+
+  static Future<int> _dirSizeSafe(Directory dir) async {
+    if (!await dir.exists()) {
+      _log('dir missing ${dir.path}');
+      return 0;
+    }
+    _log('safe dir scan start ${dir.path}');
+    var total = 0;
+    try {
+      await for (final entity in dir.list(followLinks: false)) {
+        if (entity is File) {
+          try {
+            total += await entity.length();
+          } catch (_) {}
+        } else if (entity is Directory) {
+          total += await _dirSizeSafe(entity);
+        }
+      }
+    } catch (e) {
+      _log('safe dir scan skip ${dir.path} error=$e');
+    }
+    _log('safe dir scan done ${dir.path} => ${_formatBytes(total)}');
+    return total;
+  }
+
+  static Future<int> _managedDocumentsSize(Directory docs) async {
+    var total = 0;
+    final photosDir = Directory(p.join(docs.path, 'photos'));
+    total += await _dirSizeSafe(photosDir);
+
+    if (await docs.exists()) {
+      await for (final entity in docs.list(followLinks: false)) {
+        if (entity is! File) continue;
+        final lower = entity.path.toLowerCase();
+        if (lower.endsWith('.hive') ||
+            lower.endsWith('.lock') ||
+            lower.endsWith('.hive.backup')) {
+          try {
+            total += await entity.length();
+          } catch (_) {}
+        }
+      }
+    }
+    _log('managed docs size => ${_formatBytes(total)}');
+    return total;
+  }
+
+  static bool _isManagedTempEntry(String name, {required String appId}) {
+    return name.startsWith('backup_') ||
+        name == 'backup_build' ||
+        name == 'backup_restore' ||
+        name == 'backup_fallback' ||
+        name.contains(appId) ||
+        name == 'hive_backup.zip';
+  }
+
+  static Future<int> _scopedTempSize(
+    Directory tmp, {
+    required String appId,
+  }) async {
+    if (!await tmp.exists()) return 0;
+    var total = 0;
+    await for (final entity in tmp.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      if (!_isManagedTempEntry(name, appId: appId)) continue;
+      if (entity is File) {
+        try {
+          total += await entity.length();
+        } catch (_) {}
+      } else if (entity is Directory) {
+        total += await _dirSizeSafe(entity);
+      }
+    }
+    _log('scoped temp size => ${_formatBytes(total)}');
+    return total;
+  }
+
+  static Future<int> _scopedCacheSize(
+    Directory cacheDir, {
+    required String appId,
+  }) async {
+    if (!await cacheDir.exists()) return 0;
+    var total = 0;
+    await for (final entity in cacheDir.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      if (!_isManagedTempEntry(name, appId: appId)) continue;
+      if (entity is File) {
+        try {
+          total += await entity.length();
+        } catch (_) {}
+      } else if (entity is Directory) {
+        total += await _dirSizeSafe(entity);
+      }
+    }
+    _log('scoped cache size => ${_formatBytes(total)}');
+    return total;
+  }
+
+  static Future<int> _scopedPrefsSize(
+    Directory prefsDir, {
+    required String appId,
+  }) async {
+    if (!await prefsDir.exists()) return 0;
+    var total = 0;
+    await for (final entity in prefsDir.list(followLinks: false)) {
+      if (entity is! File) continue;
+      final name = p.basename(entity.path);
+      if (!name.contains(appId)) continue;
+      try {
+        total += await entity.length();
+      } catch (_) {}
+    }
+    _log('scoped prefs size => ${_formatBytes(total)}');
     return total;
   }
 
@@ -140,6 +312,34 @@ class StorageDiagnosticsService {
       } catch (_) {
         // ignore delete errors
       }
+    }
+  }
+
+  static Future<void> _clearScopedTemp(
+    Directory tmp, {
+    required String appId,
+  }) async {
+    if (!await tmp.exists()) return;
+    await for (final entity in tmp.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      if (!_isManagedTempEntry(name, appId: appId)) continue;
+      try {
+        await entity.delete(recursive: true);
+      } catch (_) {}
+    }
+  }
+
+  static Future<void> _clearScopedCache(
+    Directory cacheDir, {
+    required String appId,
+  }) async {
+    if (!await cacheDir.exists()) return;
+    await for (final entity in cacheDir.list(followLinks: false)) {
+      final name = p.basename(entity.path);
+      if (!_isManagedTempEntry(name, appId: appId)) continue;
+      try {
+        await entity.delete(recursive: true);
+      } catch (_) {}
     }
   }
 

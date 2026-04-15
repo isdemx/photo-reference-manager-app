@@ -13,6 +13,14 @@ class MacosPalette {
   static Color surface(BuildContext context) => context.appThemeColors.surface;
   static Color surfaceAlt(BuildContext context) =>
       context.appThemeColors.surfaceAlt;
+  static Color topBar(BuildContext context) {
+    final colors = context.appThemeColors;
+    final isLight = Theme.of(context).brightness == Brightness.light;
+    if (!isLight) {
+      return colors.surfaceAlt;
+    }
+    return Color.lerp(colors.surfaceAlt, colors.text, 0.14) ?? colors.surfaceAlt;
+  }
   static Color border(BuildContext context) => context.appThemeColors.border;
   static Color subtle(BuildContext context) => context.appThemeColors.subtle;
   static Color text(BuildContext context) => context.appThemeColors.text;
@@ -21,16 +29,16 @@ class MacosPalette {
 
 class MacosTypography {
   static TextStyle title(BuildContext context) => TextStyle(
-        fontSize: 18,
+        fontSize: 14,
         fontWeight: FontWeight.w600,
-        color: MacosPalette.text(context),
+        color: MacosPalette.subtle(context),
         letterSpacing: 0.2,
       );
 
   static TextStyle section(BuildContext context) => TextStyle(
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: FontWeight.w600,
-        color: MacosPalette.text(context),
+        color: MacosPalette.subtle(context),
         letterSpacing: 0.2,
       );
 
@@ -43,7 +51,7 @@ class MacosTypography {
 }
 
 class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
-  static const double barHeight = 44.0;
+  static const double barHeight = 36.0;
   final VoidCallback onToggleSidebar;
   final VoidCallback onOpenNewWindow;
   final VoidCallback onBack;
@@ -91,12 +99,12 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
             DragToMoveArea(
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: MacosPalette.surface(context),
+                  color: MacosPalette.topBar(context),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0x26000000),
-                      blurRadius: 10,
-                      offset: Offset(0, 3),
+                      color: const Color(0x20000000),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
                     ),
                   ],
                 ),
@@ -105,7 +113,7 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             Positioned.fill(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(leftInset, 6, 16, 6),
+                padding: EdgeInsets.fromLTRB(leftInset, 4, 14, 4),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -161,8 +169,12 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(title, style: MacosTypography.title(context)),
+                    if (!kReleaseMode) ...[
+                      const SizedBox(width: 6),
+                      const _BuildBadge(),
+                    ],
                     if (centerActions != null) ...[
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       centerActions!,
                     ],
                   ],
@@ -177,6 +189,37 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Size get preferredSize => const Size.fromHeight(barHeight);
+}
+
+class _BuildBadge extends StatelessWidget {
+  const _BuildBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final label = kProfileMode ? 'PROFILE' : 'DEV';
+    final color =
+        kProfileMode ? const Color(0xFFB7791F) : const Color(0xFFB83232);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: color.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
 }
 
 class _TopBarIcon extends StatelessWidget {
@@ -196,13 +239,13 @@ class _TopBarIcon extends StatelessWidget {
       onTap: enabled ? onTap : null,
       borderRadius: BorderRadius.circular(8),
       child: SizedBox(
-        width: 28,
-        height: 28,
+        width: 24,
+        height: 24,
         child: Icon(
           icon,
-          size: 17,
+          size: 15,
           color: enabled
-              ? MacosPalette.text(context)
+              ? MacosPalette.subtle(context)
               : MacosPalette.subtle(context),
         ),
       ),

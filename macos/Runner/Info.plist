@@ -3,7 +3,7 @@
 <plist version="1.0">
 	<dict>
 		<key>CFBundleDisplayName</key>
-		<string>Refma</string>
+		<string>$(PRODUCT_NAME)</string>
 		<key>CFBundleDevelopmentRegion</key>
 		<string>$(DEVELOPMENT_LANGUAGE)</string>
 		<key>CFBundleExecutable</key>
@@ -15,7 +15,7 @@
 		<key>CFBundleInfoDictionaryVersion</key>
 		<string>6.0</string>
 		<key>CFBundleName</key>
-		<string>Refma</string>
+		<string>$(PRODUCT_NAME)</string>
 		<key>CFBundlePackageType</key>
 		<string>APPL</string>
 		<key>CFBundleShortVersionString</key>

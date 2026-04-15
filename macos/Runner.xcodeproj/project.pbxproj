@@ -722,32 +722,33 @@
 			};
 			name = Release;
 		};
-		33CC10FC2044A3C60003C045 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			baseConfigurationReference = 33E5194F232828860026EE4D /* AppInfo.xcconfig */;
-			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+			33CC10FC2044A3C60003C045 /* Debug */ = {
+				isa = XCBuildConfiguration;
+				baseConfigurationReference = 33E5194F232828860026EE4D /* AppInfo.xcconfig */;
+				buildSettings = {
+					ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/DebugProfile.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = S4XZW73SZ4;
-				INFOPLIST_FILE = Runner/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Refma;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/../Frameworks",
-				);
-				MACOSX_DEPLOYMENT_TARGET = 10.15;
-				PRODUCT_BUNDLE_IDENTIFIER = app.greenmonster.photoreferencemanager;
-				PROVISIONING_PROFILE_SPECIFIER = "";
-				SUPPORTED_PLATFORMS = macosx;
-				SUPPORTS_MACCATALYST = NO;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+					CURRENT_PROJECT_VERSION = 1;
+					DEVELOPMENT_TEAM = S4XZW73SZ4;
+					INFOPLIST_FILE = Runner/Info.plist;
+					INFOPLIST_KEY_CFBundleDisplayName = "Refma Dev";
+					INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.photography";
+					LD_RUNPATH_SEARCH_PATHS = (
+						"$(inherited)",
+						"@executable_path/../Frameworks",
+					);
+					MACOSX_DEPLOYMENT_TARGET = 10.15;
+					PRODUCT_BUNDLE_IDENTIFIER = app.greenmonster.photoreferencemanager.dev;
+					PRODUCT_NAME = "Refma Dev";
+					PROVISIONING_PROFILE_SPECIFIER = "";
+					SUPPORTED_PLATFORMS = macosx;
+					SUPPORTS_MACCATALYST = NO;
+					SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;

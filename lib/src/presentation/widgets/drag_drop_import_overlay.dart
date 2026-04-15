@@ -4,6 +4,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:photographers_reference_app/backup.service.dart';
 
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
 
@@ -45,11 +46,7 @@ class _DragDropImportOverlayState extends State<DragDropImportOverlay> {
             ),
             child: widget.child,
           ),
-          const Positioned(
-            top: 12,
-            right: 12,
-            child: _ImportStatusPopover(),
-          ),
+          const _StatusPopoverLayer(),
         ],
       ),
     );
@@ -58,6 +55,202 @@ class _DragDropImportOverlayState extends State<DragDropImportOverlay> {
   bool _isDesktop() {
     if (kIsWeb) return false;
     return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+  }
+}
+
+class _StatusPopoverLayer extends StatefulWidget {
+  const _StatusPopoverLayer();
+
+  @override
+  State<_StatusPopoverLayer> createState() => _StatusPopoverLayerState();
+}
+
+class _StatusPopoverLayerState extends State<_StatusPopoverLayer> {
+  double _backupTop = 12;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        const Positioned(
+          top: 12,
+          right: 12,
+          child: _ImportStatusPopover(),
+        ),
+        Positioned(
+          top: _backupTop,
+          right: 12,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onVerticalDragUpdate: (details) {
+              final screenHeight = MediaQuery.sizeOf(context).height;
+              setState(() {
+                _backupTop = (_backupTop + details.delta.dy).clamp(
+                  12.0,
+                  screenHeight - 120,
+                );
+              });
+            },
+            child: const _BackupStatusPopover(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BackupStatusPopover extends StatelessWidget {
+  const _BackupStatusPopover();
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<BackupProgressState?>(
+      valueListenable: BackupService.progressNotifier,
+      builder: (context, status, _) {
+        if (status == null || !status.visible) {
+          return const SizedBox.shrink();
+        }
+
+        final progressValue = (status.progress / 100).clamp(0.0, 1.0);
+        final progressText = status.progress > 0
+            ? '${status.progress.toStringAsFixed(0)}%'
+            : 'Preparing';
+        final countText = status.totalMediaFiles > 0
+            ? '${status.copiedMediaFiles}/${status.totalMediaFiles}'
+            : '0/0';
+
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 280),
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.82),
+            elevation: 8,
+            shadowColor: Colors.black54,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Backup',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (status.isActive)
+                        InkWell(
+                          onTap: BackupService.cancelCurrent,
+                          borderRadius: BorderRadius.circular(999),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Text(
+                              status.canceling ? '...' : 'Cancel',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.white70,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          status.phaseLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        progressText,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(999),
+                    child: LinearProgressIndicator(
+                      minHeight: 4,
+                      value: status.isFinal
+                          ? 1.0
+                          : progressValue == 0
+                              ? null
+                              : progressValue,
+                      backgroundColor: Colors.white12,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.white70,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Media $countText',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      Text(
+                        _formatEta(status.eta),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if ((status.currentItemName ?? '').isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      status.currentItemName!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatEta(Duration? eta) {
+    if (eta == null) return 'Estimating…';
+    if (eta.inSeconds <= 0) return 'Ready';
+    if (eta.inSeconds < 60) return '~${eta.inSeconds}s';
+    final minutes = eta.inMinutes;
+    final seconds = eta.inSeconds % 60;
+    return '~${minutes}m ${seconds.toString().padLeft(2, '0')}s';
   }
 }
 
@@ -80,9 +273,8 @@ class _ImportStatusPopover extends StatelessWidget {
         final displayCompleted = status.isActive
             ? (status.completed + 1).clamp(1, status.total)
             : status.completed;
-        final countText = status.total > 0
-            ? '$displayCompleted/${status.total}'
-            : '';
+        final countText =
+            status.total > 0 ? '$displayCompleted/${status.total}' : '';
 
         return AnimatedOpacity(
           duration: const Duration(milliseconds: 180),
@@ -90,12 +282,13 @@ class _ImportStatusPopover extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 260),
             child: Material(
-              color: Colors.black.withOpacity(0.82),
+              color: Colors.black.withValues(alpha: 0.82),
               elevation: 8,
               shadowColor: Colors.black54,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,

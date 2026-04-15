@@ -6,16 +6,20 @@ import 'package:photographers_reference_app/src/services/biometric_auth_service.
 import 'package:photographers_reference_app/src/services/biometric_settings_service.dart';
 
 class AppLockHost extends StatefulWidget {
-  const AppLockHost({super.key, required this.child});
+  const AppLockHost({
+    super.key,
+    required this.child,
+    this.enabled = true,
+  });
 
   final Widget child;
+  final bool enabled;
 
   @override
   State<AppLockHost> createState() => _AppLockHostState();
 }
 
-class _AppLockHostState extends State<AppLockHost>
-    with WidgetsBindingObserver {
+class _AppLockHostState extends State<AppLockHost> with WidgetsBindingObserver {
   final _authService = BiometricAuthService();
   final _settings = BiometricSettingsService.instance;
   VoidCallback? _enabledListener;
@@ -36,6 +40,12 @@ class _AppLockHostState extends State<AppLockHost>
   }
 
   Future<void> _init() async {
+    if (!widget.enabled) {
+      _locked = false;
+      _ready = true;
+      if (mounted) setState(() {});
+      return;
+    }
     _locked = true;
     if (mounted) setState(() {});
     await _settings.load();
@@ -101,7 +111,8 @@ class _AppLockHostState extends State<AppLockHost>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (_authInProgress) return;
-    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
       _wentToBackground = true;
       _backgroundObscured = true;
       if (_settings.enabledNotifier.value) {
@@ -140,6 +151,9 @@ class _AppLockHostState extends State<AppLockHost>
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.enabled) {
+      return widget.child;
+    }
     return Stack(
       children: [
         widget.child,

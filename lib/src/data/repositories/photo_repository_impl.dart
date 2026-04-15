@@ -21,7 +21,9 @@ class PhotoRepositoryImpl implements PhotoRepository {
     try {
       print('Add Pjoto, ${photo.fileName}');
       if (photo.isStoredInApp) {
-        final fileName = path_package.basename(photo.path);
+        final fileName = photo.fileName.isNotEmpty
+            ? photo.fileName
+            : path_package.basename(photo.path);
         final photosDir = await _getAppPhotosDirectory();
         final newFilePath = path_package.join(photosDir.path, fileName);
 

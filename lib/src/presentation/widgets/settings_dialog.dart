@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
@@ -25,19 +27,28 @@ class SettingsDialog extends StatefulWidget {
 }
 
 class _SettingsDialogState extends State<SettingsDialog> {
+  void _log(String message) {
+    debugPrint('[SettingsSize] $message');
+  }
+
   final _authService = BiometricAuthService();
   final _settings = BiometricSettingsService.instance;
   bool _biometricAvailable = false;
   bool _biometricEnabled = false;
   bool _loading = true;
   bool _cacheLoading = true;
+  bool _appSizeLoading = true;
+  bool _cacheSizeUnavailable = false;
+  bool _appSizeUnavailable = false;
   int _cacheSizeBytes = 0;
+  int _appSizeBytes = 0;
 
   @override
   void initState() {
     super.initState();
     _loadBiometrics();
     _loadCacheSize();
+    _loadAppSize();
   }
 
   Future<void> _loadBiometrics() async {
@@ -71,12 +82,64 @@ class _SettingsDialogState extends State<SettingsDialog> {
   }
 
   Future<void> _loadCacheSize() async {
-    final size = await StorageDiagnosticsService.getCacheSizeBytes();
-    if (!mounted) return;
-    setState(() {
-      _cacheSizeBytes = size;
-      _cacheLoading = false;
-    });
+    try {
+      _log('cache size calculation start');
+      final size = await StorageDiagnosticsService.getCacheSizeBytes().timeout(
+        const Duration(seconds: 20),
+      );
+      _log('cache size calculation success ${StorageDiagnosticsService.formatBytes(size)}');
+      if (!mounted) return;
+      setState(() {
+        _cacheSizeBytes = size;
+        _cacheLoading = false;
+        _cacheSizeUnavailable = false;
+      });
+    } on TimeoutException {
+      _log('cache size calculation timeout');
+      if (!mounted) return;
+      setState(() {
+        _cacheLoading = false;
+        _cacheSizeUnavailable = true;
+      });
+    } catch (e, st) {
+      _log('cache size calculation failed $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        _cacheLoading = false;
+        _cacheSizeUnavailable = true;
+      });
+    }
+  }
+
+  Future<void> _loadAppSize() async {
+    try {
+      _log('app size calculation start');
+      final size =
+          await StorageDiagnosticsService.getAppFootprintBytes().timeout(
+        const Duration(seconds: 20),
+      );
+      _log('app size calculation success ${StorageDiagnosticsService.formatBytes(size)}');
+      if (!mounted) return;
+      setState(() {
+        _appSizeBytes = size;
+        _appSizeLoading = false;
+        _appSizeUnavailable = false;
+      });
+    } on TimeoutException {
+      _log('app size calculation timeout');
+      if (!mounted) return;
+      setState(() {
+        _appSizeLoading = false;
+        _appSizeUnavailable = true;
+      });
+    } catch (e, st) {
+      _log('app size calculation failed $e\n$st');
+      if (!mounted) return;
+      setState(() {
+        _appSizeLoading = false;
+        _appSizeUnavailable = true;
+      });
+    }
   }
 
   @override
@@ -223,7 +286,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         ),
                       ),
                       subtitle: Text(
-                        'Save locally all the data and database',
+                        _appSizeLoading
+                            ? 'Save locally all the data and database • Calculating app size...'
+                            : _appSizeUnavailable
+                                ? 'Save locally all the data and database • Could not calculate app size'
+                                : 'Save locally all the data and database • App size: ${StorageDiagnosticsService.formatBytes(_appSizeBytes)}',
                         style: TextStyle(
                           color: textSecondary,
                           fontSize: 12,
@@ -231,12 +298,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       onTap: () {
-                        final rootContext =
-                            Navigator.of(context, rootNavigator: true).context;
-                        Navigator.of(context).pop();
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          BackupService.promptAndRun(rootContext);
-                        });
+                        BackupService.promptAndRun(context);
                       },
                     ),
                     Divider(color: dividerColor, height: 1),
@@ -285,7 +347,9 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       subtitle: Text(
                         _cacheLoading
                             ? 'Calculating cache size...'
-                            : 'Current cache: ${StorageDiagnosticsService.formatBytes(_cacheSizeBytes)}',
+                            : _cacheSizeUnavailable
+                                ? 'Could not calculate cache size'
+                                : 'Current cache: ${StorageDiagnosticsService.formatBytes(_cacheSizeBytes)}',
                         style: TextStyle(
                           color: textSecondary,
                           fontSize: 12,
@@ -293,10 +357,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       onTap: () async {
-                        setState(() => _cacheLoading = true);
+                        setState(() {
+                          _cacheLoading = true;
+                          _appSizeLoading = true;
+                          _cacheSizeUnavailable = false;
+                          _appSizeUnavailable = false;
+                        });
                         await StorageDiagnosticsService.clearCache();
                         await StorageDiagnosticsService.logStorage();
                         await _loadCacheSize();
+                        await _loadAppSize();
                         if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -378,28 +448,33 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       style: TextStyle(color: textSecondary, fontSize: 13),
                     ),
                     const SizedBox(height: 8),
-                    Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 360),
-                        child: SizedBox(
-                          height: 44,
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: colors.accent,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                            onPressed: () => _openTelegram(context),
-                            child: const Text(
-                              'Message the author on Telegram',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: dividerColor),
+                          foregroundColor: textSecondary,
+                          backgroundColor: Colors.transparent,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          visualDensity:
+                              const VisualDensity(horizontal: -2, vertical: -2),
+                        ),
+                        onPressed: () => _openTelegram(context),
+                        icon: const Icon(
+                          Iconsax.send_2,
+                          size: 14,
+                        ),
+                        label: const Text(
+                          'Telegram',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),

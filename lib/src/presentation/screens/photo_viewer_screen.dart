@@ -466,6 +466,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Future<void> _openEditor(Photo photo) async {
+    final editorIndex = widget.photos.indexOf(photo);
     await Navigator.of(context).push(
       PageRouteBuilder(
         opaque: false,
@@ -489,6 +490,15 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                 widget.photos.insert(_currentIndex + 1, newPhoto);
               });
             },
+            hasPrevious: editorIndex > 0,
+            hasNext: editorIndex >= 0 && editorIndex < widget.photos.length - 1,
+            onOpenPrevious: editorIndex > 0
+                ? () => _openEditor(widget.photos[editorIndex - 1])
+                : null,
+            onOpenNext:
+                editorIndex >= 0 && editorIndex < widget.photos.length - 1
+                    ? () => _openEditor(widget.photos[editorIndex + 1])
+                    : null,
           );
         },
         transitionsBuilder: (_, animation, __, child) =>
@@ -513,12 +523,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   ) async {
     final String fullPath = _resolvePhotoPath(photo);
 
-    await File(fullPath).writeAsBytes(bytes, flush: true);
+    await File(fullPath).writeAsBytes(bytes);
 
     final provider = FileImage(File(fullPath));
 
     PaintingBinding.instance.imageCache.evict(provider);
-    PaintingBinding.instance.imageCache.clearLiveImages();
 
     // 3) Бамп nonce, чтобы дерево точно пересоздалось
     setState(() {

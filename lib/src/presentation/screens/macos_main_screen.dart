@@ -217,7 +217,7 @@ class _MacosMainContent extends StatelessWidget {
                                           category.copyWith(collapsed: false)));
                                 }
                               },
-                              icon: Iconsax.arrow_down_1,
+                              icon: Icons.keyboard_arrow_down_rounded,
                               label: 'Expand all',
                             ),
                             _ActionButton(
@@ -231,7 +231,7 @@ class _MacosMainContent extends StatelessWidget {
                                           category.copyWith(collapsed: true)));
                                 }
                               },
-                              icon: Iconsax.arrow_up_1,
+                              icon: Icons.keyboard_arrow_up_rounded,
                               label: 'Collapse all',
                             ),
                             _ActionButton(
@@ -584,20 +584,21 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return TextButton.icon(
       onPressed: onPressed,
-      icon: Icon(icon, size: 14, color: MacosPalette.text(context)),
+      icon: Icon(icon, size: 14, color: MacosPalette.subtle(context)),
       label: Text(
         label,
         style: TextStyle(
-          color: MacosPalette.text(context),
+          color: MacosPalette.subtle(context),
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
       ),
       style: TextButton.styleFrom(
-        backgroundColor: MacosPalette.surfaceAlt(context),
-        foregroundColor: MacosPalette.text(context),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        backgroundColor: Colors.transparent,
+        foregroundColor: MacosPalette.subtle(context),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
     );
   }

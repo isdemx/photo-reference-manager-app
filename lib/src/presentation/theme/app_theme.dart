@@ -63,23 +63,23 @@ class AppThemeColors extends ThemeExtension<AppThemeColors> {
 
 class AppThemes {
   static const AppThemeColors darkColors = AppThemeColors(
-    canvas: Color(0xFF0B0C0F),
-    surface: Color(0xFF121318),
-    surfaceAlt: Color(0xFF161820),
+    canvas: Color(0xFF0C0D10),
+    surface: Color(0xFF13141A),
+    surfaceAlt: Color(0xFF171A22),
     border: Color(0x16FFFFFF),
-    subtle: Color(0xFF8A8F98),
-    text: Color(0xFFE7E9ED),
+    subtle: Color(0xFF6E6B66),
+    text: Color(0xFFBBB8B3),
     accent: Color(0xFF58C1FF),
     overlay: Color(0xCC000000),
   );
 
   static const AppThemeColors lightColors = AppThemeColors(
-    canvas: Color(0xFFF4F6FA),
-    surface: Color(0xFFE6EBF3),
-    surfaceAlt: Color(0xFFDCE3EE),
+    canvas: Color(0xFFEDEFF4),
+    surface: Color(0xFFD8DFE9),
+    surfaceAlt: Color(0xFFCED6E2),
     border: Color(0x1A000000),
-    subtle: Color(0xFF68707D),
-    text: Color(0xFF101318),
+    subtle: Color(0xFF6F685F),
+    text: Color(0xFF625B54),
     accent: Color(0xFF1B84D8),
     overlay: Color(0x66000000),
   );
@@ -97,6 +97,12 @@ class AppThemes {
       appBarTheme: AppBarTheme(
         backgroundColor: darkColors.surface,
         foregroundColor: darkColors.text,
+        titleTextStyle: const TextStyle(
+          color: Color(0xFF6E6B66),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        ),
       ),
       pageTransitionsTheme: transitions,
       extensions: const <ThemeExtension<dynamic>>[
@@ -118,6 +124,12 @@ class AppThemes {
       appBarTheme: AppBarTheme(
         backgroundColor: lightColors.surface,
         foregroundColor: lightColors.text,
+        titleTextStyle: const TextStyle(
+          color: Color(0xFF6F685F),
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        ),
       ),
       pageTransitionsTheme: transitions,
       extensions: const <ThemeExtension<dynamic>>[

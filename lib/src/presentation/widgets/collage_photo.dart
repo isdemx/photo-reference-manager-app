@@ -33,6 +33,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/collage_pre
 import 'package:photographers_reference_app/src/presentation/helpers/collage_save_helper.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_top_center_action.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
 import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
@@ -790,6 +791,18 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       onTags: () => Navigator.pushNamed(context, '/all_tags'),
       onSettings: _openSettings,
       title: _currentCollage?.title ?? 'Collage',
+      centerActions: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MacosTopCenterAction(
+            icon: _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
+            onTap: _toggleFullscreen,
+            tooltip: _isFullscreen
+                ? 'Exit fullscreen (F)'
+                : 'Enter fullscreen (F)',
+          ),
+        ],
+      ),
     );
   }
 
@@ -1049,11 +1062,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   void _setTransform(Matrix4 matrix) {
+    final scale = TransformMath.getScale(matrix);
     _ignoreTransformUpdates = true;
     _transformationController.value = matrix;
     _ignoreTransformUpdates = false;
 
-    final scale = TransformMath.getScale(matrix);
     if (mounted) {
       setState(() {
         _collageScale = scale;
@@ -1520,6 +1533,34 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  Future<void> _confirmCancelCollage() async {
+    final shouldClose = await showDialog<bool>(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: const Text('Cancel collage?'),
+          content: const Text(
+            'Close this collage without any additional confirmation?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Stay'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldClose == true && mounted) {
+      Navigator.pop(context);
+    }
+  }
+
   void _showAllPhotosSheet() {
     showModalBottomSheet(
       context: context,
@@ -1821,26 +1862,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  String _canvasPresetLabel(double value) {
-    if (value == value.roundToDouble()) {
-      return value.toStringAsFixed(0);
-    }
-    return value.toStringAsFixed(1);
-  }
-
-  void _setCanvasSizeMultiplier(double value) {
-    if (value <= 0 || _canvasSizeMultiplier == value) return;
-    setState(() {
-      _canvasSizeMultiplier = value;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      // Make canvas size change immediately visible.
-      _setTransform(_fitCanvasToViewportMatrix());
-      _updateDeleteRect();
-    });
-  }
-
   double _containScaleForCanvas() {
     final viewport = _viewportSize();
     final canvas = _currentCanvasSize();
@@ -1848,9 +1869,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         viewport.height <= 0 ||
         canvas.width <= 0 ||
         canvas.height <= 0) {
-      debugPrint(
-        '[ViewZones] fitCanvas skipped viewport=$viewport canvas=$canvas',
-      );
       return _minCollageScale;
     }
 
@@ -1867,9 +1885,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         viewport.height <= 0 ||
         canvas.width <= 0 ||
         canvas.height <= 0) {
-      debugPrint(
-        '[ViewZones] fitCanvas skipped viewport=$viewport canvas=$canvas',
-      );
       return _transformationController.value.clone();
     }
 
@@ -1879,10 +1894,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final offset = Offset(
       (viewport.width - canvas.width * clamped) / 2,
       (viewport.height - canvas.height * clamped) / 2,
-    );
-    debugPrint(
-      '[ViewZones] fitCanvas viewport=$viewport canvas=$canvas '
-      'contain=$containScale scale=$scale clamped=$clamped offset=$offset',
     );
     return TransformMath.matrixFromOffsetScale(offset, clamped);
   }
@@ -2630,16 +2641,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         offset: Offset(0, 2),
       ),
     ];
+    final buttonStyle = IconButton.styleFrom(
+      backgroundColor: Colors.transparent,
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      padding: const EdgeInsets.all(6),
+      minimumSize: const Size(30, 30),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+    );
 
     final isHorizontal = Platform.isIOS || Platform.isMacOS;
     final buttons = [
       IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+        style: buttonStyle,
+        icon: const Icon(
+          Iconsax.add,
+          size: 18,
+          color: Colors.white,
+          shadows: iconShadow,
         ),
-        icon: const Icon(Iconsax.add, color: Colors.white, shadows: iconShadow),
         tooltip: 'Add photo (A)',
         onPressed: _showAllPhotosSheet,
       ),
@@ -2647,13 +2668,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         GestureDetector(
           onLongPress: _showViewZonePanel,
           child: IconButton(
-            style: IconButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              surfaceTintColor: Colors.transparent,
-            ),
+            style: buttonStyle,
             icon: const Icon(
               Icons.crop_free,
+              size: 18,
               color: Colors.white,
               shadows: iconShadow,
             ),
@@ -2662,67 +2680,46 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
         ),
       IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+        style: buttonStyle,
+        icon: const Icon(
+          Icons.grid_view,
+          size: 18,
+          color: Colors.white,
+          shadows: iconShadow,
         ),
-        icon: const Icon(Icons.grid_view,
-            color: Colors.white, shadows: iconShadow),
         tooltip: 'Overview mode (O)',
         onPressed: _toggleOverviewMode,
       ),
       IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-        ),
-        icon: const Icon(Iconsax.colorfilter,
-            color: Colors.white, shadows: iconShadow),
-        tooltip: 'Change background color (B)',
-        onPressed: _showColorPickerDialog,
-      ),
-      PopupMenuButton<double>(
-        tooltip: 'Canvas size',
-        initialValue: _canvasSizeMultiplier,
-        onSelected: _setCanvasSizeMultiplier,
-        itemBuilder: (_) => _canvasSizePresets
-            .map(
-              (v) => PopupMenuItem<double>(
-                value: v,
-                child: Text('Canvas x${_canvasPresetLabel(v)}'),
-              ),
-            )
-            .toList(),
+        style: buttonStyle,
         icon: const Icon(
-          Icons.straighten,
+          Iconsax.colorfilter,
+          size: 18,
           color: Colors.white,
           shadows: iconShadow,
         ),
+        tooltip: 'Change background color (B)',
+        onPressed: _showColorPickerDialog,
       ),
       GestureDetector(
         onLongPress: _onSaveAsCollageToDb,
         child: IconButton(
-          style: IconButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            surfaceTintColor: Colors.transparent,
+          style: buttonStyle,
+          icon: const Icon(
+            Iconsax.save_2,
+            size: 18,
+            color: Colors.white,
+            shadows: iconShadow,
           ),
-          icon: const Icon(Iconsax.save_2,
-              color: Colors.white, shadows: iconShadow),
           tooltip: 'Save collage (S, hold for Save As)',
           onPressed: _onSaveCollageToDb,
         ),
       ),
       IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
-        ),
+        style: buttonStyle,
         icon: Icon(
           _isPrivate ? Icons.lock : Icons.lock_open,
+          size: 18,
           color: _isPrivate ? Colors.amber : Colors.white,
           shadows: iconShadow,
         ),
@@ -2730,45 +2727,52 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         onPressed: () => setState(() => _isPrivate = !_isPrivate),
       ),
       IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+        style: buttonStyle,
+        icon: const Icon(
+          Iconsax.image,
+          size: 18,
+          color: Colors.green,
+          shadows: iconShadow,
         ),
-        icon:
-            const Icon(Iconsax.image, color: Colors.green, shadows: iconShadow),
         tooltip: 'Save collage as image (I)',
         onPressed: _onGenerateCollage,
       ),
       IconButton(
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          surfaceTintColor: Colors.transparent,
+        style: buttonStyle,
+        icon: const Icon(
+          Icons.close,
+          size: 18,
+          color: Colors.red,
+          shadows: iconShadow,
         ),
-        icon: const Icon(Icons.close, color: Colors.red, shadows: iconShadow),
         tooltip: 'Cancel collage',
-        onPressed: () => Navigator.pop(context),
+        onPressed: _confirmCancelCollage,
       ),
     ];
 
     if (isHorizontal) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (int i = 0; i < buttons.length; i++) ...[
-            if (i != 0) const SizedBox(width: 6),
-            buttons[i],
+      return Opacity(
+        opacity: 0.9,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (int i = 0; i < buttons.length; i++) ...[
+              if (i != 0) const SizedBox(width: 4),
+              buttons[i],
+            ],
           ],
-        ],
+        ),
       );
     }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (final button in buttons) button,
-      ],
+    return Opacity(
+      opacity: 0.9,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final button in buttons) button,
+        ],
+      ),
     );
   }
 
@@ -3290,11 +3294,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (index < 0 || index >= _maxViewZones) return false;
     if (HardwareKeyboard.instance.isShiftPressed) {
       if (_showViewZoneOverlay) {
-        _pendingZoomMultiplier = null;
-        _pendingViewZoneIndex = null;
-        _skipViewZoneRestore = false;
         _setZoneAtIndex(index);
-        _viewZoneSheetController?.close();
+        _closeViewZoneOverlay();
       } else {
         _setZoneAtIndex(index);
       }
@@ -3302,10 +3303,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
     if (_viewZones[index] == null) return false;
     if (_showViewZoneOverlay) {
-      _pendingZoomMultiplier = null;
-      _pendingViewZoneIndex = index;
-      _skipViewZoneRestore = true;
-      _viewZoneSheetController?.close();
+      _closeViewZoneOverlay(applyZoneIndex: index);
     } else {
       _applyViewZone(index);
     }
@@ -3393,9 +3391,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       isSet: _viewZones[i] != null,
                       onTap: () {
                         if (_viewZones[i] == null) return;
-                        _pendingViewZoneIndex = i;
-                        _skipViewZoneRestore = true;
-                        Navigator.of(sheetContext).pop();
+                        _closeViewZoneOverlay(applyZoneIndex: i);
                       },
                       onDelete: () {
                         setState(() {
@@ -3418,48 +3414,55 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
     controller.closed.whenComplete(() {
       if (!mounted) return;
+      final pendingZoneIndex = _pendingViewZoneIndex;
+      final pendingZoom = _pendingZoomMultiplier;
+      final shouldApplyZone = _skipViewZoneRestore && pendingZoneIndex != null;
+      final restoreMatrix = _preViewZoneMatrix;
       setState(() {
         _showViewZoneOverlay = false;
-        if (_skipViewZoneRestore && _pendingViewZoneIndex != null) {
-          final idx = _pendingViewZoneIndex!;
-          _skipViewZoneRestore = false;
-          _pendingViewZoneIndex = null;
-          _pendingZoomMultiplier = null;
-          _preViewZoneMatrix = null;
-          _applyViewZone(idx);
-        } else {
-          if (_preViewZoneMatrix != null) {
-            _setTransform(_preViewZoneMatrix!);
-          }
-          _preViewZoneMatrix = null;
-          _skipViewZoneRestore = false;
-          _pendingViewZoneIndex = null;
-          final zoom = _pendingZoomMultiplier;
-          _pendingZoomMultiplier = null;
-          if (zoom != null) {
-            _zoomByStep(zoom);
-          }
-        }
+        _preViewZoneMatrix = null;
+        _skipViewZoneRestore = false;
+        _pendingViewZoneIndex = null;
+        _pendingZoomMultiplier = null;
         _viewZoneSheetController = null;
       });
+      if (shouldApplyZone) {
+        _applyViewZone(pendingZoneIndex);
+      } else {
+        if (restoreMatrix != null) {
+          _setTransform(restoreMatrix);
+        }
+        if (pendingZoom != null) {
+          _zoomByStep(pendingZoom);
+        }
+      }
     });
     _viewZoneSheetController = controller;
   }
 
-  void _exitViewZoneOverlay() {
-    if (!_showViewZoneOverlay) return;
-    setState(() {
-      _showViewZoneOverlay = false;
-      if (_preViewZoneMatrix != null) {
-        _setTransform(_preViewZoneMatrix!);
+  void _closeViewZoneOverlay({
+    int? applyZoneIndex,
+    double? zoomMultiplier,
+  }) {
+    if (!_showViewZoneOverlay) {
+      if (applyZoneIndex != null) {
+        _applyViewZone(applyZoneIndex);
+      } else if (zoomMultiplier != null) {
+        _zoomByStep(zoomMultiplier);
       }
-      _preViewZoneMatrix = null;
-      _pendingViewZoneIndex = null;
-      _pendingZoomMultiplier = null;
-      _skipViewZoneRestore = false;
+      return;
+    }
+    setState(() {
+      _pendingViewZoneIndex = applyZoneIndex;
+      _pendingZoomMultiplier = zoomMultiplier;
+      _skipViewZoneRestore = applyZoneIndex != null;
     });
     _viewZoneSheetController?.close();
-    _viewZoneSheetController = null;
+  }
+
+  void _exitViewZoneOverlay() {
+    if (!_showViewZoneOverlay) return;
+    _closeViewZoneOverlay();
   }
 
   Rect _zoneCanvasRect(_ViewZone zone) {

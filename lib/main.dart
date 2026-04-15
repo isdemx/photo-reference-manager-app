@@ -4,10 +4,8 @@ import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart'; // <- здесь живёт DartPluginRegistrant
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:path_provider/path_provider.dart';
 
 // desktop_multi_window не обязателен здесь, но пускай остаётся — окно создаётся из сервиса
 import 'package:window_manager/window_manager.dart';
@@ -40,6 +38,8 @@ import 'package:photographers_reference_app/src/presentation/bloc/theme_cubit.da
 import 'package:photographers_reference_app/src/presentation/screens/all_photos_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/all_tags_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/folder_screen.dart';
+import 'package:photographers_reference_app/src/presentation/screens/lite_photo_viewer_screen.dart';
+import 'package:photographers_reference_app/src/presentation/screens/lite_viewer_dispatch_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/my_collages_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/photo_viewer_screen.dart';
@@ -55,12 +55,19 @@ import 'package:photographers_reference_app/src/services/shared_folders_sync_ser
 import 'package:photographers_reference_app/src/data/repositories/tag_category_repository_impl.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
+import 'package:photographers_reference_app/src/services/macos_file_open_service.dart';
 import 'package:photographers_reference_app/src/services/theme_settings_service.dart';
 import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/services/window_service.dart';
+import 'package:photographers_reference_app/src/services/app_reload_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _ratingPromptScheduled = false;
+
+void _openLog(String message) {
+  debugPrint('[RefmaOpenFiles][dart] $message');
+}
 
 // --------------------- ENTRY ---------------------
 
@@ -71,16 +78,37 @@ void main(List<String> args) async {
     DartPluginRegistrant.ensureInitialized();
 
     // payload, переданный при создании окна
-    final String payload = args.isNotEmpty ? args.first : '{}';
+    final bool isMultiWindowLaunch =
+        args.length >= 3 && args.first == 'multi_window';
+    final String payload = _extractLaunchPayload(args);
     final Map<String, dynamic> initialArgs = _safeDecode(payload);
+    _openLog(
+      'main start args=$args isMultiWindowLaunch=$isMultiWindowLaunch payload=$payload initialArgs=$initialArgs',
+    );
+    if (!isMultiWindowLaunch) {
+      final Map<String, dynamic> macOSInitialRoute =
+          await MacOSFileOpenService.loadInitialRoutePayload();
+      _openLog('macOSInitialRoute=$macOSInitialRoute');
+      if (((initialArgs['route'] as String?) ?? '').isEmpty &&
+          macOSInitialRoute.isNotEmpty) {
+        initialArgs
+          ..clear()
+          ..addAll(macOSInitialRoute);
+        _openLog('initialArgs replaced from macOSInitialRoute -> $initialArgs');
+      }
+    }
 
     // Без window_manager в дочерних окнах
     final bool isChildWindow =
         ((initialArgs['route'] as String?) ?? '').isNotEmpty;
+    _openLog('isChildWindow=$isChildWindow route=${initialArgs['route']}');
+    if (!kIsWeb &&
+        (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+      await windowManager.ensureInitialized();
+    }
     if (!kIsWeb &&
         (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
         !isChildWindow) {
-      await windowManager.ensureInitialized();
       if (Platform.isMacOS) {
         try {
           final windowOptions = WindowOptions(
@@ -102,33 +130,24 @@ void main(List<String> args) async {
     // 2) Идемпотентная регистрация адаптеров (важно для multi-engine)
     _registerAdaptersSafely();
 
-    // 3) Открытие боксов
-    final tagBox = await Hive.openBox<Tag>('tags');
-    final categoryBox = await Hive.openBox<Category>('categories');
-    final folderBox = await Hive.openBox<Folder>('folders');
-    final photoBox = await Hive.openBox<Photo>('photos');
-    final collageBox = await Hive.openBox<Collage>('collages');
-    final tagCategoryBox = await Hive.openBox<TagCategory>('tag_categories');
-
-    final tagRepository = TagRepositoryImpl(tagBox);
-    await tagRepository.initializeDefaultTags();
-    await TagCategoryRepositoryImpl(tagCategoryBox, tagBox)
-        .initializeDefaultTagCategory();
-    await SharedTagsSyncService().syncTags(await tagRepository.getTags());
-    await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
-    await SharedFoldersSyncService().syncFolders(folderBox.values.toList());
-    await PhotoPathHelper().initialize();
+    final initialData = await _loadAppBootstrapData();
 
     // 5) Запуск приложения
-    runApp(MyApp(
-      tagBox: tagBox,
-      categoryBox: categoryBox,
-      folderBox: folderBox,
-      photoBox: photoBox,
-      collageBox: collageBox,
-      tagCategoryBox: tagCategoryBox,
+    runApp(_AppBootstrap(
       initialArgs: initialArgs,
+      initialData: initialData,
     ));
+
+    await MacOSFileOpenService.startListening(
+      onFilesOpened: (filePaths) {
+        _openLog('startListening callback filePaths=$filePaths');
+        for (final filePath in filePaths) {
+          _openLog('opening lite viewer window for $filePath');
+          WindowService.openLiteViewerWindow(filePath: filePath);
+        }
+      },
+    );
+    _openLog('startListening registered');
 
     // WidgetsBinding.instance.addPostFrameCallback((_) {
     //   // Бэкап-диалог только при «обычном» старте (когда не передан спец-роут)
@@ -141,6 +160,141 @@ void main(List<String> args) async {
     // ignore: avoid_print
     print('[AppError] $e\n$st');
   });
+}
+
+class _AppBootstrapData {
+  const _AppBootstrapData({
+    required this.tagBox,
+    required this.categoryBox,
+    required this.folderBox,
+    required this.photoBox,
+    required this.collageBox,
+    required this.tagCategoryBox,
+  });
+
+  final Box<Tag> tagBox;
+  final Box<Category> categoryBox;
+  final Box<Folder> folderBox;
+  final Box<Photo> photoBox;
+  final Box<Collage> collageBox;
+  final Box<TagCategory> tagCategoryBox;
+}
+
+Future<_AppBootstrapData> _loadAppBootstrapData() async {
+  final tagBox = await Hive.openBox<Tag>('tags');
+  final categoryBox = await Hive.openBox<Category>('categories');
+  final folderBox = await Hive.openBox<Folder>('folders');
+  final photoBox = await Hive.openBox<Photo>('photos');
+  final collageBox = await Hive.openBox<Collage>('collages');
+  final tagCategoryBox = await Hive.openBox<TagCategory>('tag_categories');
+
+  final tagRepository = TagRepositoryImpl(tagBox);
+  await tagRepository.initializeDefaultTags();
+  await TagCategoryRepositoryImpl(tagCategoryBox, tagBox)
+      .initializeDefaultTagCategory();
+  await SharedTagsSyncService().syncTags(await tagRepository.getTags());
+  await CategoryRepositoryImpl(categoryBox).initializeDefaultCategory();
+  await SharedFoldersSyncService().syncFolders(folderBox.values.toList());
+  await PhotoPathHelper().initialize();
+
+  return _AppBootstrapData(
+    tagBox: tagBox,
+    categoryBox: categoryBox,
+    folderBox: folderBox,
+    photoBox: photoBox,
+    collageBox: collageBox,
+    tagCategoryBox: tagCategoryBox,
+  );
+}
+
+class _AppBootstrap extends StatefulWidget {
+  const _AppBootstrap({
+    super.key,
+    required this.initialArgs,
+    required this.initialData,
+  });
+
+  final Map<String, dynamic> initialArgs;
+  final _AppBootstrapData initialData;
+
+  @override
+  State<_AppBootstrap> createState() => _AppBootstrapState();
+}
+
+class _AppBootstrapState extends State<_AppBootstrap> {
+  late _AppBootstrapData _data;
+  bool _reloading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _data = widget.initialData;
+    AppReloadService.instance.register(_reloadApp);
+  }
+
+  @override
+  void dispose() {
+    AppReloadService.instance.unregister(_reloadApp);
+    super.dispose();
+  }
+
+  Future<void> _reloadApp() async {
+    if (_reloading) return;
+    setState(() {
+      _reloading = true;
+    });
+    await Hive.close();
+    final data = await _loadAppBootstrapData();
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+      _reloading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_reloading) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                CircularProgressIndicator(),
+                SizedBox(height: 12),
+                Text('Refreshing data...'),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return MyApp(
+      tagBox: _data.tagBox,
+      categoryBox: _data.categoryBox,
+      folderBox: _data.folderBox,
+      photoBox: _data.photoBox,
+      collageBox: _data.collageBox,
+      tagCategoryBox: _data.tagCategoryBox,
+      initialArgs: widget.initialArgs,
+    );
+  }
+}
+
+String _extractLaunchPayload(List<String> args) {
+  if (args.length >= 3 && args.first == 'multi_window') {
+    _openLog('extractLaunchPayload multi_window payload=${args[2]}');
+    return args[2];
+  }
+  if (args.isNotEmpty) {
+    _openLog('extractLaunchPayload firstArg=${args.first}');
+    return args.first;
+  }
+  _openLog('extractLaunchPayload default {}');
+  return '{}';
 }
 
 // --------------------- HIVE UTILS ---------------------
@@ -206,7 +360,6 @@ class MyApp extends StatelessWidget {
   final Map<String, dynamic> initialArgs;
 
   const MyApp({
-    Key? key,
     required this.tagBox,
     required this.categoryBox,
     required this.folderBox,
@@ -214,7 +367,8 @@ class MyApp extends StatelessWidget {
     required this.collageBox,
     required this.tagCategoryBox,
     required this.initialArgs,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -299,12 +453,16 @@ class MyApp extends StatelessWidget {
               builder: (context, child) {
                 final hasCustomRoute =
                     ((initialArgs['route'] as String?) ?? '').isNotEmpty;
+                final route = (initialArgs['route'] as String?) ?? '';
+                final bypassAppLock =
+                    route == '/lite_viewer' || route == '/lite_viewer_dispatch';
                 if (!hasCustomRoute && !_ratingPromptScheduled) {
                   _ratingPromptScheduled = true;
                   WidgetsBinding.instance.addPostFrameCallback((_) async {
-                    final navContext = navigatorKey.currentContext;
-                    if (navContext == null) return;
                     if (await RatingPromptHandler.shouldShowPrompt()) {
+                      final navContext = navigatorKey.currentContext;
+                      if (navContext == null) return;
+                      if (!navContext.mounted) return;
                       RatingPromptHandler.showRatingDialog(navContext);
                     }
                   });
@@ -312,6 +470,7 @@ class MyApp extends StatelessWidget {
                 final content = child ?? const SizedBox.shrink();
                 return DragDropImportOverlay(
                   child: AppLockHost(
+                    enabled: !bypassAppLock,
                     child: MigrationOverlayHost(child: content),
                   ),
                 );
@@ -394,6 +553,36 @@ class MyApp extends StatelessWidget {
                     MaterialPageRoute(builder: (_) => TagScreen(tag: tag))
                   ];
                 }
+                if (route == '/lite_viewer') {
+                  final filePath = args['filePath'] as String?;
+                  final initialViewportAspectRatio =
+                      (args['initialViewportAspectRatio'] as num?)?.toDouble();
+                  if (filePath != null && filePath.isNotEmpty) {
+                    return [
+                      MaterialPageRoute(
+                        builder: (_) => LitePhotoViewerScreen(
+                          initialFilePath: filePath,
+                          initialViewportAspectRatio:
+                              initialViewportAspectRatio,
+                        ),
+                      ),
+                    ];
+                  }
+                }
+                if (route == '/lite_viewer_dispatch') {
+                  final filePaths = (args['filePaths'] as List?)
+                      ?.whereType<String>()
+                      .where((path) => path.isNotEmpty)
+                      .toList();
+                  if (filePaths != null && filePaths.isNotEmpty) {
+                    return [
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            LiteViewerDispatchScreen(filePaths: filePaths),
+                      ),
+                    ];
+                  }
+                }
 
                 // дефолт: полное приложение
                 return [MaterialPageRoute(builder: (_) => const MainScreen())];
@@ -424,6 +613,27 @@ class MyApp extends StatelessWidget {
                 } else if (settings.name == '/tag') {
                   final tag = settings.arguments as Tag;
                   return MaterialPageRoute(builder: (_) => TagScreen(tag: tag));
+                } else if (settings.name == '/lite_viewer') {
+                  final args = settings.arguments as Map<String, dynamic>;
+                  final filePath = args['filePath'] as String;
+                  final initialViewportAspectRatio =
+                      (args['initialViewportAspectRatio'] as num?)?.toDouble();
+                  return MaterialPageRoute(
+                    builder: (_) => LitePhotoViewerScreen(
+                      initialFilePath: filePath,
+                      initialViewportAspectRatio: initialViewportAspectRatio,
+                    ),
+                  );
+                } else if (settings.name == '/lite_viewer_dispatch') {
+                  final args = settings.arguments as Map<String, dynamic>;
+                  final filePaths = (args['filePaths'] as List)
+                      .whereType<String>()
+                      .where((path) => path.isNotEmpty)
+                      .toList();
+                  return MaterialPageRoute(
+                    builder: (_) =>
+                        LiteViewerDispatchScreen(filePaths: filePaths),
+                  );
                 }
                 return null;
               },

@@ -57,7 +57,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
     return Material(
       color: Colors.black.withOpacity(0.6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
         child: Builder(
           builder: (context) {
             final sliders = [
@@ -156,11 +156,11 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                 ),
               if (onDone != null)
                 SizedBox(
-                  height: 32,
+                  height: 28,
                   child: ElevatedButton(
                     onPressed: onDone,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
                       backgroundColor: Colors.white10,
                       foregroundColor: Colors.white,
                       elevation: 0,
@@ -170,7 +170,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                     ),
                     child: const Text(
                       'OK',
-                      style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+                      style: TextStyle(fontSize: 12, letterSpacing: 0.2),
                     ),
                   ),
                 ),
@@ -181,19 +181,19 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                    spacing: 4,
+                    runSpacing: 4,
                     alignment: WrapAlignment.center,
                     children: actions,
                   ),
-                  const SizedBox(height: 6),
-                  const Divider(color: Colors.white24, height: 12),
+                  const SizedBox(height: 4),
+                  const Divider(color: Colors.white24, height: 8),
                   LayoutBuilder(
                     builder: (context, c) {
                       final columns = 2;
                       return Wrap(
-                        spacing: 12,
-                        runSpacing: 6,
+                        spacing: 10,
+                        runSpacing: 4,
                         children: sliders
                             .map((w) => SizedBox(
                                   width: c.maxWidth / columns - 12,
@@ -214,7 +214,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                   tooltip: 'Rotate -90°',
                   onPressed: onRotateLeft,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 ActionIcon(
                   icon: Icons.rotate_right,
                   tooltip: 'Rotate +90°',
@@ -246,9 +246,9 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                 const VerticalDivider(
                   color: Colors.white24,
                   thickness: 1,
-                  width: 16,
-                  indent: 6,
-                  endIndent: 6,
+                  width: 12,
+                  indent: 4,
+                  endIndent: 4,
                 ),
                 Expanded(
                   child: LayoutBuilder(
@@ -257,8 +257,8 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
 
                       if (columns == 2) {
                         return Wrap(
-                          spacing: 12,
-                          runSpacing: 6,
+                          spacing: 10,
+                          runSpacing: 4,
                           children: sliders
                               .map((w) => SizedBox(
                                     width: c.maxWidth / 2 - 12,
@@ -276,29 +276,29 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                             child: Column(
                               children: [
                                 sliders[0],
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 sliders[1],
                               ],
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           SizedBox(
                             width: colW,
                             child: Column(
                               children: [
                                 sliders[2],
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 sliders[3],
                               ],
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
                           SizedBox(
                             width: colW,
                             child: Column(
                               children: [
                                 sliders[4],
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 sliders[5],
                               ],
                             ),
@@ -312,16 +312,16 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                   const VerticalDivider(
                     color: Colors.white24,
                     thickness: 1,
-                    width: 16,
-                    indent: 6,
-                    endIndent: 6,
+                    width: 12,
+                    indent: 4,
+                    endIndent: 4,
                   ),
                   SizedBox(
-                    height: 32,
+                    height: 28,
                     child: ElevatedButton(
                       onPressed: onDone,
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
                         backgroundColor: Colors.white10,
                         foregroundColor: Colors.white,
                         elevation: 0,
@@ -330,7 +330,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                       ),
                       child: const Text(
                         'OK',
-                        style: TextStyle(fontSize: 13, letterSpacing: 0.2),
+                        style: TextStyle(fontSize: 12, letterSpacing: 0.2),
                       ),
                     ),
                   ),
