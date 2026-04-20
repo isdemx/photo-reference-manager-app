@@ -12,6 +12,19 @@ import 'package:photographers_reference_app/src/domain/entities/tag_category.dar
 import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
 
 class TagsHelpers {
+  static const List<Shadow> _tagIconShadows = [
+    Shadow(
+      color: Color(0x66000000),
+      blurRadius: 2,
+      offset: Offset(0, 1),
+    ),
+    Shadow(
+      color: Color(0x44000000),
+      blurRadius: 6,
+      offset: Offset(0, 0),
+    ),
+  ];
+
   static void _addTagToBloc(
     BuildContext context,
     String tagName,
@@ -472,6 +485,8 @@ class TagsHelpers {
                                                                     icon,
                                                                     size: 14,
                                                                     color: Colors.white,
+                                                                    shadows:
+                                                                        _tagIconShadows,
                                                                   )
                                                                 : null,
                                                             label: Text(
@@ -488,6 +503,8 @@ class TagsHelpers {
                                                             labelStyle: const TextStyle(
                                                               color: Colors.white,
                                                               fontSize: 12,
+                                                              shadows:
+                                                                  _tagIconShadows,
                                                             ),
                                                             padding:
                                                                 const EdgeInsets.symmetric(

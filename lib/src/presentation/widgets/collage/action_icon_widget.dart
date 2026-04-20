@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 /// Маленькая иконка-кнопка с тултипом
 class ActionIcon extends StatelessWidget {
@@ -15,6 +16,8 @@ class ActionIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appColors = context.appThemeColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Tooltip(
       message: tooltip,
       waitDuration: const Duration(milliseconds: 400),
@@ -25,11 +28,12 @@ class ActionIcon extends StatelessWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: Colors.white10,
+            color: appColors.surfaceAlt.withValues(alpha: isDark ? 0.78 : 0.9),
             borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: appColors.border),
           ),
           alignment: Alignment.center,
-          child: Icon(icon, size: 14, color: Colors.white),
+          child: Icon(icon, size: 14, color: appColors.text),
         ),
       ),
     );

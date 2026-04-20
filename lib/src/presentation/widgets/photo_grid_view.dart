@@ -26,6 +26,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/column_slid
 import 'package:photographers_reference_app/src/presentation/widgets/filter_panel.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_overlay.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
@@ -571,6 +572,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appThemeColors;
     final filterState = context.watch<FilterBloc>().state;
 
     final List<Photo> photosFiltered = widget.showFilter
@@ -625,8 +627,8 @@ class PhotoGridViewState extends State<PhotoGridView> {
         : titleText;
 
     final Color currentTitleColor = _isMultiSelect
-        ? Colors.yellow
-        : (hasActiveFilters ? Colors.yellow : Colors.white);
+        ? colors.accent
+        : (hasActiveFilters ? colors.accent : colors.text);
 
     return Stack(
       children: [
@@ -656,7 +658,10 @@ class PhotoGridViewState extends State<PhotoGridView> {
                     slivers: [
                       if (widget.showInternalAppBar)
                         SliverAppBar(
-                          backgroundColor: Colors.black.withOpacity(0.5),
+                          backgroundColor: colors.surfaceAlt.withOpacity(0.92),
+                          foregroundColor: colors.text,
+                          surfaceTintColor: Colors.transparent,
+                          shadowColor: colors.overlay.withOpacity(0.12),
                           pinned: true,
                           title: Row(
                             children: [
@@ -676,6 +681,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                         overflow: TextOverflow.visible,
                                         style: TextStyle(
                                           color: currentTitleColor,
+                                          fontWeight: FontWeight.w600,
                                         ),
                                       ),
                                     ),
@@ -691,6 +697,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                       _isPinterestLayout
                                           ? Icons.grid_on
                                           : Icons.dashboard,
+                                      color: colors.text,
                                     ),
                                     onPressed: _togglePinterestLayout,
                                     tooltip: _isPinterestLayout
@@ -701,8 +708,8 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                     icon: Icon(
                                       Icons.swap_vert,
                                       color: _sortByFileSize
-                                          ? Colors.yellow
-                                          : Colors.white,
+                                          ? colors.accent
+                                          : colors.text,
                                     ),
                                     tooltip: 'Sort by file size',
                                     onPressed: _toggleSortByFileSize,
@@ -712,8 +719,8 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                       icon: Icon(
                                         Icons.filter_list,
                                         color: hasActiveFilters
-                                            ? Colors.yellow
-                                            : Colors.white,
+                                            ? colors.accent
+                                            : colors.text,
                                       ),
                                       onPressed: () => setState(() =>
                                           _showFilterPanel = !_showFilterPanel),
@@ -721,7 +728,10 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                     ),
                                   if (widget.showShareBtn == true)
                                     IconButton(
-                                      icon: const Icon(Icons.share),
+                                      icon: Icon(
+                                        Icons.share,
+                                        color: colors.text,
+                                      ),
                                       onPressed: () => ImagesHelpers.sharePhotos(
                                         context,
                                         _selectedPhotos,
@@ -730,7 +740,10 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                 ]
                               : [
                                   IconButton(
-                                    icon: const Icon(Icons.cancel),
+                                    icon: Icon(
+                                      Icons.cancel,
+                                      color: colors.text,
+                                    ),
                                     onPressed: _onDonePressed,
                                   ),
                                 ],

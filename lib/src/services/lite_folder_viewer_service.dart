@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:photographers_reference_app/src/services/macos_file_open_service.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 
 class LiteViewerItem {
@@ -82,35 +83,54 @@ class LiteFolderViewerService {
       }
 
       try {
-        final items = <LiteViewerItem>[];
-        await for (final entity in directory.list()) {
-          if (entity is! File) continue;
-
-          final mediaType = determineMediaType(entity.path);
-          if (mediaType == 'unknown') continue;
-
-          items.add(
-            LiteViewerItem(
-              path: entity.path,
-              name: p.basename(entity.path),
-              mediaType: mediaType,
-            ),
-          );
-        }
-        return items;
+        return await _readSupportedItems(directory);
       } on FileSystemException catch (error) {
         lastError = error;
       }
     }
 
     if (lastError is FileSystemException) {
-      throw LiteFolderViewerException(
-        'Unable to access this folder. macOS may still be waiting for folder permission.',
+      final grantedPath =
+          await MacOSFileOpenService.requestFolderAccess(directory.path);
+      if (grantedPath != null && grantedPath.isNotEmpty) {
+        try {
+          return await _readSupportedItems(directory);
+        } on FileSystemException {
+          if (p.normalize(grantedPath) != p.normalize(directory.path)) {
+            return _readSupportedItems(Directory(grantedPath));
+          }
+        }
+      }
+
+      throw const LiteFolderViewerException(
+        'Folder access was not granted. Choose the photo folder to enable Lite Viewer navigation.',
       );
     }
 
     throw const LiteFolderViewerException(
       'Unable to read files from this folder.',
+    );
+  }
+
+  Future<List<LiteViewerItem>> _readSupportedItems(Directory directory) async {
+    final items = <LiteViewerItem>[];
+    await for (final entity in directory.list()) {
+      if (entity is! File) continue;
+
+      final item = _itemForFile(entity);
+      if (item == null) continue;
+      items.add(item);
+    }
+    return items;
+  }
+
+  LiteViewerItem? _itemForFile(File file) {
+    final mediaType = determineMediaType(file.path);
+    if (mediaType == 'unknown') return null;
+    return LiteViewerItem(
+      path: file.path,
+      name: p.basename(file.path),
+      mediaType: mediaType,
     );
   }
 }

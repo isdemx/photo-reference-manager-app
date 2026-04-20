@@ -64,6 +64,8 @@ import 'package:photographers_reference_app/src/services/app_reload_service.dart
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _ratingPromptScheduled = false;
+bool _firstFrameRendered = false;
+bool _fatalStartupUiShown = false;
 
 void _openLog(String message) {
   debugPrint('[RefmaOpenFiles][dart] $message');
@@ -74,6 +76,22 @@ void _openLog(String message) {
 void main(List<String> args) async {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      if (!_firstFrameRendered) {
+        _runFatalStartupApp(
+          details.exception,
+          details.stack ?? StackTrace.current,
+        );
+      }
+    };
+    PlatformDispatcher.instance.onError = (error, stack) {
+      if (!_firstFrameRendered) {
+        _runFatalStartupApp(error, stack);
+        return true;
+      }
+      return false;
+    };
     // ВТОРОЙ движок (новое окно) требует ручной регистрации плагинов
     DartPluginRegistrant.ensureInitialized();
 
@@ -111,10 +129,21 @@ void main(List<String> args) async {
         !isChildWindow) {
       if (Platform.isMacOS) {
         try {
+          final themePreference =
+              await ThemeSettingsService().loadPreference();
+          final resolvedBrightness = switch (themePreference) {
+            AppThemePreference.dark => Brightness.dark,
+            AppThemePreference.light => Brightness.light,
+            AppThemePreference.system =>
+              PlatformDispatcher.instance.platformBrightness,
+          };
+          final windowBackgroundColor = resolvedBrightness == Brightness.dark
+              ? AppThemes.darkColors.surfaceAlt
+              : const Color(0xFFC7CED8);
           final windowOptions = WindowOptions(
             titleBarStyle: TitleBarStyle.hidden,
             windowButtonVisibility: true,
-            backgroundColor: Colors.transparent,
+            backgroundColor: windowBackgroundColor,
           );
           await windowManager.waitUntilReadyToShow(windowOptions, () async {
             await windowManager.show();
@@ -137,6 +166,9 @@ void main(List<String> args) async {
       initialArgs: initialArgs,
       initialData: initialData,
     ));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _firstFrameRendered = true;
+    });
 
     await MacOSFileOpenService.startListening(
       onFilesOpened: (filePaths) {
@@ -159,7 +191,18 @@ void main(List<String> args) async {
     // Чтобы видеть причину «чёрного экрана», если где-то в изоляте упало
     // ignore: avoid_print
     print('[AppError] $e\n$st');
+    _runFatalStartupApp(e, st);
   });
+}
+
+void _runFatalStartupApp(Object error, StackTrace stackTrace) {
+  if (_fatalStartupUiShown) return;
+  _fatalStartupUiShown = true;
+  try {
+    runApp(_StartupFailureApp(error: error, stackTrace: stackTrace));
+  } catch (_) {
+    // Если даже error UI не смог подняться, остаётся только native log.
+  }
 }
 
 class _AppBootstrapData {
@@ -209,7 +252,6 @@ Future<_AppBootstrapData> _loadAppBootstrapData() async {
 
 class _AppBootstrap extends StatefulWidget {
   const _AppBootstrap({
-    super.key,
     required this.initialArgs,
     required this.initialData,
   });
@@ -345,6 +387,86 @@ class _NoTransitionsBuilder extends PageTransitionsBuilder {
     Widget child,
   ) {
     return child;
+  }
+}
+
+class _StartupFailureApp extends StatelessWidget {
+  const _StartupFailureApp({
+    required this.error,
+    required this.stackTrace,
+  });
+
+  final Object error;
+  final StackTrace stackTrace;
+
+  @override
+  Widget build(BuildContext context) {
+    final message = error.toString();
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: AppThemes.darkTheme(transitions: const PageTransitionsTheme()),
+      home: Scaffold(
+        backgroundColor: AppThemes.darkColors.canvas,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Refma could not start',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFE8E5DF),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Your photos are still stored on this device. Please update Refma to the latest version from the App Store.',
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.35,
+                    color: Color(0xFFBBB8B3),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppThemes.darkColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppThemes.darkColors.border),
+                  ),
+                  child: SelectableText(
+                    message,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: Color(0xFF8F8A82),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: SelectableText(
+                      stackTrace.toString(),
+                      style: const TextStyle(
+                        fontSize: 11,
+                        height: 1.3,
+                        color: Color(0xFF6E6B66),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

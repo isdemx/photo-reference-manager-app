@@ -28,6 +28,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/video_contr
 import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_gallery_core.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 class _VideoThumbUi {
   double startFrac;
@@ -126,6 +127,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
             return BlocBuilder<PhotoBloc, PhotoState>(
               builder: (_, photoState) {
                 if (photoState is! PhotoLoaded) return const _Loader();
+                final appColors = context.appThemeColors;
 
                 final folders = {for (var f in folderState.folders) f.id: f}
                     .values
@@ -179,14 +181,14 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           if (!Platform.isIOS) ...[
-                            const Icon(Icons.filter_list,
-                                color: Colors.white70, size: 18),
+                            Icon(Icons.filter_list,
+                                color: appColors.subtle, size: 18),
                             Text(
                               'Filters',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
-                                  ?.copyWith(color: Colors.white),
+                                  ?.copyWith(color: appColors.text),
                             ),
                           ],
                           Container(
@@ -195,23 +197,24 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white10,
+                              color: appColors.surfaceAlt.withValues(alpha: 0.92),
                               borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: appColors.border),
                             ),
                             child: Icon(
                               _filtersOpen
                                   ? Icons.keyboard_arrow_up
                                   : Icons.keyboard_arrow_down,
-                              color: Colors.white70,
+                              color: appColors.subtle,
                               size: 16,
                             ),
                           ),
                           if (!Platform.isIOS) const SizedBox(width: 8),
                           DecoratedBox(
                             decoration: BoxDecoration(
-                              color: Colors.white10,
+                              color: appColors.surfaceAlt.withValues(alpha: 0.92),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white12),
+                              border: Border.all(color: appColors.border),
                             ),
                             child: ToggleButtons(
                               isSelected: [_tagLogicAnd == false, _tagLogicAnd],
@@ -221,9 +224,9 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               borderRadius: BorderRadius.circular(12),
                               borderColor: Colors.transparent,
                               selectedBorderColor: Colors.transparent,
-                              fillColor: Colors.blueGrey.shade700,
-                              color: Colors.white70,
-                              selectedColor: Colors.white,
+                              fillColor: appColors.text.withValues(alpha: 0.9),
+                              color: appColors.subtle,
+                              selectedColor: appColors.canvas,
                               constraints: const BoxConstraints(
                                 minHeight: 24,
                                 minWidth: 30,
@@ -251,6 +254,18 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                       Icons.check,
                                       size: 12,
                                       color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0x66000000),
+                                          blurRadius: 2,
+                                          offset: Offset(0, 1),
+                                        ),
+                                        Shadow(
+                                          color: Color(0x44000000),
+                                          blurRadius: 6,
+                                          offset: Offset(0, 0),
+                                        ),
+                                      ],
                                     ),
                                   )
                                 : null,
@@ -259,8 +274,8 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                 _showNotRef = !_showNotRef;
                               });
                             },
-                            selectedColor: Colors.red.shade600,
-                            backgroundColor: Colors.red.shade300,
+                            selectedColor: const Color(0xFFC86565),
+                            backgroundColor: const Color(0xFFB98989),
                             labelStyle: const TextStyle(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -283,9 +298,9 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                           ),
                           DecoratedBox(
                             decoration: BoxDecoration(
-                              color: Colors.white10,
+                              color: appColors.surfaceAlt.withValues(alpha: 0.92),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.white12),
+                              border: Border.all(color: appColors.border),
                             ),
                             child: ToggleButtons(
                               isSelected: [
@@ -302,9 +317,9 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                               borderRadius: BorderRadius.circular(12),
                               borderColor: Colors.transparent,
                               selectedBorderColor: Colors.transparent,
-                              fillColor: Colors.blueGrey.shade700,
-                              color: Colors.white70,
-                              selectedColor: Colors.white,
+                              fillColor: appColors.text.withValues(alpha: 0.9),
+                              color: appColors.subtle,
+                              selectedColor: appColors.canvas,
                               constraints: const BoxConstraints(
                                 minHeight: 24,
                                 minWidth: 30,
@@ -325,8 +340,8 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                             IconButton(
                               onPressed: () =>
                                   setState(() => _selectedTagIds.clear()),
-                              icon: const Icon(Icons.clear,
-                                  size: 16, color: Colors.white70),
+                              icon: Icon(Icons.clear,
+                                  size: 16, color: appColors.subtle),
                               tooltip: 'Clear',
                               padding: EdgeInsets.zero,
                               constraints: const BoxConstraints(
@@ -338,12 +353,12 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                             TextButton.icon(
                               onPressed: () =>
                                   setState(() => _selectedTagIds.clear()),
-                              icon: const Icon(Icons.clear,
-                                  size: 14, color: Colors.white70),
-                              label: const Text(
+                              icon: Icon(Icons.clear,
+                                  size: 14, color: appColors.subtle),
+                              label: Text(
                                 'Clear',
                                 style: TextStyle(
-                                    color: Colors.white70, fontSize: 11),
+                                    color: appColors.subtle, fontSize: 11),
                               ),
                             ),
                         ],
@@ -1406,6 +1421,7 @@ class _FilterPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final grouped = _groupTagsByCategoryId(allTags);
+    final appColors = context.appThemeColors;
 
     String _catName(String? id) {
       if (id == null) return 'No category';
@@ -1427,28 +1443,39 @@ class _FilterPanel extends StatelessWidget {
         // --- Folder row
         Row(
           children: [
-            const Text('Folder:', style: TextStyle(color: Colors.white)),
+            Text('Folder:', style: TextStyle(color: appColors.text)),
             const SizedBox(width: 8),
             Expanded(
-              child: DropdownButton<String?>(
-                value: folderId,
-                dropdownColor: Colors.grey[900],
-                style: const TextStyle(color: Colors.white),
-                iconEnabledColor: Colors.white,
-                isExpanded: true,
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('All Folders'),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: appColors.surface.withValues(alpha: 0.96),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: appColors.border),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: DropdownButton<String?>(
+                    value: folderId,
+                    dropdownColor: appColors.surface,
+                    style: TextStyle(color: appColors.text, fontSize: 15),
+                    iconEnabledColor: appColors.text,
+                    underline: const SizedBox.shrink(),
+                    isExpanded: true,
+                    items: [
+                      const DropdownMenuItem(
+                        value: null,
+                        child: Text('All Folders'),
+                      ),
+                      ...folders.map(
+                        (f) => DropdownMenuItem(
+                          value: f.id,
+                          child: Text(f.name),
+                        ),
+                      ),
+                    ],
+                    onChanged: onFolderChanged,
                   ),
-                  ...folders.map(
-                    (f) => DropdownMenuItem(
-                      value: f.id,
-                      child: Text(f.name),
-                    ),
-                  ),
-                ],
-                onChanged: onFolderChanged,
+                ),
               ),
             ),
           ],
@@ -1461,7 +1488,7 @@ class _FilterPanel extends StatelessWidget {
             padding: const EdgeInsets.only(top: 8, bottom: 4),
             child: Text(
               _catName(entry.key), // <-- здесь теперь имя категории
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(color: appColors.subtle, fontSize: 12),
             ),
           ),
           Wrap(
@@ -1482,11 +1509,11 @@ class _FilterPanel extends StatelessWidget {
 
         // --- Потом некатегоризированные
         if (grouped.uncategorized.isNotEmpty) ...[
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(top: 12, bottom: 4),
             child: Text(
               'No category',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+              style: TextStyle(color: appColors.subtle, fontSize: 12),
             ),
           ),
           Wrap(
@@ -1560,9 +1587,10 @@ class _TagBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = Color(color);
+    final appColors = context.appThemeColors;
     final text = ThemeData.estimateBrightnessForColor(bg) == Brightness.dark
         ? Colors.white
-        : Colors.black;
+        : const Color(0xFF171412);
 
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -1570,11 +1598,35 @@ class _TagBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? bg : bg.withOpacity(0.6),
+          color: selected ? bg : bg.withValues(alpha: 0.72),
           borderRadius: BorderRadius.circular(18),
-          border: selected ? Border.all(color: Colors.white, width: 2) : null,
+          border: Border.all(
+            color: selected ? Colors.white : appColors.border,
+            width: selected ? 1.6 : 0.8,
+          ),
         ),
-        child: Text(label, style: TextStyle(color: text, fontSize: 12)),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: text,
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+            shadows: text == Colors.white
+                ? const [
+                    Shadow(
+                      color: Color(0xCC000000),
+                      blurRadius: 2,
+                      offset: Offset(0, 1),
+                    ),
+                    Shadow(
+                      color: Color(0x88000000),
+                      blurRadius: 6,
+                      offset: Offset(0, 0),
+                    ),
+                  ]
+                : null,
+          ),
+        ),
       ),
     );
   }

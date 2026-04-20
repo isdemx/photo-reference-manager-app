@@ -310,7 +310,6 @@ class _TagFilterChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderColor = _borderColor(state);
-    final textColor = context.appThemeColors.text;
     final borderIdleColor = context.appThemeColors.border;
     final bgColor = Color.alphaBlend(
       context.appThemeColors.overlay.withValues(alpha: isMacOS ? 0.25 : 0.0),
@@ -353,9 +352,21 @@ class _TagFilterChip extends StatelessWidget {
             Text(
               tag.name,
               style: TextStyle(
-                color: textColor.withValues(alpha: 0.96),
+                color: Colors.white,
                 fontSize: isMacOS ? 12 : 14,
                 fontWeight: FontWeight.w500,
+                shadows: [
+                  Shadow(
+                    color: Color(0x66000000),
+                    blurRadius: 2,
+                    offset: Offset(0, 1),
+                  ),
+                  Shadow(
+                    color: Color(0x44000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 0),
+                  ),
+                ],
               ),
             ),
           ],

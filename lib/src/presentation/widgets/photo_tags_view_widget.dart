@@ -20,6 +20,18 @@ class PhotoTagsViewWidget extends StatefulWidget {
 
 class _PhotoTagsViewWidgetState extends State<PhotoTagsViewWidget> {
   static const double _minHeight = 32.0;
+  static const _tagTextShadows = [
+    Shadow(
+      color: Color(0x66000000),
+      blurRadius: 2,
+      offset: Offset(0, 1),
+    ),
+    Shadow(
+      color: Color(0x44000000),
+      blurRadius: 6,
+      offset: Offset(0, 0),
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +73,9 @@ class _PhotoTagsViewWidgetState extends State<PhotoTagsViewWidget> {
                                 style: const TextStyle(
                                   fontSize:
                                       10.0, // Уменьшаем размер шрифта для тонкого чипа
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                  shadows: _tagTextShadows,
                                 ),
                               ),
                               side: BorderSide.none,
@@ -73,6 +88,12 @@ class _PhotoTagsViewWidgetState extends State<PhotoTagsViewWidget> {
                                   horizontal: -2.0,
                                   vertical:
                                       -2.0), // Настройка плотности для уменьшения высоты
+                              deleteIcon: const Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                                shadows: _tagTextShadows,
+                              ),
                               onDeleted: () {
                                 setState(() {
                                   // Удаление тега из фотографии и обновление состояния

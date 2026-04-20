@@ -171,8 +171,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     child: Text(
                       'Settings',
                       style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
                         color: textPrimary,
                       ),
                     ),
@@ -187,7 +187,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
               const SizedBox(height: 4),
               Text(
                 'Refma: version ${widget.appVersion ?? '-'}',
-                style: TextStyle(color: textSecondary, fontSize: 13),
+                style: TextStyle(
+                  color: textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               const SizedBox(height: 16),
               Divider(color: dividerColor, height: 1),
@@ -205,14 +209,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         'Theme',
                         style: TextStyle(
                           color: textPrimary,
-                          fontSize: 15,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
                         'Dark by default. Switch to Light or Auto',
                         style: TextStyle(
                           color: textSecondary,
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -282,7 +288,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         'Create a backup',
                         style: TextStyle(
                           color: textPrimary,
-                          fontSize: 15,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
@@ -293,7 +300,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                                 : 'Save locally all the data and database • App size: ${StorageDiagnosticsService.formatBytes(_appSizeBytes)}',
                         style: TextStyle(
                           color: textSecondary,
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -311,14 +319,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         'Restore from backup',
                         style: TextStyle(
                           color: textPrimary,
-                          fontSize: 15,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
                         'Import a backup file and restore your data',
                         style: TextStyle(
                           color: textSecondary,
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -341,7 +351,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         'Clear cache',
                         style: TextStyle(
                           color: textPrimary,
-                          fontSize: 15,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
@@ -352,7 +363,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                                 : 'Current cache: ${StorageDiagnosticsService.formatBytes(_cacheSizeBytes)}',
                         style: TextStyle(
                           color: textSecondary,
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -399,7 +411,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                           'Biometric lock',
                           style: TextStyle(
                             color: textPrimary,
-                            fontSize: 15,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                         subtitle: Text(
@@ -408,7 +421,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                               : 'Biometrics not available on this device',
                           style: TextStyle(
                             color: textSecondary,
-                            fontSize: 12,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -421,14 +435,16 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         'Rate the app',
                         style: TextStyle(
                           color: textPrimary,
-                          fontSize: 15,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       subtitle: Text(
                         'Leave a quick rating in the App Store',
                         style: TextStyle(
                           color: textSecondary,
-                          fontSize: 12,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
@@ -445,7 +461,11 @@ class _SettingsDialogState extends State<SettingsDialog> {
                     const SizedBox(height: 12),
                     Text(
                       'Have a question or feedback?',
-                      style: TextStyle(color: textSecondary, fontSize: 13),
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     Align(
@@ -473,7 +493,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         label: const Text(
                           'Telegram',
                           style: TextStyle(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
                           ),
                         ),

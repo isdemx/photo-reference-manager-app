@@ -11,6 +11,11 @@ import 'package:photographers_reference_app/src/presentation/widgets/add_folder_
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+enum _FolderSortMode {
+  newestFirst,
+  alphabetical,
+}
+
 class FoldersHelpers {
   static void deleteFolderAfterConfirmation(
       BuildContext context, Folder folder) {
@@ -123,6 +128,7 @@ class FoldersHelpers {
     final prefs = await SharedPreferences.getInstance();
     bool groupedView = prefs.getBool('groupedView') ?? false;
     String? expandedCategory = prefs.getString('expandedCategory');
+    _FolderSortMode sortMode = _FolderSortMode.newestFirst;
 
     return await showDialog<bool>(
       context: outerContext,
@@ -133,7 +139,7 @@ class FoldersHelpers {
               builder: (context, categoryState) {
                 if (folderState is FolderLoaded &&
                     categoryState is CategoryLoaded) {
-                  final folders = folderState.folders;
+                  final folders = List<Folder>.from(folderState.folders);
                   final categories = {
                     for (var category in categoryState.categories)
                       category.id: category.name
@@ -157,10 +163,70 @@ class FoldersHelpers {
 
                   return StatefulBuilder(
                     builder: (context, setState) {
+                      int compareFolders(Folder a, Folder b) {
+                        switch (sortMode) {
+                          case _FolderSortMode.newestFirst:
+                            return b.dateCreated.compareTo(a.dateCreated);
+                          case _FolderSortMode.alphabetical:
+                            return a.name.toLowerCase().compareTo(
+                                  b.name.toLowerCase(),
+                                );
+                        }
+                      }
+
+                      folders.sort(compareFolders);
+                      for (final entry in categorizedFolders.entries) {
+                        entry.value.sort(compareFolders);
+                      }
+
                       return AlertDialog(
                         insetPadding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 12),
-                        title: const Text('Add Photos to Folder'),
+                        title: Row(
+                          children: [
+                            const Expanded(
+                              child: Text('Add Photos to Folder'),
+                            ),
+                            PopupMenuButton<_FolderSortMode>(
+                              initialValue: sortMode,
+                              tooltip: 'Sort folders',
+                              onSelected: (value) {
+                                setState(() {
+                                  sortMode = value;
+                                });
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem(
+                                  value: _FolderSortMode.newestFirst,
+                                  child: Text('Newest first'),
+                                ),
+                                PopupMenuItem(
+                                  value: _FolderSortMode.alphabetical,
+                                  child: Text('A-Z'),
+                                ),
+                              ],
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    sortMode == _FolderSortMode.newestFirst
+                                        ? Icons.schedule_rounded
+                                        : Icons.sort_by_alpha_rounded,
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    sortMode ==
+                                            _FolderSortMode.newestFirst
+                                        ? 'Newest'
+                                        : 'A-Z',
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                         content: SafeArea(
                           child: SizedBox(
                             width: double.maxFinite,

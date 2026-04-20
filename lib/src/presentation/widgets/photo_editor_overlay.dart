@@ -1313,29 +1313,35 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                             _temp,
                             _hue,
                           ),
-                          child: ExtendedImage.file(
-                            File(path),
-                            fit: BoxFit.contain,
-                            mode: ExtendedImageMode.editor,
-                            cacheRawData: true,
-                            extendedImageEditorKey: _editorKey,
-                            initEditorConfigHandler: (_) => EditorConfig(
-                              maxScale: 5.0,
-                              speed: 1.0,
-                              animationDuration:
-                                  const Duration(milliseconds: 200),
-                              cropRectPadding: const EdgeInsets.fromLTRB(
-                                20,
-                                20,
-                                20,
-                                20,
+                          child: Transform(
+                            alignment: Alignment.center,
+                            transform: Matrix4.identity()
+                              ..rotateZ(_rotation)
+                              ..scale(_flipX ? -1.0 : 1.0, _flipY ? -1.0 : 1.0),
+                            child: ExtendedImage.file(
+                              File(path),
+                              fit: BoxFit.contain,
+                              mode: ExtendedImageMode.editor,
+                              cacheRawData: true,
+                              extendedImageEditorKey: _editorKey,
+                              initEditorConfigHandler: (_) => EditorConfig(
+                                maxScale: 5.0,
+                                speed: 1.0,
+                                animationDuration:
+                                    const Duration(milliseconds: 200),
+                                cropRectPadding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  20,
+                                  20,
+                                  20,
+                                ),
+                                hitTestSize: 20,
+                                cornerColor: textColor,
+                                lineColor: subtleTextColor,
+                                initCropRectType: InitCropRectType.imageRect,
+                                cropLayerPainter:
+                                    const EditorCropLayerPainter(),
                               ),
-                              hitTestSize: 20,
-                              cornerColor: textColor,
-                              lineColor: subtleTextColor,
-                              initCropRectType: InitCropRectType.imageRect,
-                              cropLayerPainter:
-                                  const EditorCropLayerPainter(),
                             ),
                           ),
                         ),

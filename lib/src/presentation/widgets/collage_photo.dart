@@ -732,6 +732,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   bool _skipViewZoneRestore = false;
   int? _pendingViewZoneIndex;
   double? _pendingZoomMultiplier;
+  Offset _mobileCanvasJoystickOffset = Offset.zero;
+  Timer? _mobileCanvasJoystickTimer;
 
   // --- Delete drag target ---
   Rect _deleteRect = Rect.zero;
@@ -794,6 +796,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       centerActions: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          MacosTopCenterAction(
+            icon: Icons.info_outline,
+            onTap: _showHelp,
+            tooltip: 'Help / Info',
+          ),
+          const SizedBox(width: 4),
           MacosTopCenterAction(
             icon: _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
             onTap: _toggleFullscreen,
@@ -1076,6 +1084,58 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Future<void> _saveCollageScale(double scale) async {
     await _prefs.saveCollageScale(scale);
+  }
+
+  void _applyMobileCanvasPan(Offset direction) {
+    if (_overviewMode || direction == Offset.zero) return;
+    final next = _transformationController.value.clone()
+      ..translate(direction.dx, direction.dy);
+    final scale = TransformMath.getScale(next);
+    final canvas = _currentCanvasSize();
+    final viewport = _viewportSize();
+    final scaledWidth = canvas.width * scale;
+    final scaledHeight = canvas.height * scale;
+
+    double tx = next.storage[12];
+    double ty = next.storage[13];
+
+    if (scaledWidth <= viewport.width) {
+      tx = (viewport.width - scaledWidth) / 2;
+    } else {
+      tx = tx.clamp(viewport.width - scaledWidth, 0.0);
+    }
+
+    if (scaledHeight <= viewport.height) {
+      ty = (viewport.height - scaledHeight) / 2;
+    } else {
+      ty = ty.clamp(viewport.height - scaledHeight, 0.0);
+    }
+
+    next.storage[12] = tx;
+    next.storage[13] = ty;
+    _setTransform(next);
+  }
+
+  void _startMobileCanvasJoystick() {
+    _mobileCanvasJoystickTimer?.cancel();
+    _mobileCanvasJoystickTimer =
+        Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!mounted || _mobileCanvasJoystickOffset == Offset.zero) return;
+      final distance = _mobileCanvasJoystickOffset.distance.clamp(0.0, 1.0);
+      if (distance <= 0) return;
+      final direction = -_mobileCanvasJoystickOffset / distance;
+      final speed = (4.0 + 12.0 * distance) / 6;
+      _applyMobileCanvasPan(direction * speed);
+    });
+  }
+
+  void _stopMobileCanvasJoystick() {
+    _mobileCanvasJoystickTimer?.cancel();
+    _mobileCanvasJoystickTimer = null;
+    if (!mounted || _mobileCanvasJoystickOffset == Offset.zero) return;
+    setState(() {
+      _mobileCanvasJoystickOffset = Offset.zero;
+    });
   }
 
   void _zoomToScale(double scale, Offset focalPoint) {
@@ -2424,8 +2484,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       setState(() => editingPhoto.rotation -= math.pi / 2),
                   onRotateRight: () =>
                       setState(() => editingPhoto.rotation += math.pi / 2),
-                  onFlipX: () =>
-                      setState(() => editingPhoto.flipX = !editingPhoto.flipX),
+                  onFlipX: () => _toggleEditingFlipX(editingPhoto),
                   onSendBackward: () => _sendItemBackward(editingPhoto),
                   onBringForward: () => _sendItemForward(editingPhoto),
                   onFlipY: null,
@@ -2479,33 +2538,44 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       ),
                     ),
                   ),
+                if (!Platform.isMacOS)
+                  Positioned(
+                    left: 12,
+                    bottom: 12 + (isIOS ? bottomInset : 0.0),
+                    child: SafeArea(
+                      top: false,
+                      child: _buildMobileCanvasJoystick(),
+                    ),
+                  ),
                 Positioned(
                   right: 12,
                   bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: MouseRegion(
-                    onEnter: (_) {
-                      if (!_fullscreenBottomHoverRight) {
-                        setState(() => _fullscreenBottomHoverRight = true);
-                      }
-                    },
-                    onExit: (_) {
-                      if (_fullscreenBottomHoverRight) {
-                        setState(() => _fullscreenBottomHoverRight = false);
-                      }
-                    },
-                    child: AnimatedOpacity(
-                      opacity: (_fullscreenBottomHoverLeft ||
-                              _fullscreenBottomHoverRight)
-                          ? 1.0
-                          : 0.0,
-                      duration: const Duration(milliseconds: 150),
-                      child: IgnorePointer(
-                        ignoring: !(_fullscreenBottomHoverLeft ||
-                            _fullscreenBottomHoverRight),
-                        child: _buildFloatingActionButtons(),
-                      ),
-                    ),
-                  ),
+                  child: Platform.isMacOS
+                      ? MouseRegion(
+                          onEnter: (_) {
+                            if (!_fullscreenBottomHoverRight) {
+                              setState(() => _fullscreenBottomHoverRight = true);
+                            }
+                          },
+                          onExit: (_) {
+                            if (_fullscreenBottomHoverRight) {
+                              setState(() => _fullscreenBottomHoverRight = false);
+                            }
+                          },
+                          child: AnimatedOpacity(
+                            opacity: (_fullscreenBottomHoverLeft ||
+                                    _fullscreenBottomHoverRight)
+                                ? 1.0
+                                : 0.0,
+                            duration: const Duration(milliseconds: 150),
+                            child: IgnorePointer(
+                              ignoring: !(_fullscreenBottomHoverLeft ||
+                                  _fullscreenBottomHoverRight),
+                              child: _buildFloatingActionButtons(),
+                            ),
+                          ),
+                        )
+                      : _buildFloatingActionButtons(),
                 ),
               ] else ...[
                 if (Platform.isMacOS)
@@ -2514,10 +2584,21 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     bottom: 12 + (isIOS ? bottomInset : 0.0),
                     child: _buildFloatingZoomControl(),
                   ),
+                if (!Platform.isMacOS)
+                  Positioned(
+                    left: 12,
+                    bottom: 12 + (isIOS ? bottomInset : 0.0),
+                    child: SafeArea(
+                      top: false,
+                      child: _buildMobileCanvasJoystick(),
+                    ),
+                  ),
                 Positioned(
                   right: 12,
                   bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: _buildFloatingActionButtons(),
+                  child: Platform.isMacOS
+                      ? _buildFloatingActionButtons()
+                      : _buildFloatingActionButtons(),
                 ),
               ],
             ],
@@ -2633,6 +2714,90 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  Widget _buildMobileCanvasJoystick() {
+    const double size = 56;
+    const double knobSize = 22;
+    const double maxRadius = 14;
+    const iconShadow = [
+      Shadow(
+        color: Colors.black54,
+        blurRadius: 6,
+        offset: Offset(0, 2),
+      ),
+    ];
+
+    Offset clampToRadius(Offset delta) {
+      if (delta.distance <= maxRadius) return delta;
+      return delta / delta.distance * maxRadius;
+    }
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.28),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withOpacity(0.14),
+          width: 1,
+        ),
+      ),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanStart: (details) {
+          final center = const Offset(size / 2, size / 2);
+          final delta = clampToRadius(details.localPosition - center);
+          setState(() {
+            _mobileCanvasJoystickOffset = delta / maxRadius;
+          });
+          _startMobileCanvasJoystick();
+        },
+        onPanUpdate: (details) {
+          final center = const Offset(size / 2, size / 2);
+          final delta = clampToRadius(details.localPosition - center);
+          setState(() {
+            _mobileCanvasJoystickOffset = delta / maxRadius;
+          });
+        },
+        onPanEnd: (_) => _stopMobileCanvasJoystick(),
+        onPanCancel: _stopMobileCanvasJoystick,
+        child: Stack(
+          children: [
+            const Center(
+              child: Icon(
+                Icons.open_with,
+                size: 18,
+                color: Colors.white70,
+                shadows: iconShadow,
+              ),
+            ),
+            Positioned(
+              left: (size - knobSize) / 2 +
+                  _mobileCanvasJoystickOffset.dx * maxRadius,
+              top: (size - knobSize) / 2 +
+                  _mobileCanvasJoystickOffset.dy * maxRadius,
+              child: Container(
+                width: knobSize,
+                height: knobSize,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.92),
+                  shape: BoxShape.circle,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFloatingActionButtons() {
     const iconShadow = [
       Shadow(
@@ -2645,8 +2810,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       backgroundColor: Colors.transparent,
       shadowColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
-      padding: const EdgeInsets.all(6),
-      minimumSize: const Size(30, 30),
+      padding: const EdgeInsets.all(7),
+      minimumSize: const Size(33, 33),
       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       visualDensity: VisualDensity.compact,
     );
@@ -2657,7 +2822,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         style: buttonStyle,
         icon: const Icon(
           Iconsax.add,
-          size: 18,
+          size: 20,
           color: Colors.white,
           shadows: iconShadow,
         ),
@@ -2671,7 +2836,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             style: buttonStyle,
             icon: const Icon(
               Icons.crop_free,
-              size: 18,
+              size: 20,
               color: Colors.white,
               shadows: iconShadow,
             ),
@@ -2683,7 +2848,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         style: buttonStyle,
         icon: const Icon(
           Icons.grid_view,
-          size: 18,
+          size: 20,
           color: Colors.white,
           shadows: iconShadow,
         ),
@@ -2694,7 +2859,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         style: buttonStyle,
         icon: const Icon(
           Iconsax.colorfilter,
-          size: 18,
+          size: 20,
           color: Colors.white,
           shadows: iconShadow,
         ),
@@ -2707,7 +2872,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           style: buttonStyle,
           icon: const Icon(
             Iconsax.save_2,
-            size: 18,
+            size: 20,
             color: Colors.white,
             shadows: iconShadow,
           ),
@@ -2719,7 +2884,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         style: buttonStyle,
         icon: Icon(
           _isPrivate ? Icons.lock : Icons.lock_open,
-          size: 18,
+          size: 20,
           color: _isPrivate ? Colors.amber : Colors.white,
           shadows: iconShadow,
         ),
@@ -2730,7 +2895,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         style: buttonStyle,
         icon: const Icon(
           Iconsax.image,
-          size: 18,
+          size: 20,
           color: Colors.green,
           shadows: iconShadow,
         ),
@@ -2741,7 +2906,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         style: buttonStyle,
         icon: const Icon(
           Icons.close,
-          size: 18,
+          size: 20,
           color: Colors.red,
           shadows: iconShadow,
         ),
@@ -2785,8 +2950,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       ),
     ];
 
-    final title =
-        '${_currentCollage?.title ?? "Collage"} (${_items.length} images)';
+    final title = _currentCollage?.title ?? "Collage";
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -3060,6 +3224,56 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     });
   }
 
+  void _normalizeEditingCropState(CollagePhotoState item) {
+    final rect = Rect.fromLTRB(
+      item.cropRect.left.clamp(0.0, 1.0),
+      item.cropRect.top.clamp(0.0, 1.0),
+      item.cropRect.right.clamp(0.0, 1.0),
+      item.cropRect.bottom.clamp(0.0, 1.0),
+    );
+
+    final normalizedRect = Rect.fromLTRB(
+      math.min(rect.left, rect.right),
+      math.min(rect.top, rect.bottom),
+      math.max(rect.left, rect.right),
+      math.max(rect.top, rect.bottom),
+    );
+
+    item.cropRect = normalizedRect;
+
+    final effectiveWidth = item.baseWidth * item.scale;
+    final effectiveHeight = item.baseHeight * item.scale;
+    if (effectiveWidth <= 0 || effectiveHeight <= 0) return;
+
+    final minDx = -((1 - normalizedRect.right) * effectiveWidth);
+    final maxDx = normalizedRect.left * effectiveWidth;
+    final minDy = -((1 - normalizedRect.bottom) * effectiveHeight);
+    final maxDy = normalizedRect.top * effectiveHeight;
+
+    item.internalOffset = Offset(
+      item.internalOffset.dx.clamp(minDx, maxDx),
+      item.internalOffset.dy.clamp(minDy, maxDy),
+    );
+  }
+
+  void _toggleEditingFlipX(CollagePhotoState item) {
+    setState(() {
+      final oldRect = item.cropRect;
+      item.flipX = !item.flipX;
+      item.cropRect = Rect.fromLTRB(
+        1 - oldRect.right,
+        oldRect.top,
+        1 - oldRect.left,
+        oldRect.bottom,
+      );
+      item.internalOffset = Offset(
+        -item.internalOffset.dx,
+        item.internalOffset.dy,
+      );
+      _normalizeEditingCropState(item);
+    });
+  }
+
   Widget _buildEditableContent(
     CollagePhotoState item,
     double effectiveWidth,
@@ -3167,7 +3381,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             item,
             effectiveWidth,
             effectiveHeight,
-            (Rect newRect) => setState(() => item.cropRect = newRect),
+            (Rect newRect) => setState(() {
+              item.cropRect = newRect;
+              _normalizeEditingCropState(item);
+            }),
           ),
         ],
       ],
@@ -3772,6 +3989,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
     _importService.unregisterCollageHandler(_handleImportedPhotos);
     _cancelArrowRepeat();
+    _mobileCanvasJoystickTimer?.cancel();
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
     _overviewScrollController.dispose();

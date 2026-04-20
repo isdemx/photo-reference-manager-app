@@ -74,13 +74,13 @@ class AppThemes {
   );
 
   static const AppThemeColors lightColors = AppThemeColors(
-    canvas: Color(0xFFEDEFF4),
-    surface: Color(0xFFD8DFE9),
-    surfaceAlt: Color(0xFFCED6E2),
-    border: Color(0x1A000000),
-    subtle: Color(0xFF6F685F),
-    text: Color(0xFF625B54),
-    accent: Color(0xFF1B84D8),
+    canvas: Color(0xFFE6E9EC),
+    surface: Color(0xFFD7DCE0),
+    surfaceAlt: Color(0xFFC8D0D6),
+    border: Color(0x22000000),
+    subtle: Color(0xFF5A554F),
+    text: Color(0xFF46413A),
+    accent: Color(0xFF5B7686),
     overlay: Color(0x66000000),
   );
 
@@ -88,6 +88,19 @@ class AppThemes {
     final scheme = ColorScheme.fromSeed(
       seedColor: darkColors.accent,
       brightness: Brightness.dark,
+    ).copyWith(
+      surface: darkColors.surface,
+      onSurface: darkColors.text,
+      outline: darkColors.border,
+      primary: darkColors.accent,
+      surfaceContainer: darkColors.surface,
+      surfaceContainerHigh: darkColors.surfaceAlt,
+      surfaceContainerHighest: darkColors.surfaceAlt,
+    );
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: scheme,
     );
     return ThemeData(
       useMaterial3: true,
@@ -104,6 +117,40 @@ class AppThemes {
           letterSpacing: 0.2,
         ),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: darkColors.surface,
+        titleTextStyle: TextStyle(
+          color: darkColors.text,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+        contentTextStyle: TextStyle(
+          color: darkColors.subtle,
+          fontSize: 14,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: darkColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: darkColors.surface,
+        surfaceTintColor: Colors.transparent,
+        textStyle: TextStyle(color: darkColors.text),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: darkColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dividerTheme: DividerThemeData(color: darkColors.border),
+      listTileTheme: ListTileThemeData(
+        iconColor: darkColors.subtle,
+        textColor: darkColors.text,
+      ),
+      textTheme: base.textTheme.apply(
+        bodyColor: darkColors.text,
+        displayColor: darkColors.text,
+      ),
       pageTransitionsTheme: transitions,
       extensions: const <ThemeExtension<dynamic>>[
         darkColors,
@@ -115,6 +162,20 @@ class AppThemes {
     final scheme = ColorScheme.fromSeed(
       seedColor: lightColors.accent,
       brightness: Brightness.light,
+    ).copyWith(
+      surface: lightColors.surface,
+      onSurface: lightColors.text,
+      outline: lightColors.border,
+      primary: lightColors.accent,
+      onPrimary: Colors.white,
+      surfaceContainer: lightColors.surface,
+      surfaceContainerHigh: lightColors.surfaceAlt,
+      surfaceContainerHighest: lightColors.surfaceAlt,
+    );
+    final base = ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      colorScheme: scheme,
     );
     return ThemeData(
       useMaterial3: true,
@@ -125,11 +186,45 @@ class AppThemes {
         backgroundColor: lightColors.surface,
         foregroundColor: lightColors.text,
         titleTextStyle: const TextStyle(
-          color: Color(0xFF6F685F),
+          color: Color(0xFF676058),
           fontSize: 14,
           fontWeight: FontWeight.w600,
           letterSpacing: 0.2,
         ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: lightColors.surface,
+        titleTextStyle: TextStyle(
+          color: lightColors.text,
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+        ),
+        contentTextStyle: TextStyle(
+          color: lightColors.subtle,
+          fontSize: 14,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: lightColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: lightColors.surface,
+        surfaceTintColor: Colors.transparent,
+        textStyle: TextStyle(color: lightColors.text),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: lightColors.surface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dividerTheme: DividerThemeData(color: lightColors.border),
+      listTileTheme: ListTileThemeData(
+        iconColor: lightColors.subtle,
+        textColor: lightColors.text,
+      ),
+      textTheme: base.textTheme.apply(
+        bodyColor: lightColors.text,
+        displayColor: lightColors.text,
       ),
       pageTransitionsTheme: transitions,
       extensions: const <ThemeExtension<dynamic>>[

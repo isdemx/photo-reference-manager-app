@@ -46,14 +46,19 @@ class _AppLockHostState extends State<AppLockHost> with WidgetsBindingObserver {
       if (mounted) setState(() {});
       return;
     }
-    _locked = true;
-    if (mounted) setState(() {});
-    await _settings.load();
-    _available = await _authService.isAvailable();
-    _enabledListener = _onEnabledChanged;
-    _settings.enabledNotifier.addListener(_enabledListener!);
-    _ready = true;
-    _syncLockState();
+    try {
+      await _settings.load();
+      _available = await _authService.isAvailable();
+      _enabledListener = _onEnabledChanged;
+      _settings.enabledNotifier.addListener(_enabledListener!);
+      _ready = true;
+      _syncLockState();
+    } catch (error, stackTrace) {
+      debugPrint('[AppLock] init failed: $error\n$stackTrace');
+      _locked = false;
+      _ready = true;
+      if (mounted) setState(() {});
+    }
   }
 
   void _onEnabledChanged() {
@@ -94,7 +99,8 @@ class _AppLockHostState extends State<AppLockHost> with WidgetsBindingObserver {
     bool ok = false;
     try {
       ok = await _authService.authenticate();
-    } catch (_) {
+    } catch (error, stackTrace) {
+      debugPrint('[AppLock] authenticate failed: $error\n$stackTrace');
       ok = false;
     } finally {
       _authInProgress = false;
@@ -134,9 +140,17 @@ class _AppLockHostState extends State<AppLockHost> with WidgetsBindingObserver {
   }
 
   Future<void> _refreshAvailability() async {
-    _available = await _authService.isAvailable();
-    if (!_available && _settings.enabledNotifier.value) {
-      await _settings.setEnabled(false);
+    try {
+      _available = await _authService.isAvailable();
+      if (!_available && _settings.enabledNotifier.value) {
+        await _settings.setEnabled(false);
+      }
+    } catch (error, stackTrace) {
+      debugPrint('[AppLock] refresh availability failed: $error\n$stackTrace');
+      _available = false;
+      if (_settings.enabledNotifier.value) {
+        await _settings.setEnabled(false);
+      }
     }
   }
 
@@ -165,7 +179,7 @@ class _AppLockHostState extends State<AppLockHost> with WidgetsBindingObserver {
                   child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                     child: Container(
-                      color: Colors.black.withOpacity(0.6),
+                      color: Colors.black.withValues(alpha: 0.6),
                     ),
                   ),
                 ),

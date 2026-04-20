@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/backup.service.dart';
 
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
 
 class DragDropImportOverlay extends StatefulWidget {
@@ -25,7 +26,21 @@ class _DragDropImportOverlayState extends State<DragDropImportOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_isDesktop()) return widget.child;
+    final content = Stack(
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: _dragOver ? Colors.white10 : null,
+          ),
+          child: widget.child,
+        ),
+        const _StatusPopoverLayer(),
+      ],
+    );
+
+    if (!_isDesktop()) {
+      return content;
+    }
 
     final importService = context.read<DragDropImportService>();
 
@@ -39,15 +54,7 @@ class _DragDropImportOverlayState extends State<DragDropImportOverlay> {
       onDragEntered: (_) => setState(() => _dragOver = true),
       onDragExited: (_) => setState(() => _dragOver = false),
       child: Stack(
-        children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: _dragOver ? Colors.white10 : null,
-            ),
-            child: widget.child,
-          ),
-          const _StatusPopoverLayer(),
-        ],
+        children: [content],
       ),
     );
   }
@@ -70,15 +77,16 @@ class _StatusPopoverLayerState extends State<_StatusPopoverLayer> {
 
   @override
   Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top + 12;
     return Stack(
       children: [
-        const Positioned(
-          top: 12,
+        Positioned(
+          top: topInset,
           right: 12,
-          child: _ImportStatusPopover(),
+          child: const _ImportStatusPopover(),
         ),
         Positioned(
-          top: _backupTop,
+          top: (_backupTop < topInset ? topInset : _backupTop),
           right: 12,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
@@ -86,7 +94,7 @@ class _StatusPopoverLayerState extends State<_StatusPopoverLayer> {
               final screenHeight = MediaQuery.sizeOf(context).height;
               setState(() {
                 _backupTop = (_backupTop + details.delta.dy).clamp(
-                  12.0,
+                  topInset,
                   screenHeight - 120,
                 );
               });
@@ -104,6 +112,7 @@ class _BackupStatusPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appThemeColors;
     return ValueListenableBuilder<BackupProgressState?>(
       valueListenable: BackupService.progressNotifier,
       builder: (context, status, _) {
@@ -122,9 +131,9 @@ class _BackupStatusPopover extends StatelessWidget {
         return ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 280),
           child: Material(
-            color: Colors.black.withValues(alpha: 0.82),
+            color: colors.surface.withValues(alpha: 0.96),
             elevation: 8,
-            shadowColor: Colors.black54,
+            shadowColor: Colors.black26,
             borderRadius: BorderRadius.circular(12),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -134,12 +143,12 @@ class _BackupStatusPopover extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
                           'Backup',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white,
+                            color: colors.text,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -152,9 +161,9 @@ class _BackupStatusPopover extends StatelessWidget {
                             padding: const EdgeInsets.all(4),
                             child: Text(
                               status.canceling ? '...' : 'Cancel',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white70,
+                                color: colors.subtle,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -171,18 +180,18 @@ class _BackupStatusPopover extends StatelessWidget {
                           status.phaseLabel,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white70,
+                            color: colors.subtle,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Text(
                         progressText,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: Colors.white54,
+                          color: colors.subtle.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -197,9 +206,9 @@ class _BackupStatusPopover extends StatelessWidget {
                           : progressValue == 0
                               ? null
                               : progressValue,
-                      backgroundColor: Colors.white12,
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Colors.white70,
+                      backgroundColor: colors.border.withValues(alpha: 0.45),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colors.text.withValues(alpha: 0.82),
                       ),
                     ),
                   ),
@@ -209,16 +218,16 @@ class _BackupStatusPopover extends StatelessWidget {
                     children: [
                       Text(
                         'Media $countText',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: Colors.white70,
+                          color: colors.subtle,
                         ),
                       ),
                       Text(
                         _formatEta(status.eta),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: Colors.white54,
+                          color: colors.subtle.withValues(alpha: 0.8),
                         ),
                       ),
                     ],
@@ -229,9 +238,9 @@ class _BackupStatusPopover extends StatelessWidget {
                       status.currentItemName!,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
-                        color: Colors.white54,
+                        color: colors.subtle.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -259,6 +268,7 @@ class _ImportStatusPopover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.appThemeColors;
     final service = context.read<DragDropImportService>();
     return StreamBuilder<ImportStatus>(
       stream: service.statusStream,
@@ -282,9 +292,9 @@ class _ImportStatusPopover extends StatelessWidget {
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 260),
             child: Material(
-              color: Colors.black.withValues(alpha: 0.82),
+              color: colors.surface.withValues(alpha: 0.96),
               elevation: 8,
-              shadowColor: Colors.black54,
+              shadowColor: Colors.black26,
               borderRadius: BorderRadius.circular(12),
               child: Padding(
                 padding:
@@ -300,9 +310,9 @@ class _ImportStatusPopover extends StatelessWidget {
                             current.isEmpty ? 'Import' : current,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: Colors.white,
+                              color: colors.text,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -311,12 +321,12 @@ class _ImportStatusPopover extends StatelessWidget {
                           InkWell(
                             onTap: service.cancel,
                             borderRadius: BorderRadius.circular(999),
-                            child: const Padding(
+                            child: Padding(
                               padding: EdgeInsets.all(4),
                               child: Icon(
                                 Icons.close,
                                 size: 16,
-                                color: Colors.white70,
+                                color: colors.subtle,
                               ),
                             ),
                           ),
@@ -328,17 +338,17 @@ class _ImportStatusPopover extends StatelessWidget {
                       children: [
                         Text(
                           label,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: Colors.white70,
+                            color: colors.subtle,
                           ),
                         ),
                         if (countText.isNotEmpty)
                           Text(
                             countText,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.white54,
+                              color: colors.subtle.withValues(alpha: 0.8),
                             ),
                           ),
                       ],
@@ -349,9 +359,9 @@ class _ImportStatusPopover extends StatelessWidget {
                       child: LinearProgressIndicator(
                         minHeight: 4,
                         value: status.isFinal ? 1.0 : status.progress,
-                        backgroundColor: Colors.white12,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          Colors.white70,
+                        backgroundColor: colors.border.withValues(alpha: 0.45),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colors.text.withValues(alpha: 0.82),
                         ),
                       ),
                     ),

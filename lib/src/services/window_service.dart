@@ -81,13 +81,13 @@ class WindowService {
     String filePath,
   ) async {
     final screenSize = _currentScreenSize();
-    const horizontalChrome = 28.0;
-    const verticalChrome = 34.0;
+    const horizontalChrome = 0.0;
+    const verticalChrome = 32.0;
     const minWindowWidth = 360.0;
     const minWindowHeight = 260.0;
     const minMediaWidth = 240.0;
     const minMediaHeight = 180.0;
-    const sideInset = 32.0;
+    const sideInset = 24.0;
     const topBarHeight = 32.0;
 
     final maxMediaWidth =

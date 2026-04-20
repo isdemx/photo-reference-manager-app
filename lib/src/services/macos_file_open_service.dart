@@ -68,6 +68,30 @@ class MacOSFileOpenService {
     }
   }
 
+  static Future<String?> requestFolderAccess(String folderPath) async {
+    if (!_isSupportedPlatform) return null;
+    try {
+      final selectedPath = await _channel.invokeMethod<String>(
+        'requestFolderAccess',
+        folderPath,
+      );
+      debugPrint(
+        '[RefmaOpenFiles][dart] requestFolderAccess folder=$folderPath selected=$selectedPath',
+      );
+      return selectedPath;
+    } on MissingPluginException {
+      debugPrint(
+        '[RefmaOpenFiles][dart] requestFolderAccess MissingPluginException',
+      );
+      return null;
+    } on PlatformException catch (error) {
+      debugPrint(
+        '[RefmaOpenFiles][dart] requestFolderAccess PlatformException $error',
+      );
+      return null;
+    }
+  }
+
   static List<String> _normalizeFiles(dynamic rawFiles) {
     if (rawFiles is! List) return const <String>[];
 

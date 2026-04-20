@@ -1,6 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 /// Компактный слайдер: тонкий трек, подпись + значение, двойной тап — сброс к центру
 class MiniSlider extends StatelessWidget {
@@ -28,6 +29,8 @@ class MiniSlider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final txt = (format ?? ((v) => v.toStringAsFixed(2)))(value);
+    final appColors = context.appThemeColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -35,11 +38,11 @@ class MiniSlider extends StatelessWidget {
         Row(
           children: [
             Text(label,
-                style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                style: TextStyle(color: appColors.subtle, fontSize: 11)),
             const Spacer(),
             Text(txt,
-                style: const TextStyle(
-                    color: Colors.white,
+                style: TextStyle(
+                    color: appColors.text,
                     fontSize: 11,
                     fontFeatures: [ui.FontFeature.tabularFigures()])),
           ],
@@ -52,10 +55,12 @@ class MiniSlider extends StatelessWidget {
               trackHeight: 1.5,
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5.5),
               overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-              activeTrackColor: Colors.white,
-              inactiveTrackColor: Colors.white24,
-              thumbColor: Colors.white,
-              overlayColor: Colors.white12,
+              activeTrackColor: appColors.text,
+              inactiveTrackColor:
+                  appColors.border.withValues(alpha: isDark ? 0.9 : 0.7),
+              thumbColor: appColors.text,
+              overlayColor:
+                  appColors.surfaceAlt.withValues(alpha: isDark ? 0.18 : 0.12),
               tickMarkShape:
                   const RoundSliderTickMarkShape(tickMarkRadius: 0.0),
             ),

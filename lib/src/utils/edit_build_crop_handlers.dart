@@ -54,8 +54,8 @@ List<Widget> buildCropHandles(
     required bool isTop,
   }) {
     return SizedBox(
-      width: 18,
-      height: 18,
+      width: 9,
+      height: 9,
       child: CustomPaint(
         painter: _CornerHandlePainter(
           isLeft: isLeft,
@@ -87,11 +87,9 @@ List<Widget> buildCropHandles(
             onUpdateCropRect(newRect);
           },
           child: SizedBox(
-            width: 28,
-            height: 28,
-            child: Center(
-              child: cornerHandlePaint(isLeft: isLeft, isTop: isTop),
-            ),
+            width: 12,
+            height: 12,
+            child: cornerHandlePaint(isLeft: isLeft, isTop: isTop),
           ),
         ),
       ),
@@ -123,8 +121,8 @@ class _CornerHandlePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final corner = Offset(isLeft ? 0.0 : size.width, isTop ? 0.0 : size.height);
-    const double len = 10.0;
-    const double stroke = 2.0;
+    const double len = 5.0;
+    const double stroke = 1.2;
 
     final white = Paint()
       ..color = Colors.white
@@ -135,7 +133,7 @@ class _CornerHandlePainter extends CustomPainter {
     final red = Paint()
       ..color = const Color(0xFFE53935)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
+      ..strokeWidth = 0.8
       ..strokeCap = StrokeCap.square;
 
     final horizontalEnd = Offset(
@@ -150,7 +148,7 @@ class _CornerHandlePainter extends CustomPainter {
     canvas.drawLine(corner, horizontalEnd, white);
     canvas.drawLine(corner, verticalEnd, white);
 
-    final redLen = 6.0;
+    final redLen = 3.0;
     final redHorizontalEnd = Offset(
       corner.dx + (isLeft ? redLen : -redLen),
       corner.dy,

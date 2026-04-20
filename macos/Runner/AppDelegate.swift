@@ -6,6 +6,7 @@ class AppDelegate: FlutterAppDelegate {
   private let openFilesChannelName = "refma/macos_open_files"
   private var openFilesChannel: FlutterMethodChannel?
   private var pendingOpenFiles: [String] = []
+  private var activeSecurityScopedURLs: [URL] = []
 
   override func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
     return true
@@ -58,6 +59,12 @@ class AppDelegate: FlutterAppDelegate {
         print("[RefmaOpenFiles][native] getPendingOpenFiles -> \(self.pendingOpenFiles)")
         result(self.pendingOpenFiles)
         self.pendingOpenFiles.removeAll()
+      case "requestFolderAccess":
+        guard let folderPath = call.arguments as? String else {
+          result(nil)
+          return
+        }
+        self.requestFolderAccess(folderPath: folderPath, result: result)
       default:
         print("[RefmaOpenFiles][native] methodNotImplemented \(call.method)")
         result(FlutterMethodNotImplemented)
@@ -95,6 +102,34 @@ class AppDelegate: FlutterAppDelegate {
 
     pendingOpenFiles.append(contentsOf: normalized)
     flushPendingOpenFiles()
+  }
+
+  private func requestFolderAccess(folderPath: String, result: @escaping FlutterResult) {
+    DispatchQueue.main.async {
+      let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
+      let panel = NSOpenPanel()
+      panel.canChooseFiles = false
+      panel.canChooseDirectories = true
+      panel.allowsMultipleSelection = false
+      panel.canCreateDirectories = false
+      panel.directoryURL = folderURL
+      panel.prompt = "Allow"
+      panel.message = "Allow Refma to read this folder so Lite Viewer can show nearby photos."
+
+      let response = panel.runModal()
+      guard response == .OK, let selectedURL = panel.url else {
+        print("[RefmaOpenFiles][native] requestFolderAccess cancelled folder=\(folderPath)")
+        result(nil)
+        return
+      }
+
+      if selectedURL.startAccessingSecurityScopedResource() {
+        self.activeSecurityScopedURLs.append(selectedURL)
+      }
+
+      print("[RefmaOpenFiles][native] requestFolderAccess granted folder=\(selectedURL.path)")
+      result(selectedURL.path)
+    }
   }
 
 }

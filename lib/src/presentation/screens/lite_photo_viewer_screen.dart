@@ -30,7 +30,8 @@ class LitePhotoViewerScreen extends StatefulWidget {
   State<LitePhotoViewerScreen> createState() => _LitePhotoViewerScreenState();
 }
 
-class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
+class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen>
+    with WidgetsBindingObserver {
   late final Future<LiteFolderViewerData> _dataFuture;
   final FocusNode _focusNode = FocusNode(debugLabel: 'LitePhotoViewer');
   final Map<String, _LiteMediaMetadata> _metadataByPath = {};
@@ -55,6 +56,7 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     debugPrint(
       '[RefmaOpenFiles][dart] LitePhotoViewerScreen init initialFilePath=${widget.initialFilePath}',
     );
@@ -79,8 +81,19 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _focusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _restoreInteractionAfterFocusReturn();
+    } else if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused) {
+      _scalingItemId = null;
+    }
   }
 
   _LiteCanvasItem? get _activeCanvasItem {
@@ -110,6 +123,15 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  void _restoreInteractionAfterFocusReturn() {
+    _scalingItemId = null;
+    _isSwitching = false;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _focusNode.requestFocus();
+    });
   }
 
   Future<void> _toggleFullScreen() async {
@@ -215,8 +237,75 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
       parts.add(_formatBytes(metadata.fileSizeBytes!));
     }
 
-    parts.add('Refma');
     return parts.join(' ');
+  }
+
+  Future<void> _fitWindowToCanvasItems(LiteFolderViewerData data) async {
+    if (_canvasItems.isEmpty || _canvasSize.width <= 0 || _canvasSize.height <= 0) {
+      return;
+    }
+
+    const horizontalChrome = 0.0;
+    const verticalChrome = 32.0;
+    const horizontalPadding = 32.0;
+    const verticalPadding = 0.0;
+
+    var minLeft = double.infinity;
+    var minTop = double.infinity;
+    var maxRight = double.negativeInfinity;
+    var maxBottom = double.negativeInfinity;
+
+    for (final item in _canvasItems) {
+      final metadata = _metadataForCanvasItem(data, item);
+      final width = (metadata.pixelWidth ?? 1000).toDouble() * item.scale;
+      final height = (metadata.pixelHeight ?? 1000).toDouble() * item.scale;
+      minLeft = math.min(minLeft, item.offset.dx);
+      minTop = math.min(minTop, item.offset.dy);
+      maxRight = math.max(maxRight, item.offset.dx + width);
+      maxBottom = math.max(maxBottom, item.offset.dy + height);
+    }
+
+    if (!minLeft.isFinite ||
+        !minTop.isFinite ||
+        !maxRight.isFinite ||
+        !maxBottom.isFinite) {
+      return;
+    }
+
+    final desiredCanvasWidth = math.max(
+      _canvasSize.width,
+      (maxRight - minLeft) + horizontalPadding,
+    );
+    final desiredCanvasHeight = math.max(
+      _canvasSize.height,
+      (maxBottom - minTop) + verticalPadding,
+    );
+
+    try {
+      final screenSize = MediaQuery.sizeOf(context);
+      final currentSize = await windowManager.getSize();
+      final desiredWidth = math.min(
+        screenSize.width - 8,
+        desiredCanvasWidth + horizontalChrome,
+      );
+      final desiredHeight = math.min(
+        screenSize.height - 8,
+        desiredCanvasHeight + verticalChrome,
+      );
+
+      final shouldResizeWidth = (desiredWidth - currentSize.width).abs() > 8;
+      final shouldResizeHeight = (desiredHeight - currentSize.height).abs() > 8;
+
+      if (shouldResizeWidth || shouldResizeHeight) {
+        await windowManager.setSize(
+          Size(
+            shouldResizeWidth ? desiredWidth : currentSize.width,
+            shouldResizeHeight ? desiredHeight : currentSize.height,
+          ),
+        );
+        await windowManager.center();
+      }
+    } catch (_) {}
   }
 
   ImageProvider _imageProviderFor(LiteViewerItem item) {
@@ -273,14 +362,6 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
       canvasSize.width / metadata.pixelWidth!,
       canvasSize.height / metadata.pixelHeight!,
     );
-  }
-
-  double _scaledWidthForItem(
-    _LiteCanvasItem item,
-    LiteFolderViewerData data,
-  ) {
-    final metadata = _metadataForCanvasItem(data, item);
-    return (metadata.pixelWidth ?? 1000).toDouble() * item.scale;
   }
 
   void _fitSingleCanvasItemToCanvas(
@@ -369,21 +450,6 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
     });
   }
 
-  Future<void> _expandWindowForCanvasItems(double desiredCanvasWidth) async {
-    if (desiredCanvasWidth <= 0) return;
-    final screenSize = MediaQuery.sizeOf(context);
-    try {
-      final currentSize = await windowManager.getSize();
-      final maxWidth = screenSize.width - 8;
-      final desiredWidth =
-          math.min(maxWidth, math.max(currentSize.width, desiredCanvasWidth));
-      if (desiredWidth > currentSize.width + 8) {
-        await windowManager.setSize(Size(desiredWidth, currentSize.height));
-        await windowManager.center();
-      }
-    } catch (_) {}
-  }
-
   Future<void> _addNextPhotoToCollage(LiteFolderViewerData data) async {
     final activeItem = _activeCanvasItem;
     final baseIndex = activeItem?.folderIndex ?? _displayedIndex;
@@ -393,24 +459,6 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
     await _prepareItem(data.items[nextIndex]);
     if (!mounted) return;
 
-    final nextMetadata = _readMetadata(data.items[nextIndex]);
-    final nextScale = _fitScaleForMetadata(nextMetadata, _canvasSize);
-    final nextWidth = (nextMetadata.pixelWidth ?? 1000).toDouble() * nextScale;
-
-    var minLeft = double.infinity;
-    var maxRight = double.negativeInfinity;
-    for (final item in _canvasItems) {
-      minLeft = math.min(minLeft, item.offset.dx);
-      maxRight =
-          math.max(maxRight, item.offset.dx + _scaledWidthForItem(item, data));
-    }
-
-    const gap = 32.0;
-    final existingSpan =
-        minLeft.isFinite && maxRight.isFinite ? (maxRight - minLeft) : 0.0;
-    final desiredCanvasWidth =
-        math.max(_canvasSize.width, (existingSpan * 2) + (gap * 2) + nextWidth);
-
     final canvasItem = _createCanvasItem(folderIndex: nextIndex);
     setState(() {
       _canvasItems.add(canvasItem);
@@ -419,11 +467,15 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
       _displayedIndex = nextIndex;
     });
 
-    await _expandWindowForCanvasItems(desiredCanvasWidth);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() {
         _placeNewCanvasItemCentered(canvasItem, data);
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _fitWindowToCanvasItems(data);
+        _focusNode.requestFocus();
       });
     });
   }
@@ -480,9 +532,8 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
 
       _precacheNearbyItems(data, targetIndex);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_focusNode.hasFocus) {
-          _focusNode.requestFocus();
-        }
+        if (!mounted) return;
+        _focusNode.requestFocus();
       });
     } finally {
       _isSwitching = false;
@@ -615,24 +666,21 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
         final sortedItems = List<_LiteCanvasItem>.from(_canvasItems)
           ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Listener(
-            behavior: HitTestBehavior.opaque,
-            onPointerPanZoomStart: (_) {},
-            onPointerPanZoomUpdate: (event) => _translateCanvas(event.panDelta),
-            onPointerPanZoomEnd: (_) {},
-            child: ColoredBox(
-              color: appColors.canvas,
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: ColoredBox(color: appColors.canvas),
-                  ),
-                  ...sortedItems
-                      .map((item) => _buildCanvasItemWidget(data, item)),
-                ],
-              ),
+        return Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: (_) => _focusNode.requestFocus(),
+          onPointerPanZoomStart: (_) {},
+          onPointerPanZoomUpdate: (event) => _translateCanvas(event.panDelta),
+          onPointerPanZoomEnd: (_) {},
+          child: ColoredBox(
+            color: appColors.canvas,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: ColoredBox(color: appColors.canvas),
+                ),
+                ...sortedItems.map((item) => _buildCanvasItemWidget(data, item)),
+              ],
             ),
           ),
         );
@@ -734,8 +782,9 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
                             children: [
                               Center(
                                 child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 240,
+                                  padding: const EdgeInsets.only(
+                                    left: 96,
+                                    right: 84,
                                   ),
                                   child: Text(
                                     _buildTopBarText(
@@ -744,7 +793,8 @@ class _LitePhotoViewerScreenState extends State<LitePhotoViewerScreen> {
                                       currentMetadata,
                                     ),
                                     maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
+                                    overflow: TextOverflow.fade,
+                                    softWrap: false,
                                     textAlign: TextAlign.center,
                                     style: const TextStyle(
                                       color: Color(0xFF6C665E),

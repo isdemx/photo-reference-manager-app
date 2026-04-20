@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage/action_icon_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage/mini_slider_widget.dart';
 
@@ -54,8 +55,10 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isIOS = Platform.isIOS;
+    final appColors = context.appThemeColors;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
-      color: Colors.black.withOpacity(0.6),
+      color: appColors.surface.withValues(alpha: isDark ? 0.94 : 0.97),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
         child: Builder(
@@ -161,8 +164,9 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                     onPressed: onDone,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
-                      backgroundColor: Colors.white10,
-                      foregroundColor: Colors.white,
+                      backgroundColor:
+                          appColors.surfaceAlt.withValues(alpha: 0.92),
+                      foregroundColor: appColors.text,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
@@ -187,7 +191,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                     children: actions,
                   ),
                   const SizedBox(height: 4),
-                  const Divider(color: Colors.white24, height: 8),
+                  Divider(color: appColors.border, height: 8),
                   LayoutBuilder(
                     builder: (context, c) {
                       final columns = 2;
@@ -243,8 +247,8 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                     tooltip: 'Bring forward',
                     onPressed: onBringForward!,
                   ),
-                const VerticalDivider(
-                  color: Colors.white24,
+                VerticalDivider(
+                  color: appColors.border,
                   thickness: 1,
                   width: 12,
                   indent: 4,
