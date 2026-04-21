@@ -78,6 +78,7 @@ class CollageSaveHelper {
     BuildContext context, {
     required Rect cropRect,
     required int sliceCount,
+    required Color backgroundColor,
   }) async {
     final repo = RepositoryProvider.of<PhotoRepositoryImpl>(context);
     final photoBloc = context.read<PhotoBloc>();
@@ -97,18 +98,31 @@ class CollageSaveHelper {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
 
       for (var i = 0; i < sliceCount; i++) {
+        final sliceLeft = cropRect.left + i * sliceWidth;
+        final availableWidth = cropRect.right - sliceLeft;
+        if (availableWidth <= 0) break;
+        final sourceWidth = math.min(sliceWidth, availableWidth);
         final sliceRect = Rect.fromLTWH(
-          cropRect.left + i * sliceWidth,
+          sliceLeft,
           cropRect.top,
-          sliceWidth,
+          sourceWidth,
           cropRect.height,
         );
-        final pngBytes = await _renderBoundaryPngBytes(
-          boundary,
-          pixelRatio: 3.0,
-          cropRect: sliceRect,
-          targetSize: const Size(1080, 1350),
-        );
+        final pngBytes = sourceWidth >= sliceWidth - 0.5
+            ? await _renderBoundaryPngBytes(
+                boundary,
+                pixelRatio: 3.0,
+                cropRect: sliceRect,
+                targetSize: const Size(1080, 1350),
+              )
+            : await _renderPaddedBoundaryPngBytes(
+                boundary,
+                pixelRatio: 3.0,
+                cropRect: sliceRect,
+                fullSliceWidth: sliceWidth,
+                targetSize: const Size(1080, 1350),
+                backgroundColor: backgroundColor,
+              );
 
         final fileName =
             'insta_carousel_${timestamp}_${(i + 1).toString().padLeft(2, '0')}.png';
@@ -180,6 +194,59 @@ class CollageSaveHelper {
         outputImage.dispose();
       }
       image.dispose();
+    }
+  }
+
+  static Future<Uint8List> _renderPaddedBoundaryPngBytes(
+    RenderRepaintBoundary boundary, {
+    required double pixelRatio,
+    required Rect cropRect,
+    required double fullSliceWidth,
+    required Size targetSize,
+    required Color backgroundColor,
+  }) async {
+    final targetContentWidth =
+        targetSize.width * (cropRect.width / fullSliceWidth);
+    final effectivePixelRatio = _effectivePixelRatio(
+      cropRect: cropRect,
+      targetSize: Size(targetContentWidth, targetSize.height),
+      fallbackPixelRatio: pixelRatio,
+    );
+    final image = await _renderBoundaryImage(
+      boundary,
+      pixelRatio: effectivePixelRatio,
+      cropRect: cropRect,
+    );
+
+    final outWidth = targetSize.width.round().clamp(1, 10000).toInt();
+    final outHeight = targetSize.height.round().clamp(1, 10000).toInt();
+    final contentWidth =
+        targetContentWidth.round().clamp(1, outWidth).toInt();
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, outWidth.toDouble(), outHeight.toDouble()),
+      Paint()..color = backgroundColor,
+    );
+    canvas.drawImageRect(
+      image,
+      Rect.fromLTWH(0, 0, image.width.toDouble(), image.height.toDouble()),
+      Rect.fromLTWH(0, 0, contentWidth.toDouble(), outHeight.toDouble()),
+      Paint()..filterQuality = FilterQuality.high,
+    );
+
+    final picture = recorder.endRecording();
+    ui.Image? outputImage;
+    try {
+      outputImage = await picture.toImage(outWidth, outHeight);
+      final byteData =
+          await outputImage.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception("Failed to convert finalImage");
+      return byteData.buffer.asUint8List();
+    } finally {
+      outputImage?.dispose();
+      image.dispose();
+      picture.dispose();
     }
   }
 

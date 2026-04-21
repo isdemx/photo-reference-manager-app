@@ -672,6 +672,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   static const double _minCollageScale = 0.9;
   static const double _maxCollageScale = 60.0;
   static const double _defaultCanvasSizeMultiplier = 144.0;
+  static const double _iosCanvasSide = 12000.0;
   static const List<double> _canvasSizePresets = <double>[
     144.0,
     120.0,
@@ -764,6 +765,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   bool _fullscreenBottomHoverLeft = false;
   bool _fullscreenBottomHoverRight = false;
   bool _iosCollageControlsExpanded = false;
+  bool _isIOSLandscape = false;
   bool _allowIOSRoutePop = false;
   Timer? _arrowRepeatDelay;
   Timer? _arrowRepeatTick;
@@ -1489,6 +1491,46 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     } catch (_) {}
   }
 
+  Future<void> _toggleIOSOrientation() async {
+    if (!Platform.isIOS) return;
+
+    final nextLandscape = !_isIOSLandscape;
+    final currentViewport = _viewportSize();
+    final canvasAnchor =
+        _screenToCanvas(currentViewport.center(Offset.zero));
+    final scale = TransformMath.getScale(_transformationController.value)
+        .clamp(_minCollageScale, _maxCollageScale)
+        .toDouble();
+
+    setState(() {
+      _isIOSLandscape = nextLandscape;
+      _iosCollageControlsExpanded = false;
+    });
+
+    await SystemChrome.setPreferredOrientations(
+      nextLandscape
+          ? const [DeviceOrientation.landscapeRight]
+          : const [DeviceOrientation.portraitUp],
+    );
+    _restoreCanvasAnchorAfterLayout(canvasAnchor, scale);
+  }
+
+  void _restoreCanvasAnchorAfterLayout(Offset canvasAnchor, double scale) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final viewport = _viewportSize();
+        if (viewport.width <= 0 || viewport.height <= 0) return;
+
+        final center = viewport.center(Offset.zero);
+        final translation = center - canvasAnchor * scale;
+        _setTransform(
+          TransformMath.matrixFromOffsetScale(translation, scale),
+        );
+      });
+    });
+  }
+
   void _showHelp() {
     setState(() {
       _showTutorial = true;
@@ -1806,14 +1848,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Rect _instaCarouselExportRect(Rect rect) {
     if (rect.isEmpty) return rect;
-    const targetSliceAspect = 4 / 5;
-    final sliceCount = _instaCarouselSliceCount(rect);
-    final targetWidth = rect.height * targetSliceAspect * sliceCount;
     final canvas = Offset.zero & _currentCanvasSize();
-    final exportWidth = math.min(targetWidth, canvas.width);
-    final maxLeft = math.max(canvas.left, canvas.right - exportWidth);
-    final left = rect.left.clamp(canvas.left, maxLeft).toDouble();
-    return Rect.fromLTWH(left, rect.top, exportWidth, rect.height);
+    return rect.intersect(canvas);
   }
 
   Rect _canvasRectToScreen(Rect rect) {
@@ -1853,6 +1889,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         context,
         cropRect: exportRect,
         sliceCount: _instaCarouselSliceCount(exportRect),
+        backgroundColor: _backgroundColor,
       );
 
       if (!mounted) return;
@@ -1880,6 +1917,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         rect == null || rect.isEmpty ? Rect.zero : _canvasRectToScreen(rect);
     final sliceCount = rect == null ? 1 : _instaCarouselSliceCount(rect);
     final viewport = _viewportSize();
+    final media = MediaQuery.of(context);
+    final isIOS = Platform.isIOS;
+    final isLandscape = media.size.width > media.size.height;
+    final bottomControlsReserve = isIOS
+        ? media.padding.bottom + (isLandscape ? 88.0 : 158.0)
+        : 56.0;
+    final maxButtonTop = math.max(12.0, viewport.height - bottomControlsReserve);
     final buttonLeft = screenRect.isEmpty
         ? 16.0
         : screenRect.left
@@ -1888,7 +1932,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final buttonTop = screenRect.isEmpty
         ? 16.0
         : (screenRect.bottom + 10)
-            .clamp(12.0, math.max(12.0, viewport.height - 56))
+            .clamp(12.0, maxButtonTop)
             .toDouble();
 
     return Positioned.fill(
@@ -1912,10 +1956,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 final currentRect = _instaSelectionRect;
                 final handleRect = screenRect.isEmpty
                     ? Rect.zero
-                    : Rect.fromCenter(
-                        center: screenRect.bottomRight,
-                        width: 34,
-                        height: 34,
+                    : Rect.fromLTRB(
+                        screenRect.right - 56,
+                        screenRect.bottom - 56,
+                        screenRect.right + 24,
+                        screenRect.bottom + 24,
                       );
                 final shouldResize = currentRect != null &&
                     !currentRect.isEmpty &&
@@ -2281,6 +2326,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Size _currentCanvasSize() {
     final base = _viewportSize();
+    if (Platform.isIOS) {
+      return const Size.square(_iosCanvasSide);
+    }
     return Size(
       base.width * _canvasSizeMultiplier,
       base.height * _canvasSizeMultiplier,
@@ -3287,6 +3335,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
           const SizedBox(width: 6),
         ],
+        if (Platform.isIOS) ...[
+          IconButton(
+            style: IconButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+            ),
+            tooltip: _isIOSLandscape ? 'Portrait' : 'Landscape',
+            icon: Icon(
+              Icons.rotate_90_degrees_cw,
+              color: _isIOSLandscape ? Colors.amberAccent : Colors.white,
+              shadows: iconShadow,
+            ),
+            onPressed: _toggleIOSOrientation,
+          ),
+          const SizedBox(width: 6),
+        ],
         IconButton(
           style: IconButton.styleFrom(
             backgroundColor: Colors.transparent,
@@ -4283,6 +4348,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (Platform.isIOS && _isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       WakelockPlus.disable();
+    }
+    if (Platform.isIOS && _isIOSLandscape) {
+      SystemChrome.setPreferredOrientations(const [
+        DeviceOrientation.portraitUp,
+      ]);
     }
     _importService.unregisterCollageHandler(_handleImportedPhotos);
     _cancelArrowRepeat();

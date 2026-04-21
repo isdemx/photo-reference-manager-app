@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'dart:io';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -94,6 +95,11 @@ void main(List<String> args) async {
     };
     // ВТОРОЙ движок (новое окно) требует ручной регистрации плагинов
     DartPluginRegistrant.ensureInitialized();
+    if (!kIsWeb && Platform.isIOS) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    }
 
     // payload, переданный при создании окна
     final bool isMultiWindowLaunch =

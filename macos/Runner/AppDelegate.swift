@@ -4,6 +4,7 @@ import FlutterMacOS
 @main
 class AppDelegate: FlutterAppDelegate {
   private let openFilesChannelName = "refma/macos_open_files"
+  private let folderAccessBookmarksKey = "refma.folderAccessBookmarks.v1"
   private var openFilesChannel: FlutterMethodChannel?
   private var pendingOpenFiles: [String] = []
   private var activeSecurityScopedURLs: [URL] = []
@@ -105,6 +106,12 @@ class AppDelegate: FlutterAppDelegate {
 
   private func requestFolderAccess(folderPath: String, result: @escaping FlutterResult) {
     DispatchQueue.main.async {
+      if let restoredPath = self.restoreStoredFolderAccess(for: folderPath) {
+        print("[RefmaOpenFiles][native] requestFolderAccess restored folder=\(restoredPath)")
+        result(restoredPath)
+        return
+      }
+
       let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
       let panel = NSOpenPanel()
       panel.canChooseFiles = false
@@ -125,9 +132,92 @@ class AppDelegate: FlutterAppDelegate {
       if selectedURL.startAccessingSecurityScopedResource() {
         self.activeSecurityScopedURLs.append(selectedURL)
       }
+      self.storeFolderAccessBookmark(for: selectedURL)
 
       print("[RefmaOpenFiles][native] requestFolderAccess granted folder=\(selectedURL.path)")
       result(selectedURL.path)
+    }
+  }
+
+  private func normalizedFolderPath(_ path: String) -> String {
+    let expanded = NSString(string: path).expandingTildeInPath
+    return URL(fileURLWithPath: expanded).standardizedFileURL.path
+  }
+
+  private func path(_ path: String, isInsideOrEqualTo grantedPath: String) -> Bool {
+    let normalizedPath = normalizedFolderPath(path)
+    let normalizedGrantedPath = normalizedFolderPath(grantedPath)
+    return normalizedPath == normalizedGrantedPath ||
+      normalizedPath.hasPrefix(normalizedGrantedPath + "/")
+  }
+
+  private func folderAccessBookmarks() -> [String: Data] {
+    return UserDefaults.standard.object(forKey: folderAccessBookmarksKey) as? [String: Data] ?? [:]
+  }
+
+  private func saveFolderAccessBookmarks(_ bookmarks: [String: Data]) {
+    UserDefaults.standard.set(bookmarks, forKey: folderAccessBookmarksKey)
+  }
+
+  private func restoreStoredFolderAccess(for folderPath: String) -> String? {
+    var bookmarks = folderAccessBookmarks()
+    let matchingKeys = bookmarks.keys
+      .filter { path(folderPath, isInsideOrEqualTo: $0) }
+      .sorted { $0.count > $1.count }
+
+    for key in matchingKeys {
+      guard let data = bookmarks[key] else {
+        continue
+      }
+
+      do {
+        var isStale = false
+        let url = try URL(
+          resolvingBookmarkData: data,
+          options: [.withSecurityScope],
+          relativeTo: nil,
+          bookmarkDataIsStale: &isStale
+        )
+
+        if url.startAccessingSecurityScopedResource() {
+          activeSecurityScopedURLs.append(url)
+        }
+
+        if isStale {
+          let refreshedData = try url.bookmarkData(
+            options: [.withSecurityScope],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+          )
+          bookmarks.removeValue(forKey: key)
+          bookmarks[normalizedFolderPath(url.path)] = refreshedData
+          saveFolderAccessBookmarks(bookmarks)
+        }
+
+        return url.path
+      } catch {
+        print("[RefmaOpenFiles][native] failed to restore folder bookmark key=\(key) error=\(error)")
+        bookmarks.removeValue(forKey: key)
+        saveFolderAccessBookmarks(bookmarks)
+      }
+    }
+
+    return nil
+  }
+
+  private func storeFolderAccessBookmark(for url: URL) {
+    do {
+      let data = try url.bookmarkData(
+        options: [.withSecurityScope],
+        includingResourceValuesForKeys: nil,
+        relativeTo: nil
+      )
+      var bookmarks = folderAccessBookmarks()
+      bookmarks[normalizedFolderPath(url.path)] = data
+      saveFolderAccessBookmarks(bookmarks)
+      print("[RefmaOpenFiles][native] stored folder bookmark path=\(url.path)")
+    } catch {
+      print("[RefmaOpenFiles][native] failed to store folder bookmark path=\(url.path) error=\(error)")
     }
   }
 

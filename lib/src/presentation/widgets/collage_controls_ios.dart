@@ -17,8 +17,15 @@ List<Widget> buildIOSCollageControlsOverlay({
 }) {
   final expanded = !isFullscreen || controlsExpanded;
   final bottom = 14.0 + bottomInset;
-  final screenWidth = MediaQuery.sizeOf(context).width;
+  final screenSize = MediaQuery.sizeOf(context);
+  final screenWidth = screenSize.width;
+  final isLandscape = screenSize.width > screenSize.height;
   final zoomWidth = math.min(screenWidth - 112, 300.0);
+  final landscapeZoomWidth = math.min(
+    math.max(screenWidth * 0.26, 180.0),
+    260.0,
+  );
+  final landscapeRightInset = isFullscreen ? 70.0 : 14.0;
 
   return [
     if (isFullscreen && expanded)
@@ -29,7 +36,33 @@ List<Widget> buildIOSCollageControlsOverlay({
           child: const SizedBox.expand(),
         ),
       ),
-    if (expanded) ...[
+    if (expanded && isLandscape)
+      Positioned(
+        left: 14,
+        right: landscapeRightInset,
+        bottom: bottom,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: CollageIOSActionDock(
+                actions: actions,
+                bare: true,
+              ),
+            ),
+            const SizedBox(width: 10),
+            CollageIOSZoomControl(
+              width: landscapeZoomWidth,
+              value: sliderValue,
+              onChanged: onSliderChanged,
+              bare: true,
+            ),
+            const SizedBox(width: 10),
+            joystick,
+          ],
+        ),
+      )
+    else if (expanded) ...[
       Positioned(
         right: 18,
         bottom: bottom + 76,
@@ -113,22 +146,24 @@ class CollageIOSActionDock extends StatelessWidget {
   const CollageIOSActionDock({
     super.key,
     required this.actions,
+    this.bare = false,
   });
 
   final List<CollageControlAction> actions;
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
+    final buttons = CollageActionButtons(
+      actions: actions,
+      horizontal: true,
+      scrollable: true,
+    );
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {},
-      child: CollageGlassPanel(
-        child: CollageActionButtons(
-          actions: actions,
-          horizontal: true,
-          scrollable: true,
-        ),
-      ),
+      child: bare ? buttons : CollageGlassPanel(child: buttons),
     );
   }
 }
@@ -139,11 +174,13 @@ class CollageIOSZoomControl extends StatelessWidget {
     required this.width,
     required this.value,
     required this.onChanged,
+    this.bare = false,
   });
 
   final double width;
   final double value;
   final ValueChanged<double> onChanged;
+  final bool bare;
 
   @override
   Widget build(BuildContext context) {
@@ -157,40 +194,44 @@ class CollageIOSZoomControl extends StatelessWidget {
       overlayShape: const RoundSliderOverlayShape(overlayRadius: 22),
     );
 
+    final content = SizedBox(
+      width: width,
+      child: Row(
+        children: [
+          Icon(
+            Icons.remove,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.62),
+          ),
+          Expanded(
+            child: SliderTheme(
+              data: sliderTheme,
+              child: Slider(
+                min: 0.0,
+                max: 1.0,
+                value: value,
+                onChanged: onChanged,
+              ),
+            ),
+          ),
+          Icon(
+            Icons.add,
+            size: 16,
+            color: Colors.white.withValues(alpha: 0.62),
+          ),
+        ],
+      ),
+    );
+
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () {},
-      child: CollageGlassPanel(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
-        child: SizedBox(
-          width: width,
-          child: Row(
-            children: [
-              Icon(
-                Icons.remove,
-                size: 16,
-                color: Colors.white.withValues(alpha: 0.62),
-              ),
-              Expanded(
-                child: SliderTheme(
-                  data: sliderTheme,
-                  child: Slider(
-                    min: 0.0,
-                    max: 1.0,
-                    value: value,
-                    onChanged: onChanged,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.add,
-                size: 16,
-                color: Colors.white.withValues(alpha: 0.62),
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: bare
+          ? content
+          : CollageGlassPanel(
+              padding: const EdgeInsets.fromLTRB(18, 8, 18, 10),
+              child: content,
+            ),
     );
   }
 }
