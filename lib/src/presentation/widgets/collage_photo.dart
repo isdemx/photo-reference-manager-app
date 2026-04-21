@@ -361,7 +361,9 @@ class CollagePersistService {
     required double canvasOffsetY,
     required double canvasScale,
     required List<_ViewZone?> viewZones,
+    required Rect? previewCropRect,
   }) async {
+    final collageBloc = context.read<CollageBloc>();
     final now = DateTime.now();
 
     final itemsList = items.map((it) {
@@ -415,7 +417,8 @@ class CollagePersistService {
         previewPath = await CollagePreviewHelper.renderPreviewPng(
           boundaryKey: boundaryKey,
           collageId: collageId,
-          pixelRatio: 1.25,
+          pixelRatio: 2.0,
+          cropRect: previewCropRect,
         );
       } catch (_) {}
 
@@ -434,7 +437,7 @@ class CollagePersistService {
         viewZones: zoneEntries,
       );
 
-      context.read<CollageBloc>().add(AddCollage(newCollage));
+      collageBloc.add(AddCollage(newCollage));
       return newCollage;
     } else {
       String previewPath = existing.previewPath ?? '';
@@ -442,7 +445,8 @@ class CollagePersistService {
         previewPath = await CollagePreviewHelper.renderPreviewPng(
           boundaryKey: boundaryKey,
           collageId: existing.id,
-          pixelRatio: 1.25,
+          pixelRatio: 2.0,
+          cropRect: previewCropRect,
         );
       } catch (_) {}
 
@@ -461,7 +465,7 @@ class CollagePersistService {
         viewZones: zoneEntries,
       );
 
-      context.read<CollageBloc>().add(UpdateCollage(updated));
+      collageBloc.add(UpdateCollage(updated));
       return updated;
     }
   }
@@ -754,8 +758,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Timer? _arrowRepeatTick;
   LogicalKeyboardKey? _heldArrowKey;
 
-  bool get _showDesktopTopBar =>
-      !kIsWeb && Platform.isMacOS && !_isFullscreen;
+  bool get _showDesktopTopBar => !kIsWeb && Platform.isMacOS && !_isFullscreen;
 
   void _openSettings() {
     showDialog(
@@ -805,9 +808,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           MacosTopCenterAction(
             icon: _isFullscreen ? Icons.fullscreen_exit : Icons.fullscreen,
             onTap: _toggleFullscreen,
-            tooltip: _isFullscreen
-                ? 'Exit fullscreen (F)'
-                : 'Enter fullscreen (F)',
+            tooltip:
+                _isFullscreen ? 'Exit fullscreen (F)' : 'Enter fullscreen (F)',
           ),
         ],
       ),
@@ -1718,7 +1720,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Future<void> _onGenerateCollage() async {
     _controller.clearEditing();
     setState(() {});
-    await CollageSaveHelper.saveCollage(_collageKey, context);
+    await CollageSaveHelper.saveCollage(
+      _collageKey,
+      context,
+      cropRect: _currentViewZoneCropRect(),
+    );
   }
 
   Future<String?> _showSaveTitleDialog(String initialTitle) async {
@@ -1794,6 +1800,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           TransformMath.getTranslation(_transformationController.value).dy,
       canvasScale: TransformMath.getScale(_transformationController.value),
       viewZones: _viewZones,
+      previewCropRect: _currentViewZoneCropRect(),
     );
 
     if (!mounted) return;
@@ -2554,12 +2561,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       ? MouseRegion(
                           onEnter: (_) {
                             if (!_fullscreenBottomHoverRight) {
-                              setState(() => _fullscreenBottomHoverRight = true);
+                              setState(
+                                  () => _fullscreenBottomHoverRight = true);
                             }
                           },
                           onExit: (_) {
                             if (_fullscreenBottomHoverRight) {
-                              setState(() => _fullscreenBottomHoverRight = false);
+                              setState(
+                                  () => _fullscreenBottomHoverRight = false);
                             }
                           },
                           child: AnimatedOpacity(
@@ -3361,6 +3370,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                             width: effectiveWidth,
                             height: effectiveHeight,
                             fit: BoxFit.cover,
+                            filterQuality: FilterQuality.high,
                           ),
                   ),
                 ),
@@ -3537,6 +3547,24 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         TransformMath.getTranslation(_transformationController.value);
     final scale = TransformMath.getScale(_transformationController.value);
     return _ViewZone(translation: translation, scale: scale);
+  }
+
+  Rect? _currentViewZoneCropRect() {
+    _ensureViewZoneState();
+    _ViewZone? zone;
+
+    final activeIndex = _activeViewZoneIndex;
+    if (activeIndex != null &&
+        activeIndex >= 0 &&
+        activeIndex < _viewZones.length) {
+      zone = _viewZones[activeIndex];
+    }
+
+    zone ??= _viewZones.isNotEmpty ? _viewZones.first : null;
+    zone ??= _captureCurrentViewZone();
+
+    final rect = _zoneCanvasRect(zone);
+    return rect.isEmpty ? null : rect;
   }
 
   void _addViewZone() {
