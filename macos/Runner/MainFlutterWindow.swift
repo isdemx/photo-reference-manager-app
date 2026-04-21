@@ -4,6 +4,7 @@ import desktop_multi_window
 
 class MainFlutterWindow: NSWindow {
   override func awakeFromNib() {
+    orderOut(nil)
     self.titlebarAppearsTransparent = true
     self.isOpaque = true
     self.backgroundColor = NSColor(
@@ -25,6 +26,9 @@ class MainFlutterWindow: NSWindow {
 
     FlutterMultiWindowPlugin.setOnWindowCreatedCallback { controller in
       RegisterGeneratedPlugins(registry: controller)
+      if let appDelegate = NSApp.delegate as? AppDelegate {
+        appDelegate.configureOpenFilesChannel(with: controller)
+      }
     }
 
     super.awakeFromNib()

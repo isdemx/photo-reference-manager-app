@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:photo_view/photo_view_gallery.dart';
@@ -396,6 +397,56 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     }
   }
 
+  Future<void> _downloadSelectedPhotos() async {
+    if (!Platform.isMacOS || _selectedPhotos.isEmpty) return;
+
+    final destinationDirectory = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose download folder',
+    );
+    if (destinationDirectory == null || destinationDirectory.isEmpty) return;
+
+    final total = _selectedPhotos.length;
+    var copied = 0;
+    for (final photo in List<Photo>.from(_selectedPhotos)) {
+      try {
+        final sourceFile = File(_resolvePhotoPath(photo));
+        if (!await sourceFile.exists()) continue;
+
+        final destinationPath = await _availableDownloadPath(
+          destinationDirectory,
+          photo.fileName,
+        );
+        await sourceFile.copy(destinationPath);
+        copied++;
+      } catch (_) {
+        // Continue saving the rest of the selected files.
+      }
+    }
+
+    if (!mounted) return;
+    if (copied > 0) {
+      _clearSelection();
+    }
+    _showDownloadToast(
+      copied == total ? 'Saved $copied files' : 'Saved $copied/$total files',
+    );
+  }
+
+  Future<String> _availableDownloadPath(
+      String directory, String fileName) async {
+    final extension = p.extension(fileName);
+    final basename = p.basenameWithoutExtension(fileName);
+    var candidate = p.join(directory, fileName);
+    var index = 2;
+
+    while (await File(candidate).exists()) {
+      candidate = p.join(directory, '$basename $index$extension');
+      index++;
+    }
+
+    return candidate;
+  }
+
   void _openCollageWithPhotos(List<Photo> photos) {
     if (photos.isEmpty) return;
     Navigator.push(
@@ -413,6 +464,67 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     ).then((_) {
       if (mounted) _clearSelection();
     });
+  }
+
+  Future<void> _downloadOriginalPhoto(Photo photo) async {
+    if (!Platform.isMacOS) return;
+
+    final sourcePath = _resolvePhotoPath(photo);
+    final sourceFile = File(sourcePath);
+    if (!await sourceFile.exists()) {
+      if (!mounted) return;
+      _showDownloadToast('Original file was not found');
+      return;
+    }
+
+    final extension = p.extension(photo.fileName).replaceFirst('.', '');
+    final destinationPath = await FilePicker.platform.saveFile(
+      dialogTitle: 'Save original photo',
+      fileName: photo.fileName,
+      type: extension.isEmpty ? FileType.any : FileType.custom,
+      allowedExtensions: extension.isEmpty ? null : [extension],
+    );
+
+    if (destinationPath == null || destinationPath.isEmpty) return;
+
+    try {
+      if (p.normalize(destinationPath) != p.normalize(sourcePath)) {
+        await sourceFile.copy(destinationPath);
+      }
+      if (!mounted) return;
+      _showDownloadToast('Saved ${p.basename(destinationPath)}');
+    } catch (_) {
+      if (!mounted) return;
+      _showDownloadToast('Failed to save original file');
+    }
+  }
+
+  void _showDownloadToast(String message) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final leftMargin = screenWidth > 360 ? screenWidth - 340 : 16.0;
+    final messenger = ScaffoldMessenger.of(context);
+
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(milliseconds: 1300),
+        margin: EdgeInsets.only(
+          left: leftMargin,
+          right: 16,
+          bottom: safeBottom + 18,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
   }
 
   void _updateBottomBarHeight() {
@@ -1152,6 +1264,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       },
       onAddToCollage: () => _openCollageWithPhotos([currentPhoto]),
       onAddToCollageMulti: () => _openCollageWithPhotos(_selectedPhotos),
+      onDownload: () => _downloadOriginalPhoto(currentPhoto),
+      onDownloadMulti: _downloadSelectedPhotos,
       onEdit: () => _openEditor(currentPhoto),
     );
 

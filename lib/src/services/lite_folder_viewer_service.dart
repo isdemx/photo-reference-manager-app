@@ -39,7 +39,19 @@ class LiteFolderViewerService {
     }
 
     final directory = source.parent;
-    final items = await _listSupportedItems(directory);
+    late final List<LiteViewerItem> items;
+    try {
+      items = await _listSupportedItems(directory);
+    } on LiteFolderViewerException catch (error) {
+      if (!error.canFallbackToSingleFile) rethrow;
+      final fallbackItem = _itemForFile(source);
+      if (fallbackItem == null) rethrow;
+      return LiteFolderViewerData(
+        directoryPath: directory.path,
+        items: [fallbackItem],
+        initialIndex: 0,
+      );
+    }
 
     items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
 
@@ -68,28 +80,9 @@ class LiteFolderViewerService {
   }
 
   Future<List<LiteViewerItem>> _listSupportedItems(Directory directory) async {
-    const retryDelays = <Duration>[
-      Duration.zero,
-      Duration(milliseconds: 250),
-      Duration(milliseconds: 700),
-      Duration(milliseconds: 1400),
-    ];
-
-    Object? lastError;
-
-    for (final delay in retryDelays) {
-      if (delay > Duration.zero) {
-        await Future<void>.delayed(delay);
-      }
-
-      try {
-        return await _readSupportedItems(directory);
-      } on FileSystemException catch (error) {
-        lastError = error;
-      }
-    }
-
-    if (lastError is FileSystemException) {
+    try {
+      return await _readSupportedItems(directory);
+    } on FileSystemException {
       final grantedPath =
           await MacOSFileOpenService.requestFolderAccess(directory.path);
       if (grantedPath != null && grantedPath.isNotEmpty) {
@@ -104,12 +97,9 @@ class LiteFolderViewerService {
 
       throw const LiteFolderViewerException(
         'Folder access was not granted. Choose the photo folder to enable Lite Viewer navigation.',
+        canFallbackToSingleFile: true,
       );
     }
-
-    throw const LiteFolderViewerException(
-      'Unable to read files from this folder.',
-    );
   }
 
   Future<List<LiteViewerItem>> _readSupportedItems(Directory directory) async {
@@ -136,9 +126,13 @@ class LiteFolderViewerService {
 }
 
 class LiteFolderViewerException implements Exception {
-  const LiteFolderViewerException(this.message);
+  const LiteFolderViewerException(
+    this.message, {
+    this.canFallbackToSingleFile = false,
+  });
 
   final String message;
+  final bool canFallbackToSingleFile;
 
   @override
   String toString() => message;

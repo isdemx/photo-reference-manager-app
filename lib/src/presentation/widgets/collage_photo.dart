@@ -5,7 +5,6 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -33,6 +32,9 @@ import 'package:photographers_reference_app/src/presentation/helpers/collage_pre
 import 'package:photographers_reference_app/src/presentation/helpers/collage_save_helper.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_ios.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_macos.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_shared.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_top_center_action.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
@@ -349,7 +351,7 @@ class CollagePrefsService {
 class CollagePersistService {
   /// Сохранить/обновить коллаж в БД через Bloc + перерендерить превью.
   Future<Collage> saveToDb({
-    required BuildContext context,
+    required CollageBloc collageBloc,
     required GlobalKey boundaryKey,
     required Collage? existing,
     required String titleForNew,
@@ -363,7 +365,6 @@ class CollagePersistService {
     required List<_ViewZone?> viewZones,
     required Rect? previewCropRect,
   }) async {
-    final collageBloc = context.read<CollageBloc>();
     final now = DateTime.now();
 
     final itemsList = items.map((it) {
@@ -724,6 +725,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   final List<Color> _viewZoneColors =
       List<Color>.generate(_maxViewZones, (i) => _viewZonePalette[i]);
   bool _showViewZoneOverlay = false;
+  bool _instaSelectionMode = false;
+  bool _isDraggingInstaSelection = false;
+  bool _isSavingInstaCarousel = false;
+  Offset? _instaSelectionStartCanvas;
+  Rect? _instaSelectionDragStartRect;
+  bool _isMovingInstaSelection = false;
+  bool _isResizingInstaSelection = false;
+  Rect? _instaSelectionRect;
   int? _draggingViewZoneIndex;
   Offset? _viewZoneDragLastScreen;
   int? _resizingViewZoneIndex;
@@ -754,11 +763,31 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   bool _isTrackpadPanZoomActive = false;
   bool _fullscreenBottomHoverLeft = false;
   bool _fullscreenBottomHoverRight = false;
+  bool _iosCollageControlsExpanded = false;
+  bool _allowIOSRoutePop = false;
   Timer? _arrowRepeatDelay;
   Timer? _arrowRepeatTick;
   LogicalKeyboardKey? _heldArrowKey;
 
   bool get _showDesktopTopBar => !kIsWeb && Platform.isMacOS && !_isFullscreen;
+
+  void _popCollageRoute() {
+    if (!Platform.isIOS) {
+      Navigator.pop(context);
+      return;
+    }
+
+    // PopScope disables the iOS edge-swipe, so explicit UI back waits one frame
+    // until the route can be popped programmatically.
+    setState(() => _allowIOSRoutePop = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      if (mounted) {
+        setState(() => _allowIOSRoutePop = false);
+      }
+    });
+  }
 
   void _openSettings() {
     showDialog(
@@ -1423,6 +1452,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final next = !_isFullscreen;
     setState(() {
       _isFullscreen = next;
+      if (Platform.isIOS) {
+        _iosCollageControlsExpanded = false;
+      }
     });
     if (Platform.isIOS) {
       if (next) {
@@ -1619,7 +1651,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
 
     if (shouldClose == true && mounted) {
-      Navigator.pop(context);
+      _popCollageRoute();
     }
   }
 
@@ -1727,6 +1759,332 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
+  int _instaCarouselSliceCount(Rect rect) {
+    if (rect.width <= 0 || rect.height <= 0) return 1;
+    const targetSliceAspect = 4 / 5;
+    final raw = rect.width / (rect.height * targetSliceAspect);
+    return raw.ceil().clamp(1, 20);
+  }
+
+  Rect _normalizedCanvasSelectionRect(Offset a, Offset b) {
+    final canvas = Offset.zero & _currentCanvasSize();
+    final rect = Rect.fromPoints(a, b).intersect(canvas);
+    if (rect.width < 1 || rect.height < 1) return Rect.zero;
+    return rect;
+  }
+
+  Rect _moveCanvasRectWithinCanvas(Rect rect, Offset delta) {
+    final canvas = Offset.zero & _currentCanvasSize();
+    var moved = rect.shift(delta);
+
+    var dx = 0.0;
+    var dy = 0.0;
+    if (moved.left < canvas.left) {
+      dx = canvas.left - moved.left;
+    } else if (moved.right > canvas.right) {
+      dx = canvas.right - moved.right;
+    }
+    if (moved.top < canvas.top) {
+      dy = canvas.top - moved.top;
+    } else if (moved.bottom > canvas.bottom) {
+      dy = canvas.bottom - moved.bottom;
+    }
+
+    moved = moved.shift(Offset(dx, dy));
+    return moved.intersect(canvas);
+  }
+
+  Rect _resizeCanvasRectWithinCanvas(Rect rect, Offset bottomRight) {
+    final canvas = Offset.zero & _currentCanvasSize();
+    const minSize = 24.0;
+    final clamped = Offset(
+      bottomRight.dx.clamp(rect.left + minSize, canvas.right).toDouble(),
+      bottomRight.dy.clamp(rect.top + minSize, canvas.bottom).toDouble(),
+    );
+    return Rect.fromLTRB(rect.left, rect.top, clamped.dx, clamped.dy);
+  }
+
+  Rect _instaCarouselExportRect(Rect rect) {
+    if (rect.isEmpty) return rect;
+    const targetSliceAspect = 4 / 5;
+    final sliceCount = _instaCarouselSliceCount(rect);
+    final targetWidth = rect.height * targetSliceAspect * sliceCount;
+    final canvas = Offset.zero & _currentCanvasSize();
+    final exportWidth = math.min(targetWidth, canvas.width);
+    final maxLeft = math.max(canvas.left, canvas.right - exportWidth);
+    final left = rect.left.clamp(canvas.left, maxLeft).toDouble();
+    return Rect.fromLTWH(left, rect.top, exportWidth, rect.height);
+  }
+
+  Rect _canvasRectToScreen(Rect rect) {
+    final topLeft = _canvasToScreen(rect.topLeft);
+    final bottomRight = _canvasToScreen(rect.bottomRight);
+    return Rect.fromPoints(topLeft, bottomRight);
+  }
+
+  void _toggleInstaSelectionMode() {
+    setState(() {
+      _instaSelectionMode = !_instaSelectionMode;
+      _isDraggingInstaSelection = false;
+      _isMovingInstaSelection = false;
+      _isResizingInstaSelection = false;
+      _instaSelectionStartCanvas = null;
+      _instaSelectionDragStartRect = null;
+      if (!_instaSelectionMode) {
+        _instaSelectionRect = null;
+      }
+    });
+  }
+
+  Future<void> _saveInstaCarouselSelection() async {
+    if (_isSavingInstaCarousel) return;
+    final rect = _instaSelectionRect;
+    if (rect == null || rect.isEmpty) return;
+
+    _controller.clearEditing();
+    setState(() {
+      _isSavingInstaCarousel = true;
+    });
+
+    try {
+      final exportRect = _instaCarouselExportRect(rect);
+      await CollageSaveHelper.saveCollageCarouselSlices(
+        _collageKey,
+        context,
+        cropRect: exportRect,
+        sliceCount: _instaCarouselSliceCount(exportRect),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _instaSelectionMode = false;
+        _isDraggingInstaSelection = false;
+        _isMovingInstaSelection = false;
+        _isResizingInstaSelection = false;
+        _instaSelectionStartCanvas = null;
+        _instaSelectionDragStartRect = null;
+        _instaSelectionRect = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingInstaCarousel = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildInstaSelectionOverlay() {
+    final rect = _instaSelectionRect;
+    final screenRect =
+        rect == null || rect.isEmpty ? Rect.zero : _canvasRectToScreen(rect);
+    final sliceCount = rect == null ? 1 : _instaCarouselSliceCount(rect);
+    final viewport = _viewportSize();
+    final buttonLeft = screenRect.isEmpty
+        ? 16.0
+        : screenRect.left
+            .clamp(12.0, math.max(12.0, viewport.width - 260))
+            .toDouble();
+    final buttonTop = screenRect.isEmpty
+        ? 16.0
+        : (screenRect.bottom + 10)
+            .clamp(12.0, math.max(12.0, viewport.height - 56))
+            .toDouble();
+
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _InstaCarouselSelectionPainter(
+                screenRect: screenRect,
+                sliceCount: sliceCount,
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onPanStart: (details) {
+                if (_isSavingInstaCarousel) return;
+                _exitEditingMode();
+                final canvasPoint = _screenToCanvas(details.localPosition);
+                final currentRect = _instaSelectionRect;
+                final handleRect = screenRect.isEmpty
+                    ? Rect.zero
+                    : Rect.fromCenter(
+                        center: screenRect.bottomRight,
+                        width: 34,
+                        height: 34,
+                      );
+                final shouldResize = currentRect != null &&
+                    !currentRect.isEmpty &&
+                    handleRect.contains(details.localPosition);
+                final shouldMove = currentRect != null &&
+                    !currentRect.isEmpty &&
+                    !shouldResize &&
+                    currentRect.contains(canvasPoint);
+                setState(() {
+                  _isDraggingInstaSelection = true;
+                  _isMovingInstaSelection = shouldMove;
+                  _isResizingInstaSelection = shouldResize;
+                  _instaSelectionStartCanvas = canvasPoint;
+                  _instaSelectionDragStartRect = currentRect;
+                  if (!shouldMove && !shouldResize) {
+                    _instaSelectionRect = Rect.zero;
+                  }
+                });
+              },
+              onPanUpdate: (details) {
+                final start = _instaSelectionStartCanvas;
+                if (start == null) return;
+                final current = _screenToCanvas(details.localPosition);
+                setState(() {
+                  if (_isMovingInstaSelection &&
+                      _instaSelectionDragStartRect != null) {
+                    _instaSelectionRect = _moveCanvasRectWithinCanvas(
+                      _instaSelectionDragStartRect!,
+                      current - start,
+                    );
+                  } else if (_isResizingInstaSelection &&
+                      _instaSelectionDragStartRect != null) {
+                    _instaSelectionRect = _resizeCanvasRectWithinCanvas(
+                      _instaSelectionDragStartRect!,
+                      current,
+                    );
+                  } else {
+                    _instaSelectionRect =
+                        _normalizedCanvasSelectionRect(start, current);
+                  }
+                });
+              },
+              onPanEnd: (_) {
+                setState(() {
+                  _isDraggingInstaSelection = false;
+                  _isMovingInstaSelection = false;
+                  _isResizingInstaSelection = false;
+                  _instaSelectionStartCanvas = null;
+                  _instaSelectionDragStartRect = null;
+                });
+              },
+              onPanCancel: () {
+                setState(() {
+                  _isDraggingInstaSelection = false;
+                  _isMovingInstaSelection = false;
+                  _isResizingInstaSelection = false;
+                  _instaSelectionStartCanvas = null;
+                  _instaSelectionDragStartRect = null;
+                });
+              },
+              onSecondaryTap: _toggleInstaSelectionMode,
+            ),
+          ),
+          if (rect != null && !rect.isEmpty && !_isDraggingInstaSelection)
+            Positioned(
+              left: buttonLeft,
+              top: buttonTop,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.72),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.16),
+                  ),
+                ),
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _isSavingInstaCarousel
+                            ? null
+                            : _saveInstaCarouselSelection,
+                        icon: _isSavingInstaCarousel
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.view_carousel_outlined),
+                        label: Text(
+                          _isSavingInstaCarousel
+                              ? 'Saving...'
+                              : 'Save carousel ($sliceCount)',
+                        ),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          disabledForegroundColor: Colors.white70,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Cancel selection',
+                        onPressed: _isSavingInstaCarousel
+                            ? null
+                            : _toggleInstaSelectionMode,
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (_isSavingInstaCarousel)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  child: const Center(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0xCC111111),
+                        borderRadius: BorderRadius.all(Radius.circular(16)),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 14,
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Saving carousel...',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Future<String?> _showSaveTitleDialog(String initialTitle) async {
     final titleController = TextEditingController(text: initialTitle);
     try {
@@ -1759,6 +2117,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   Future<void> _saveCollageToDb({required bool forceAskTitle}) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final collageBloc = context.read<CollageBloc>();
     final existing = _currentCollage;
     final now = DateTime.now();
     final defaultTitle =
@@ -1786,7 +2146,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     setState(() {});
 
     final savedCollage = await _persist.saveToDb(
-      context: context,
+      collageBloc: collageBloc,
       boundaryKey: _collageKey,
       existing: saveAsNew ? null : existing,
       titleForNew: title,
@@ -1807,8 +2167,6 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     setState(() {
       _currentCollage = savedCollage;
     });
-    final messenger =
-        ScaffoldMessenger.maybeOf(_scaffoldKey.currentContext ?? context);
     messenger?.hideCurrentSnackBar();
     messenger?.showSnackBar(
       SnackBar(
@@ -1966,16 +2324,22 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   Offset _screenToCanvas(Offset screen) {
+    final topInset = Platform.isIOS && !_isFullscreen
+        ? MediaQuery.of(context).padding.top
+        : 0.0;
     final inv = Matrix4.inverted(_transformationController.value);
-    final v = Vector3(screen.dx, screen.dy, 0);
+    final v = Vector3(screen.dx, screen.dy - topInset, 0);
     final out = inv.transform3(v);
     return Offset(out.x, out.y);
   }
 
   Offset _canvasToScreen(Offset canvas) {
+    final topInset = Platform.isIOS && !_isFullscreen
+        ? MediaQuery.of(context).padding.top
+        : 0.0;
     final v = Vector3(canvas.dx, canvas.dy, 0);
     final out = _transformationController.value.transform3(v);
-    return Offset(out.x, out.y);
+    return Offset(out.x, out.y + topInset);
   }
 
   void _clampItemOffset(CollagePhotoState item) {
@@ -2126,10 +2490,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             .map(_buildRotationSliderViewportOverlay)
             .toList(growable: false);
 
-    return Focus(
-      focusNode: _focusNode,
-      autofocus: true,
-      onKeyEvent: (node, event) {
+    return PopScope<void>(
+      canPop: !Platform.isIOS || _allowIOSRoutePop,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _allowIOSRoutePop && mounted) {
+          setState(() => _allowIOSRoutePop = false);
+        }
+      },
+      child: Focus(
+        focusNode: _focusNode,
+        autofocus: true,
+        onKeyEvent: (node, event) {
         if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
             event.logicalKey == LogicalKeyboardKey.arrowLeft) {
           if (event is KeyUpEvent) {
@@ -2275,7 +2646,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
         return KeyEventResult.ignored;
       },
-      child: Scaffold(
+        child: Scaffold(
         key: _scaffoldKey,
         appBar: _showDesktopTopBar ? _desktopTopBar() : null,
         body: Stack(
@@ -2481,6 +2852,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 ),
               ],
             ),
+            if (_instaSelectionMode) _buildInstaSelectionOverlay(),
             if (isSomePhotoInEditMode && editingPhoto != null)
               Positioned(
                 left: 12,
@@ -2496,6 +2868,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   onBringForward: () => _sendItemForward(editingPhoto),
                   onFlipY: null,
                   onDone: () => _exitEditingMode(),
+                  onReset: () => _resetPhotoEditSettings(editingPhoto),
                   brightness: editingPhoto.brightness,
                   saturation: editingPhoto.saturation,
                   temp: editingPhoto.temp,
@@ -2515,101 +2888,51 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 ),
               )
             else if (_draggingIndex == null) ...[
-              if (_isFullscreen) ...[
-                if (Platform.isMacOS)
-                  Positioned(
-                    left: 12,
-                    bottom: 12 + (isIOS ? bottomInset : 0.0),
-                    child: MouseRegion(
-                      onEnter: (_) {
-                        if (!_fullscreenBottomHoverLeft) {
-                          setState(() => _fullscreenBottomHoverLeft = true);
-                        }
-                      },
-                      onExit: (_) {
-                        if (_fullscreenBottomHoverLeft) {
-                          setState(() => _fullscreenBottomHoverLeft = false);
-                        }
-                      },
-                      child: AnimatedOpacity(
-                        opacity: (_fullscreenBottomHoverLeft ||
-                                _fullscreenBottomHoverRight)
-                            ? 1.0
-                            : 0.0,
-                        duration: const Duration(milliseconds: 150),
-                        child: IgnorePointer(
-                          ignoring: !(_fullscreenBottomHoverLeft ||
-                              _fullscreenBottomHoverRight),
-                          child: _buildFloatingZoomControl(),
-                        ),
-                      ),
-                    ),
+              if (isIOS)
+                ...buildIOSCollageControlsOverlay(
+                  context: context,
+                  isFullscreen: _isFullscreen,
+                  controlsExpanded: _iosCollageControlsExpanded,
+                  bottomInset: bottomInset,
+                  sliderValue: _scaleToSliderValue(
+                    _collageScale.clamp(_minCollageScale, _maxCollageScale),
                   ),
-                if (!Platform.isMacOS)
-                  Positioned(
-                    left: 12,
-                    bottom: 12 + (isIOS ? bottomInset : 0.0),
-                    child: SafeArea(
-                      top: false,
-                      child: _buildMobileCanvasJoystick(),
-                    ),
+                  onSliderChanged: _handleCollageZoomSliderChanged,
+                  joystick: _buildMobileCanvasJoystick(),
+                  actions: _collageControlActions(
+                    includeViewZones: false,
+                    includeCancel: false,
                   ),
+                  onToggleControls: () {
+                    setState(() {
+                      _iosCollageControlsExpanded =
+                          !_iosCollageControlsExpanded;
+                    });
+                  },
+                  onCollapseControls: () {
+                    setState(() => _iosCollageControlsExpanded = false);
+                  },
+                )
+              else if (Platform.isMacOS)
+                ...buildMacOSCollageControlsOverlay(
+                  isFullscreen: _isFullscreen,
+                  zoomControl: _buildFloatingZoomControl(),
+                  actionButtons: _buildFloatingActionButtons(),
+                  leftHover: _fullscreenBottomHoverLeft,
+                  rightHover: _fullscreenBottomHoverRight,
+                  onLeftHoverChanged: (value) {
+                    setState(() => _fullscreenBottomHoverLeft = value);
+                  },
+                  onRightHoverChanged: (value) {
+                    setState(() => _fullscreenBottomHoverRight = value);
+                  },
+                )
+              else
                 Positioned(
                   right: 12,
-                  bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: Platform.isMacOS
-                      ? MouseRegion(
-                          onEnter: (_) {
-                            if (!_fullscreenBottomHoverRight) {
-                              setState(
-                                  () => _fullscreenBottomHoverRight = true);
-                            }
-                          },
-                          onExit: (_) {
-                            if (_fullscreenBottomHoverRight) {
-                              setState(
-                                  () => _fullscreenBottomHoverRight = false);
-                            }
-                          },
-                          child: AnimatedOpacity(
-                            opacity: (_fullscreenBottomHoverLeft ||
-                                    _fullscreenBottomHoverRight)
-                                ? 1.0
-                                : 0.0,
-                            duration: const Duration(milliseconds: 150),
-                            child: IgnorePointer(
-                              ignoring: !(_fullscreenBottomHoverLeft ||
-                                  _fullscreenBottomHoverRight),
-                              child: _buildFloatingActionButtons(),
-                            ),
-                          ),
-                        )
-                      : _buildFloatingActionButtons(),
+                  bottom: 12,
+                  child: _buildFloatingActionButtons(),
                 ),
-              ] else ...[
-                if (Platform.isMacOS)
-                  Positioned(
-                    left: 12,
-                    bottom: 12 + (isIOS ? bottomInset : 0.0),
-                    child: _buildFloatingZoomControl(),
-                  ),
-                if (!Platform.isMacOS)
-                  Positioned(
-                    left: 12,
-                    bottom: 12 + (isIOS ? bottomInset : 0.0),
-                    child: SafeArea(
-                      top: false,
-                      child: _buildMobileCanvasJoystick(),
-                    ),
-                  ),
-                Positioned(
-                  right: 12,
-                  bottom: 12 + (isIOS ? bottomInset : 0.0),
-                  child: Platform.isMacOS
-                      ? _buildFloatingActionButtons()
-                      : _buildFloatingActionButtons(),
-                ),
-              ],
             ],
             if (_isFullscreen && _draggingIndex == null)
               Positioned(
@@ -2649,12 +2972,22 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ],
         ),
       ),
+    ),
     );
   }
 
   // ----------------------------
   // Panels
   // ----------------------------
+
+  void _handleCollageZoomSliderChanged(double t) {
+    final next = _sliderValueToScale(t);
+    final focal = _canvasViewportSize == Size.zero
+        ? Offset.zero
+        : _canvasViewportSize.center(Offset.zero);
+    _zoomToScale(next, focal);
+    _saveCollageScale(next);
+  }
 
   Widget _buildFloatingZoomControl() {
     final sliderTheme = SliderTheme.of(context).copyWith(
@@ -2704,14 +3037,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                       value: _scaleToSliderValue(
                         _collageScale.clamp(_minCollageScale, _maxCollageScale),
                       ),
-                      onChanged: (t) {
-                        final next = _sliderValueToScale(t);
-                        final focal = _canvasViewportSize == Size.zero
-                            ? Offset.zero
-                            : _canvasViewportSize.center(Offset.zero);
-                        _zoomToScale(next, focal);
-                        _saveCollageScale(next);
-                      },
+                      onChanged: _handleCollageZoomSliderChanged,
                     ),
                   ),
                 ],
@@ -2807,146 +3133,74 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     );
   }
 
-  Widget _buildFloatingActionButtons() {
-    const iconShadow = [
-      Shadow(
-        color: Colors.black54,
-        blurRadius: 6,
-        offset: Offset(0, 2),
-      ),
-    ];
-    final buttonStyle = IconButton.styleFrom(
-      backgroundColor: Colors.transparent,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      padding: const EdgeInsets.all(7),
-      minimumSize: const Size(33, 33),
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      visualDensity: VisualDensity.compact,
-    );
-
-    final isHorizontal = Platform.isIOS || Platform.isMacOS;
-    final buttons = [
-      IconButton(
-        style: buttonStyle,
-        icon: const Icon(
-          Iconsax.add,
-          size: 20,
-          color: Colors.white,
-          shadows: iconShadow,
-        ),
+  List<CollageControlAction> _collageControlActions({
+    required bool includeViewZones,
+    required bool includeCancel,
+  }) {
+    return [
+      CollageControlAction(
+        icon: Iconsax.add,
         tooltip: 'Add photo (A)',
         onPressed: _showAllPhotosSheet,
       ),
-      if (!Platform.isIOS)
-        GestureDetector(
+      if (includeViewZones)
+        CollageControlAction(
+          icon: Icons.crop_free,
+          tooltip: 'Add view zone (Z, hold for list)',
+          onPressed: _addViewZone,
           onLongPress: _showViewZonePanel,
-          child: IconButton(
-            style: buttonStyle,
-            icon: const Icon(
-              Icons.crop_free,
-              size: 20,
-              color: Colors.white,
-              shadows: iconShadow,
-            ),
-            tooltip: 'Add view zone (Z, hold for list)',
-            onPressed: _addViewZone,
-          ),
         ),
-      IconButton(
-        style: buttonStyle,
-        icon: const Icon(
-          Icons.grid_view,
-          size: 20,
-          color: Colors.white,
-          shadows: iconShadow,
-        ),
+      CollageControlAction(
+        icon: Icons.grid_view,
         tooltip: 'Overview mode (O)',
         onPressed: _toggleOverviewMode,
       ),
-      IconButton(
-        style: buttonStyle,
-        icon: const Icon(
-          Iconsax.colorfilter,
-          size: 20,
-          color: Colors.white,
-          shadows: iconShadow,
-        ),
+      CollageControlAction(
+        icon: Iconsax.colorfilter,
         tooltip: 'Change background color (B)',
         onPressed: _showColorPickerDialog,
       ),
-      GestureDetector(
+      CollageControlAction(
+        icon: Iconsax.save_2,
+        tooltip: 'Save collage (S, hold for Save As)',
+        onPressed: _onSaveCollageToDb,
         onLongPress: _onSaveAsCollageToDb,
-        child: IconButton(
-          style: buttonStyle,
-          icon: const Icon(
-            Iconsax.save_2,
-            size: 20,
-            color: Colors.white,
-            shadows: iconShadow,
-          ),
-          tooltip: 'Save collage (S, hold for Save As)',
-          onPressed: _onSaveCollageToDb,
-        ),
       ),
-      IconButton(
-        style: buttonStyle,
-        icon: Icon(
-          _isPrivate ? Icons.lock : Icons.lock_open,
-          size: 20,
-          color: _isPrivate ? Colors.amber : Colors.white,
-          shadows: iconShadow,
-        ),
+      CollageControlAction(
+        icon: _isPrivate ? Icons.lock : Icons.lock_open,
         tooltip: _isPrivate ? 'Private collage (P)' : 'Public collage (P)',
+        color: _isPrivate ? Colors.amber : Colors.white,
         onPressed: () => setState(() => _isPrivate = !_isPrivate),
       ),
-      IconButton(
-        style: buttonStyle,
-        icon: const Icon(
-          Iconsax.image,
-          size: 20,
-          color: Colors.green,
-          shadows: iconShadow,
-        ),
+      CollageControlAction(
+        icon: Iconsax.image,
         tooltip: 'Save collage as image (I)',
+        color: Colors.green,
         onPressed: _onGenerateCollage,
       ),
-      IconButton(
-        style: buttonStyle,
-        icon: const Icon(
-          Icons.close,
-          size: 20,
+      CollageControlAction(
+        icon: Icons.view_carousel_outlined,
+        tooltip: 'Select Instagram carousel area',
+        color: _instaSelectionMode ? Colors.amberAccent : Colors.white,
+        onPressed: _toggleInstaSelectionMode,
+      ),
+      if (includeCancel)
+        CollageControlAction(
+          icon: Icons.close,
+          tooltip: 'Cancel collage',
           color: Colors.red,
-          shadows: iconShadow,
+          onPressed: _confirmCancelCollage,
         ),
-        tooltip: 'Cancel collage',
-        onPressed: _confirmCancelCollage,
-      ),
     ];
+  }
 
-    if (isHorizontal) {
-      return Opacity(
-        opacity: 0.9,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (int i = 0; i < buttons.length; i++) ...[
-              if (i != 0) const SizedBox(width: 4),
-              buttons[i],
-            ],
-          ],
-        ),
-      );
-    }
-
-    return Opacity(
-      opacity: 0.9,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final button in buttons) button,
-        ],
+  Widget _buildFloatingActionButtons() {
+    return CollageActionButtons(
+      actions: _collageControlActions(
+        includeViewZones: !Platform.isIOS,
+        includeCancel: true,
       ),
+      horizontal: Platform.isIOS || Platform.isMacOS,
     );
   }
 
@@ -2973,7 +3227,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           icon: const Icon(Icons.arrow_back,
               color: Colors.white, shadows: textShadow),
           tooltip: 'Back',
-          onPressed: () => Navigator.pop(context),
+          onPressed: _popCollageRoute,
         ),
         const SizedBox(width: 4),
         Text(
@@ -3280,6 +3534,21 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         item.internalOffset.dy,
       );
       _normalizeEditingCropState(item);
+    });
+  }
+
+  void _resetPhotoEditSettings(CollagePhotoState item) {
+    setState(() {
+      item.rotation = 0.0;
+      item.flipX = false;
+      item.internalOffset = Offset.zero;
+      item.cropRect = const Rect.fromLTWH(0, 0, 1, 1);
+      item.brightness = 1.0;
+      item.saturation = 1.0;
+      item.temp = 0.0;
+      item.hue = 0.0;
+      item.contrast = 1.0;
+      item.opacity = 1.0;
     });
   }
 
@@ -4322,6 +4591,126 @@ class _ViewZoneAddChip extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _InstaCarouselSelectionPainter extends CustomPainter {
+  const _InstaCarouselSelectionPainter({
+    required this.screenRect,
+    required this.sliceCount,
+  });
+
+  final Rect screenRect;
+  final int sliceCount;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (screenRect.isEmpty) {
+      final textPainter = TextPainter(
+        text: const TextSpan(
+          text: 'Drag to select carousel area',
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      textPainter.paint(canvas, const Offset(18, 18));
+      return;
+    }
+
+    final overlayPaint = Paint()..color = Colors.black.withValues(alpha: 0.32);
+    final selectionPath = Path()..addRect(screenRect);
+    final overlayPath = Path()
+      ..addRect(Offset.zero & size)
+      ..addPath(selectionPath, Offset.zero)
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(overlayPath, overlayPaint);
+
+    final fillPaint = Paint()..color = Colors.white.withValues(alpha: 0.045);
+    canvas.drawRect(screenRect, fillPaint);
+
+    final borderPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.86)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+    canvas.drawRect(screenRect, borderPaint);
+
+    final handlePaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.92)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round;
+    final handleShadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.35)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.2
+      ..strokeCap = StrokeCap.round;
+    const handleLength = 22.0;
+    final handleCorner = screenRect.bottomRight;
+    final handleHorizontalStart = Offset(
+      handleCorner.dx - handleLength,
+      handleCorner.dy,
+    );
+    final handleVerticalStart = Offset(
+      handleCorner.dx,
+      handleCorner.dy - handleLength,
+    );
+    canvas.drawLine(handleHorizontalStart, handleCorner, handleShadowPaint);
+    canvas.drawLine(handleVerticalStart, handleCorner, handleShadowPaint);
+    canvas.drawLine(handleHorizontalStart, handleCorner, handlePaint);
+    canvas.drawLine(handleVerticalStart, handleCorner, handlePaint);
+
+    final gridPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.52)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.8;
+    const targetSliceAspect = 4 / 5;
+    final sliceWidth = screenRect.height * targetSliceAspect;
+    for (var i = 1; i <= sliceCount; i++) {
+      final x = screenRect.left + sliceWidth * i;
+      if (x <= screenRect.left || x > screenRect.right) continue;
+      canvas.drawLine(
+        Offset(x, screenRect.top),
+        Offset(x, screenRect.bottom),
+        gridPaint,
+      );
+    }
+
+    final label = '$sliceCount frames';
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final labelRect = Rect.fromLTWH(
+      screenRect.left + 8,
+      screenRect.top + 8,
+      textPainter.width + 14,
+      textPainter.height + 8,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(labelRect, const Radius.circular(999)),
+      Paint()..color = Colors.black.withValues(alpha: 0.62),
+    );
+    textPainter.paint(
+      canvas,
+      Offset(labelRect.left + 7, labelRect.top + 4),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _InstaCarouselSelectionPainter oldDelegate) {
+    return oldDelegate.screenRect != screenRect ||
+        oldDelegate.sliceCount != sliceCount;
   }
 }
 

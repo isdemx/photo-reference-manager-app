@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
@@ -19,6 +21,8 @@ class ActionBar extends StatelessWidget {
   final VoidCallback onAddToTag;
   final VoidCallback onAddToCollage;
   final VoidCallback onAddToCollageMulti;
+  final VoidCallback? onDownload;
+  final VoidCallback onDownloadMulti;
 
   // ✅ NEW
   final VoidCallback onEdit;
@@ -37,6 +41,8 @@ class ActionBar extends StatelessWidget {
     required this.onAddToTag,
     required this.onAddToCollage,
     required this.onAddToCollageMulti,
+    this.onDownload,
+    required this.onDownloadMulti,
     required this.onEdit, // ✅ NEW
   });
 
@@ -96,16 +102,33 @@ class ActionBar extends StatelessWidget {
                     ),
                     child: const Icon(Iconsax.grid_2, color: Colors.white),
                   ),
-                  ElevatedButton(
-                    onPressed: onShare,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 35, 107, 166),
-                      shape: const CircleBorder(),
-                      padding: const EdgeInsets.all(12),
-                      minimumSize: const Size(48, 48),
+                  if (Platform.isMacOS)
+                    ElevatedButton(
+                      onPressed: onDownloadMulti,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            const Color.fromARGB(255, 82, 102, 120),
+                        shape: const CircleBorder(),
+                        padding: const EdgeInsets.all(12),
+                        minimumSize: const Size(48, 48),
+                      ),
+                      child: const Icon(
+                        Icons.file_download_outlined,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    ElevatedButton(
+                      onPressed: onShare,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            const Color.fromARGB(255, 35, 107, 166),
+                        shape: const CircleBorder(),
+                        padding: const EdgeInsets.all(12),
+                        minimumSize: const Size(48, 48),
+                      ),
+                      child: const Icon(Iconsax.export_1, color: Colors.white),
                     ),
-                    child: const Icon(Iconsax.export_1, color: Colors.white),
-                  ),
                   ElevatedButton(
                     onPressed: deletePhoto,
                     style: ElevatedButton.styleFrom(
@@ -135,6 +158,15 @@ class ActionBar extends StatelessWidget {
                     onPressed: onAddToCollage,
                     tooltip: 'Add to collage',
                   ),
+                  if (Platform.isMacOS && onDownload != null)
+                    IconButton(
+                      icon: const Icon(
+                        Icons.file_download_outlined,
+                        color: Color.fromARGB(255, 82, 102, 120),
+                      ),
+                      onPressed: onDownload,
+                      tooltip: 'Download original',
+                    ),
                   AddToEditWidget(
                     onEdit: onEdit,
                   ),
@@ -154,6 +186,3 @@ class ActionBar extends StatelessWidget {
     );
   }
 }
-
-
-

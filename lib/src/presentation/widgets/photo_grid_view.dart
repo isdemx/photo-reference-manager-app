@@ -1,6 +1,7 @@
 // lib/src/presentation/widgets/photo_grid_view.dart
 import 'dart:io';
 import 'dart:isolate';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
@@ -304,6 +305,76 @@ class PhotoGridViewState extends State<PhotoGridView> {
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
+  }
+
+  Future<void> _onSelectedDownloadPressed(BuildContext context) async {
+    if (!_isMacOS || _selectedPhotos.isEmpty) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final destinationDirectory = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Choose download folder',
+    );
+    if (destinationDirectory == null || destinationDirectory.isEmpty) return;
+
+    setState(() => _isSharing = true);
+    final total = _selectedPhotos.length;
+    var copied = 0;
+    try {
+      for (final photo in List<Photo>.from(_selectedPhotos)) {
+        try {
+          final sourceFile = File(_resolveOriginalPhotoPath(photo));
+          if (!await sourceFile.exists()) continue;
+
+          final destinationPath = await _availableDownloadPath(
+            destinationDirectory,
+            photo.fileName,
+          );
+          await sourceFile.copy(destinationPath);
+          copied++;
+        } catch (_) {
+          // Keep downloading the rest of the selected files.
+        }
+      }
+
+      if (!mounted) return;
+      if (copied > 0) _turnMultiSelectModeOff();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            copied == total
+                ? 'Saved $copied files'
+                : 'Saved $copied/$total files',
+          ),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(milliseconds: 1300),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
+  }
+
+  String _resolveOriginalPhotoPath(Photo photo) {
+    return photo.isStoredInApp
+        ? PhotoPathHelper().getFullPath(photo.fileName)
+        : photo.path;
+  }
+
+  Future<String> _availableDownloadPath(
+    String directory,
+    String fileName,
+  ) async {
+    final extension = p.extension(fileName);
+    final basename = p.basenameWithoutExtension(fileName);
+    var candidate = p.join(directory, fileName);
+    var index = 2;
+
+    while (await File(candidate).exists()) {
+      candidate = p.join(directory, '$basename $index$extension');
+      index++;
+    }
+
+    return candidate;
   }
 
   Future<void> _onDeletePressed(
@@ -732,7 +803,8 @@ class PhotoGridViewState extends State<PhotoGridView> {
                                         Icons.share,
                                         color: colors.text,
                                       ),
-                                      onPressed: () => ImagesHelpers.sharePhotos(
+                                      onPressed: () =>
+                                          ImagesHelpers.sharePhotos(
                                         context,
                                         _selectedPhotos,
                                       ),
@@ -881,9 +953,16 @@ class PhotoGridViewState extends State<PhotoGridView> {
                     onPressed: () => _onCollageGeneratorPressed(context),
                   ),
                   IconButton(
-                    icon: const Icon(Iconsax.export, color: Colors.white),
-                    tooltip: 'Share chosen media',
-                    onPressed: () => _onSelectedSharePressed(context),
+                    icon: Icon(
+                      _isMacOS ? Icons.file_download_outlined : Iconsax.export,
+                      color: Colors.white,
+                    ),
+                    tooltip: _isMacOS
+                        ? 'Download chosen media'
+                        : 'Share chosen media',
+                    onPressed: () => _isMacOS
+                        ? _onSelectedDownloadPressed(context)
+                        : _onSelectedSharePressed(context),
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.trash,

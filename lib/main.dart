@@ -162,12 +162,22 @@ void main(List<String> args) async {
     final initialData = await _loadAppBootstrapData();
 
     // 5) Запуск приложения
+    final shouldShowWindowAfterFirstFrame = !kIsWeb &&
+        Platform.isMacOS &&
+        !isMultiWindowLaunch &&
+        ((initialArgs['route'] as String?) ?? '').isNotEmpty;
     runApp(_AppBootstrap(
       initialArgs: initialArgs,
       initialData: initialData,
     ));
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _firstFrameRendered = true;
+      if (shouldShowWindowAfterFirstFrame) {
+        try {
+          await windowManager.show();
+          await windowManager.focus();
+        } catch (_) {}
+      }
     });
 
     await MacOSFileOpenService.startListening(

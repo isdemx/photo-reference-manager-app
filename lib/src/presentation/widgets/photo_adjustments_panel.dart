@@ -14,6 +14,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
   final VoidCallback? onSendBackward;
   final VoidCallback? onBringForward;
   final VoidCallback? onDone;
+  final VoidCallback? onReset;
 
   final double brightness;
   final double saturation;
@@ -38,6 +39,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
     this.onSendBackward,
     this.onBringForward,
     this.onDone,
+    this.onReset,
     required this.brightness,
     required this.saturation,
     required this.temp,
@@ -174,6 +176,27 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                     ),
                     child: const Text(
                       'OK',
+                      style: TextStyle(fontSize: 12, letterSpacing: 0.2),
+                    ),
+                  ),
+                ),
+              if (onReset != null)
+                SizedBox(
+                  height: 28,
+                  child: ElevatedButton(
+                    onPressed: onReset,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      backgroundColor:
+                          appColors.surfaceAlt.withValues(alpha: 0.72),
+                      foregroundColor: appColors.text,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Reset',
                       style: TextStyle(fontSize: 12, letterSpacing: 0.2),
                     ),
                   ),
@@ -338,6 +361,29 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onReset != null) ...[
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      height: 28,
+                      child: ElevatedButton(
+                        onPressed: onReset,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          backgroundColor:
+                              appColors.surfaceAlt.withValues(alpha: 0.72),
+                          foregroundColor: appColors.text,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        child: const Text(
+                          'Reset',
+                          style: TextStyle(fontSize: 12, letterSpacing: 0.2),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ],
             );

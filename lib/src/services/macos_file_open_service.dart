@@ -20,8 +20,8 @@ class MacOSFileOpenService {
     if (supportedFiles.isEmpty) return const <String, dynamic>{};
 
     return <String, dynamic>{
-      'route': '/lite_viewer_dispatch',
-      'filePaths': supportedFiles,
+      'route': '/lite_viewer',
+      'filePath': supportedFiles.first,
     };
   }
 

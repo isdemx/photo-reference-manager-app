@@ -38,9 +38,6 @@ class AppDelegate: FlutterAppDelegate {
   }
 
   func configureOpenFilesChannel(with controller: FlutterViewController) {
-    guard openFilesChannel == nil else {
-      return
-    }
     print("[RefmaOpenFiles][native] configureOpenFilesChannel")
 
     let channel = FlutterMethodChannel(
@@ -71,8 +68,10 @@ class AppDelegate: FlutterAppDelegate {
       }
     }
 
-    openFilesChannel = channel
-    flushPendingOpenFiles()
+    if openFilesChannel == nil {
+      openFilesChannel = channel
+      flushPendingOpenFiles()
+    }
   }
 
   private func flushPendingOpenFiles() {

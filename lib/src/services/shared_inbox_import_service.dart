@@ -97,20 +97,10 @@ class SharedInboxImportService {
         originalName,
         srcPath,
       );
-      final destPath = p.join(photosDir.path, targetName);
-
-      try {
-        await srcFile.copy(destPath);
-      } catch (_) {
-        processed++;
-        onProgress?.call(processed);
-        continue;
-      }
-
       final photo = Photo(
         id: const Uuid().v4(),
         fileName: targetName,
-        path: destPath,
+        path: srcPath,
         mediaType: mediaType,
         dateAdded: DateTime.now(),
         folderIds: folderIds,
