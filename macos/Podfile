@@ -26,10 +26,111 @@ require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelpe
 
 flutter_macos_podfile_setup
 
+def patch_ffmpeg_kit_flutter_new_macos_podspec
+  podspec_path = File.expand_path(
+    File.join(
+      '..',
+      'Flutter',
+      'ephemeral',
+      '.symlinks',
+      'plugins',
+      'ffmpeg_kit_flutter_new',
+      'macos',
+      'ffmpeg_kit_flutter_new.podspec'
+    ),
+    __FILE__
+  )
+  script_path = File.expand_path(
+    File.join(
+      '..',
+      'Flutter',
+      'ephemeral',
+      '.symlinks',
+      'plugins',
+      'ffmpeg_kit_flutter_new',
+      'scripts',
+      'setup_macos.sh'
+    ),
+    __FILE__
+  )
+
+  return unless File.exist?(podspec_path) && File.exist?(script_path)
+
+  patched_script = <<~SCRIPT
+    #!/bin/bash
+    set -e
+
+    MACOS_URL="https://github.com/sk3llo/ffmpeg_kit_flutter/releases/download/6.0.2/ffmpeg-kit-macos-full-gpl-6.0.zip"
+    rm -rf Frameworks
+    mkdir -p Frameworks
+    curl -L "$MACOS_URL" -o frameworks.zip
+    unzip -o frameworks.zip -d Frameworks
+    rm frameworks.zip
+
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/ffmpegkit.framework/ffmpegkit -o Frameworks/ffmpeg-kit-macos-full-gpl/ffmpegkit.framework/ffmpegkit
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libavcodec.framework/libavcodec -o Frameworks/ffmpeg-kit-macos-full-gpl/libavcodec.framework/libavcodec
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libavdevice.framework/libavdevice -o Frameworks/ffmpeg-kit-macos-full-gpl/libavdevice.framework/libavdevice
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libavfilter.framework/libavfilter -o Frameworks/ffmpeg-kit-macos-full-gpl/libavfilter.framework/libavfilter
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libavformat.framework/libavformat -o Frameworks/ffmpeg-kit-macos-full-gpl/libavformat.framework/libavformat
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libavutil.framework/libavutil -o Frameworks/ffmpeg-kit-macos-full-gpl/libavutil.framework/libavutil
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libswresample.framework/libswresample -o Frameworks/ffmpeg-kit-macos-full-gpl/libswresample.framework/libswresample
+    xcrun bitcode_strip -r Frameworks/ffmpeg-kit-macos-full-gpl/libswscale.framework/libswscale -o Frameworks/ffmpeg-kit-macos-full-gpl/libswscale.framework/libswscale
+  SCRIPT
+
+  patched_podspec = <<~PODSPEC
+    Pod::Spec.new do |s|
+      s.name             = 'ffmpeg_kit_flutter_new'
+      s.version          = '1.0.0'
+      s.summary          = 'FFmpeg Kit for Flutter'
+      s.description      = 'A Flutter plugin for running FFmpeg and FFprobe commands.'
+      s.homepage         = 'https://github.com/sk3llo/ffmpeg_kit_flutter'
+      s.license          = { :file => '../LICENSE' }
+      s.author           = { 'Anton Karpenko' => 'kapraton@gmail' }
+
+      s.platform            = :osx
+      s.requires_arc        = true
+      s.static_framework    = true
+
+      s.source              = { :path => '.' }
+      s.source_files        = 'Classes/**/*'
+      s.public_header_files = 'Classes/**/*.h'
+
+      s.default_subspec     = 'full-gpl'
+
+      s.dependency          'FlutterMacOS'
+      s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
+
+      s.subspec 'full-gpl' do |ss|
+        s.prepare_command = <<-CMD
+          chmod +x ../scripts/setup_macos.sh
+          ../scripts/setup_macos.sh
+        CMD
+        ss.source_files         = 'Classes/**/*'
+        ss.public_header_files  = 'Classes/**/*.h'
+        ss.osx.vendored_frameworks = 'Frameworks/ffmpeg-kit-macos-full-gpl/ffmpegkit.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libavcodec.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libavdevice.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libavfilter.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libavformat.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libavutil.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libswresample.framework',
+                                     'Frameworks/ffmpeg-kit-macos-full-gpl/libswscale.framework'
+        ss.osx.frameworks = 'AudioToolbox', 'CoreMedia'
+        ss.libraries = 'z', 'bz2', 'c++', 'iconv'
+        ss.osx.deployment_target = '10.15'
+      end
+    end
+  PODSPEC
+
+  File.write(script_path, patched_script)
+  File.write(podspec_path, patched_podspec)
+end
+
 target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+  patch_ffmpeg_kit_flutter_new_macos_podspec
   flutter_install_all_macos_pods File.dirname(File.realpath(__FILE__))
   
   target 'RunnerTests' do

@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:exif/exif.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart'; // kIsWeb
@@ -12,6 +11,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart'; // <-- generateVideoThumbnail() здесь
+import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -136,15 +136,17 @@ class _UploadScreenState extends State<UploadScreen> {
         folderIds.add(widget.folder!.id);
       }
 
+      final photoId = const Uuid().v4();
+
       /// 1. Сохраняем оригинальный файл (фото или видео) в постоянную директорию "photos/"
-      final savedPath = await _saveFileToPhotosDir(xfile);
+      final savedPath = await _saveFileToPhotosDir(xfile, photoId: photoId);
       final resolvedMediaType = determineMediaType(savedPath);
       final mediaType =
           resolvedMediaType == 'unknown' ? initialMediaType : resolvedMediaType;
 
       /// 2. Создаём объект Photo и записываем в Hive
       final photo = Photo(
-        id: const Uuid().v4(),
+        id: photoId,
         path: savedPath, // Уже в постоянной директории
         folderIds: folderIds,
         tagIds: [],
@@ -204,7 +206,10 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   /// Сохраняем файл (фото или видео) в постоянную директорию "photos"
-  Future<String> _saveFileToPhotosDir(XFile xfile) async {
+  Future<String> _saveFileToPhotosDir(
+    XFile xfile, {
+    required String photoId,
+  }) async {
     final appDocDir = await getApplicationDocumentsDirectory();
     final photosDir = Directory(path_package.join(appDocDir.path, 'photos'));
 
@@ -215,15 +220,26 @@ class _UploadScreenState extends State<UploadScreen> {
     final convertedPath = await convertVideoToMp4IfNeeded(
       inputPath: xfile.path,
       outputDir: photosDir.path,
+      outputFileName: mediaFileNameWithId(
+        '${path_package.basenameWithoutExtension(xfile.path)}.mp4',
+        photoId,
+      ),
     );
     if (convertedPath != null) {
       return convertedPath;
     }
 
+    final desiredFileName = mediaFileNameWithId(
+      path_package.basename(xfile.path),
+      photoId,
+    );
+    final uniqueFileName =
+        uniqueFileNameInDirectory(photosDir, desiredFileName);
+
     // Формируем конечный путь
     final newPath = path_package.join(
       photosDir.path,
-      path_package.basename(xfile.path),
+      uniqueFileName,
     );
 
     // Копируем файл

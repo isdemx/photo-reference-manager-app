@@ -748,6 +748,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   double? _pendingZoomMultiplier;
   Offset _mobileCanvasJoystickOffset = Offset.zero;
   Timer? _mobileCanvasJoystickTimer;
+  bool _isTouchCanvasPanActive = false;
+  Offset? _touchCanvasPanLastGlobalPosition;
 
   // --- Delete drag target ---
   Rect _deleteRect = Rect.zero;
@@ -1115,14 +1117,21 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
   }
 
+  void _setTransformWithoutUiRebuild(Matrix4 matrix) {
+    _ignoreTransformUpdates = true;
+    _transformationController.value = matrix;
+    _ignoreTransformUpdates = false;
+  }
+
   Future<void> _saveCollageScale(double scale) async {
     await _prefs.saveCollageScale(scale);
   }
 
-  void _applyMobileCanvasPan(Offset direction) {
-    if (_overviewMode || direction == Offset.zero) return;
+  void _translateCanvasByScreenDelta(Offset delta) {
+    if (delta == Offset.zero || _overviewMode) return;
+
     final next = _transformationController.value.clone()
-      ..translate(direction.dx, direction.dy);
+      ..translate(delta.dx, delta.dy);
     final scale = TransformMath.getScale(next);
     final canvas = _currentCanvasSize();
     final viewport = _viewportSize();
@@ -1135,18 +1144,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (scaledWidth <= viewport.width) {
       tx = (viewport.width - scaledWidth) / 2;
     } else {
-      tx = tx.clamp(viewport.width - scaledWidth, 0.0);
+      tx = tx.clamp(viewport.width - scaledWidth, 0.0).toDouble();
     }
 
     if (scaledHeight <= viewport.height) {
       ty = (viewport.height - scaledHeight) / 2;
     } else {
-      ty = ty.clamp(viewport.height - scaledHeight, 0.0);
+      ty = ty.clamp(viewport.height - scaledHeight, 0.0).toDouble();
     }
 
     next.storage[12] = tx;
     next.storage[13] = ty;
-    _setTransform(next);
+    _setTransformWithoutUiRebuild(next);
+  }
+
+  void _applyMobileCanvasPan(Offset direction) {
+    if (_overviewMode || direction == Offset.zero) return;
+    _translateCanvasByScreenDelta(direction);
   }
 
   void _startMobileCanvasJoystick() {
@@ -1169,6 +1183,43 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     setState(() {
       _mobileCanvasJoystickOffset = Offset.zero;
     });
+  }
+
+  bool get _canPanCanvasByTouch {
+    return Platform.isIOS &&
+        !_overviewMode &&
+        !_instaSelectionMode &&
+        !_showViewZoneOverlay &&
+        !_isSavingInstaCarousel &&
+        !_isItemScaleGestureActive &&
+        _draggingIndex == null;
+  }
+
+  void _startTouchCanvasPan(DragStartDetails details) {
+    if (!_canPanCanvasByTouch) return;
+    _exitEditingMode();
+    _isTouchCanvasPanActive = true;
+    _touchCanvasPanLastGlobalPosition = details.globalPosition;
+  }
+
+  void _updateTouchCanvasPan(DragUpdateDetails details) {
+    if (!_isTouchCanvasPanActive || !_canPanCanvasByTouch) return;
+    final previous = _touchCanvasPanLastGlobalPosition;
+    if (previous == null) {
+      _touchCanvasPanLastGlobalPosition = details.globalPosition;
+      return;
+    }
+
+    final delta = details.globalPosition - previous;
+    _touchCanvasPanLastGlobalPosition = details.globalPosition;
+    _translateCanvasByScreenDelta(delta);
+  }
+
+  void _endTouchCanvasPan() {
+    if (!_isTouchCanvasPanActive) return;
+    _isTouchCanvasPanActive = false;
+    _touchCanvasPanLastGlobalPosition = null;
+    _saveCollageScale(_collageScale);
   }
 
   void _zoomToScale(double scale, Offset focalPoint) {
@@ -1752,7 +1803,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       if (_items.isEmpty) {
         _fitAndCenterFirstItem(item);
       } else {
-        item.scale = item.scale * 0.5;
+        _applyDefaultAddedPhotoScale(item);
       }
       final offset = _items.isEmpty
           ? item.offset
@@ -1774,7 +1825,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       if (_items.isEmpty) {
         _fitAndCenterFirstItem(item);
       } else {
-        item.scale = item.scale * 0.5;
+        _applyDefaultAddedPhotoScale(item);
       }
       final offset = _items.isEmpty
           ? item.offset
@@ -2438,12 +2489,27 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return _screenToCanvas(screenOffset);
   }
 
-  void _fitAndCenterFirstItem(CollagePhotoState item) {
+  double _screenContainScaleForItem(CollagePhotoState item) {
     final size = _viewportSize();
     final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
     final scaleW = size.width / (item.baseWidth * screenScale);
     final scaleH = size.height / (item.baseHeight * screenScale);
-    final scale = math.min(scaleW, scaleH);
+    return math.min(scaleW, scaleH);
+  }
+
+  void _applyDefaultAddedPhotoScale(CollagePhotoState item) {
+    if (Platform.isIOS) {
+      item.scale = _screenContainScaleForItem(item) / 6.0;
+      return;
+    }
+    item.scale = item.scale * 0.5;
+  }
+
+  void _fitAndCenterFirstItem(CollagePhotoState item) {
+    final size = _viewportSize();
+    final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
+    final containScale = _screenContainScaleForItem(item);
+    final scale = Platform.isIOS ? containScale / 6.0 : containScale;
 
     final screenW = item.baseWidth * scale * screenScale;
     final screenH = item.baseHeight * scale * screenScale;
@@ -2775,8 +2841,22 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                             clipBehavior: Clip.none,
                                             children: [
                                               Positioned.fill(
+                                                child: GestureDetector(
+                                                  behavior:
+                                                      HitTestBehavior.opaque,
+                                                  onPanStart:
+                                                      _startTouchCanvasPan,
+                                                  onPanUpdate:
+                                                      _updateTouchCanvasPan,
+                                                  onPanEnd: (_) =>
+                                                      _endTouchCanvasPan(),
+                                                  onPanCancel:
+                                                      _endTouchCanvasPan,
                                                   child: Container(
-                                                      color: _backgroundColor)),
+                                                    color: _backgroundColor,
+                                                  ),
+                                                ),
+                                              ),
                                               for (final item in sorted)
                                                 _buildPhotoItem(item),
                                               if (_showViewZoneOverlay)

@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 // ✅ добавь импорт на твою функцию превью
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
+import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
 
 class PhotoSaveHelper {
   static Future<String> _ensureUniqueFileName(String fileName) async {
@@ -21,19 +22,7 @@ class PhotoSaveHelper {
       await photosDir.create(recursive: true);
     }
 
-    final base = p.basenameWithoutExtension(fileName).trim();
-    final ext = p.extension(fileName);
-    final safeBase = base.isEmpty ? 'media' : base;
-
-    var candidate = '$safeBase$ext';
-    var counter = 1;
-
-    while (File(p.join(photosDir.path, candidate)).existsSync()) {
-      candidate = '$safeBase ($counter)$ext';
-      counter++;
-    }
-
-    return candidate;
+    return uniqueFileNameInDirectory(photosDir, fileName);
   }
 
   /// Сохраняет файл из байтов [bytes] с именем [fileName] в папку "photos" приложения,
@@ -58,7 +47,9 @@ class PhotoSaveHelper {
       }
 
       // 2) Создаём путь для сохранения файла.
-      final uniqueFileName = await _ensureUniqueFileName(fileName);
+      final photoId = const Uuid().v4();
+      final desiredFileName = mediaFileNameWithId(fileName, photoId);
+      final uniqueFileName = await _ensureUniqueFileName(desiredFileName);
       final outPath = p.join(photosDir.path, uniqueFileName);
       final outFile = File(outPath);
 
@@ -67,7 +58,7 @@ class PhotoSaveHelper {
       await outFile.writeAsBytes(bytes);
 
       String finalPath = outPath;
-      String finalFileName = fileName;
+      String finalFileName = uniqueFileName;
       final ext = p.extension(outPath).toLowerCase();
       const convertExts = ['.avi', '.wmv', '.vmv', '.m4v'];
       if (Platform.isMacOS && convertExts.contains(ext)) {
@@ -76,6 +67,10 @@ class PhotoSaveHelper {
       final convertedPath = await convertVideoToMp4IfNeeded(
         inputPath: outPath,
         outputDir: photosDir.path,
+        outputFileName: mediaFileNameWithId(
+          '${p.basenameWithoutExtension(fileName)}.mp4',
+          photoId,
+        ),
       );
       if (convertedPath != null) {
         finalPath = convertedPath;
@@ -91,7 +86,7 @@ class PhotoSaveHelper {
 
       // 4) Создаём объект Photo.
       final newPhoto = Photo(
-        id: const Uuid().v4(),
+        id: photoId,
         fileName: finalFileName,
         path: finalPath,
         mediaType: actualMediaType,
@@ -154,11 +149,15 @@ class PhotoSaveHelper {
         throw Exception('Неподдерживаемый тип файла');
       }
 
-      final uniqueFileName =
-          await _ensureUniqueFileName(p.basename(sourcePath));
+      final photoId = const Uuid().v4();
+      final desiredFileName = mediaFileNameWithId(
+        p.basename(sourcePath),
+        photoId,
+      );
+      final uniqueFileName = await _ensureUniqueFileName(desiredFileName);
 
       final photo = Photo(
-        id: const Uuid().v4(),
+        id: photoId,
         path: sourcePath,
         fileName: uniqueFileName,
         mediaType: mediaType,

@@ -24,6 +24,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
 import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
+import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
@@ -502,8 +503,6 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     });
 
     final inputPath = _resolveVideoPath(widget.photo);
-    final ext =
-        p.extension(inputPath).isNotEmpty ? p.extension(inputPath) : '.mp4';
     final appDir = await getApplicationDocumentsDirectory();
     final photosDir = Directory(p.join(appDir.path, 'photos'));
     if (!await photosDir.exists()) {
@@ -511,7 +510,13 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     }
 
     final id = const Uuid().v4();
-    final newFileName = 'trim_$id$ext';
+    final sourceName = widget.photo.fileName.isNotEmpty
+        ? widget.photo.fileName
+        : p.basename(inputPath);
+    final newFileName = mediaFileNameWithSuffix(
+      sourceName,
+      'trim_${id.replaceAll('-', '').substring(0, 12)}',
+    );
     final outPath = p.join(photosDir.path, newFileName);
 
     final startSec = (startMs / 1000).toStringAsFixed(3);
@@ -597,7 +602,13 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     }
 
     final id = const Uuid().v4();
-    final newFileName = 'export_$id.mp4';
+    final sourceName = widget.photo.fileName.isNotEmpty
+        ? widget.photo.fileName
+        : p.basename(inputPath);
+    final newFileName = mediaFileNameWithSuffix(
+      '${p.basenameWithoutExtension(sourceName)}.mp4',
+      'export_${id.replaceAll('-', '').substring(0, 12)}',
+    );
     final outPath = p.join(photosDir.path, newFileName);
 
     final duration = c.value.duration;

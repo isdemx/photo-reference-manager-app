@@ -108,6 +108,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
 
   /// Состояние панели фильтров (по умолчанию открыта)
   bool _filtersOpen = true;
+  bool _didInitFiltersOpenForLayout = false;
 
   /// Размер грида: кол-во столбцов (изменяется ползунком)
   double _gridColumnsSlider = 4; // [2; 8]
@@ -128,6 +129,14 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
               builder: (_, photoState) {
                 if (photoState is! PhotoLoaded) return const _Loader();
                 final appColors = context.appThemeColors;
+                final media = MediaQuery.of(context);
+                final isMobile = Platform.isIOS || Platform.isAndroid;
+                final isMobileLandscape =
+                    isMobile && media.size.width > media.size.height;
+                if (!_didInitFiltersOpenForLayout) {
+                  _filtersOpen = !isMobileLandscape;
+                  _didInitFiltersOpenForLayout = true;
+                }
 
                 final folders = {for (var f in folderState.folders) f.id: f}
                     .values
@@ -413,31 +422,40 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                         child: _filtersOpen
                             ? Container(
                                 width: double.infinity,
-                                color: Colors.black54,
+                                constraints: BoxConstraints(
+                                  maxHeight: isMobileLandscape
+                                      ? media.size.height * 0.46
+                                      : double.infinity,
+                                ),
+                                color: appColors.surface.withValues(
+                                  alpha: isMobileLandscape ? 0.96 : 0.88,
+                                ),
                                 padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-                                child: _FilterPanel(
-                                  folders: folders,
-                                  allTags: visibleTags,
-                                  folderId: _folderId,
-                                  categories: categories,
-                                  onFolderChanged: (v) =>
-                                      setState(() => _folderId = v),
-                                  selectedTagIds: _selectedTagIds,
-                                  tagLogicAnd: _tagLogicAnd,
-                                  onToggleLogic: () => setState(
-                                      () => _tagLogicAnd = !_tagLogicAnd),
-                                  onClearAllTags: () {
-                                    setState(() => _selectedTagIds.clear());
-                                  },
-                                  onToggleTag: (tagId) {
-                                    setState(() {
-                                      if (_selectedTagIds.contains(tagId)) {
-                                        _selectedTagIds.remove(tagId);
-                                      } else {
-                                        _selectedTagIds.add(tagId);
-                                      }
-                                    });
-                                  },
+                                child: SingleChildScrollView(
+                                  child: _FilterPanel(
+                                    folders: folders,
+                                    allTags: visibleTags,
+                                    folderId: _folderId,
+                                    categories: categories,
+                                    onFolderChanged: (v) =>
+                                        setState(() => _folderId = v),
+                                    selectedTagIds: _selectedTagIds,
+                                    tagLogicAnd: _tagLogicAnd,
+                                    onToggleLogic: () => setState(
+                                        () => _tagLogicAnd = !_tagLogicAnd),
+                                    onClearAllTags: () {
+                                      setState(() => _selectedTagIds.clear());
+                                    },
+                                    onToggleTag: (tagId) {
+                                      setState(() {
+                                        if (_selectedTagIds.contains(tagId)) {
+                                          _selectedTagIds.remove(tagId);
+                                        } else {
+                                          _selectedTagIds.add(tagId);
+                                        }
+                                      });
+                                    },
+                                  ),
                                 ),
                               )
                             : const SizedBox.shrink(),

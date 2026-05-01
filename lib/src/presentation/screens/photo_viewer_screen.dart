@@ -26,6 +26,7 @@ import 'package:photographers_reference_app/src/services/navigation_history_serv
 import 'package:photographers_reference_app/src/services/window_service.dart';
 import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
+import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:path/path.dart' as p;
@@ -665,7 +666,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     String comment,
   ) async {
     final id = const Uuid().v4();
-    final newFileName = 'crop_$id.jpg';
+    final sourceName =
+        source.fileName.isNotEmpty ? source.fileName : p.basename(source.path);
+    final newFileName = mediaFileNameWithSuffix(
+      '${p.basenameWithoutExtension(sourceName)}.jpg',
+      'edited_${id.replaceAll('-', '').substring(0, 12)}',
+    );
 
     final newFullPath = PhotoPathHelper().getFullPath(newFileName);
     await File(newFullPath).writeAsBytes(bytes, flush: true);

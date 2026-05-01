@@ -1,10 +1,14 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 
 class StorageDiagnosticsService {
+  static const String _videoThumbsCacheDirName = 'refma_video_thumbs';
+
   static void _log(String message) {
     debugPrint('[SettingsSize] $message');
   }
@@ -100,9 +104,8 @@ class StorageDiagnosticsService {
         library == null ? null : Directory(p.join(library.path, 'Caches'));
 
     final tmpSize = await _scopedTempSize(tmp, appId: appId);
-    final cacheSize = cacheDir == null
-        ? 0
-        : await _scopedCacheSize(cacheDir, appId: appId);
+    final cacheSize =
+        cacheDir == null ? 0 : await _scopedCacheSize(cacheDir, appId: appId);
     _log(
       'getCacheSizeBytes done tmp=${_formatBytes(tmpSize)} cache=${_formatBytes(cacheSize)} total=${_formatBytes(tmpSize + cacheSize)}',
     );
@@ -163,6 +166,50 @@ class StorageDiagnosticsService {
     if (cacheDir != null) {
       await _clearScopedCache(cacheDir, appId: appId);
     }
+    await clearUnreferencedPhotoFiles();
+  }
+
+  static Future<int> clearUnreferencedPhotoFiles() async {
+    final docs = await getApplicationDocumentsDirectory();
+    final photosDir = Directory(p.join(docs.path, 'photos'));
+    if (!await photosDir.exists()) return 0;
+
+    final photoBox = Hive.isBoxOpen('photos')
+        ? Hive.box<Photo>('photos')
+        : await Hive.openBox<Photo>('photos');
+    final referencedNames = <String>{};
+
+    for (final photo in photoBox.values) {
+      if (photo.fileName.isNotEmpty) {
+        referencedNames.add(p.basename(photo.fileName));
+      }
+      if (photo.path.isNotEmpty &&
+          _isInsideDirectory(photo.path, photosDir.path)) {
+        referencedNames.add(p.basename(photo.path));
+      }
+      final preview = photo.videoPreview;
+      if (preview != null && preview.isNotEmpty) {
+        referencedNames.add(p.basename(preview));
+      }
+    }
+
+    var deletedBytes = 0;
+    await for (final entity in photosDir.list(followLinks: false)) {
+      if (entity is! File) continue;
+      final name = p.basename(entity.path);
+      if (referencedNames.contains(name)) continue;
+      try {
+        final size = await entity.length();
+        await entity.delete();
+        deletedBytes += size;
+        _log('deleted unreferenced photo file $name ${_formatBytes(size)}');
+      } catch (e) {
+        _log('failed to delete unreferenced photo file ${entity.path}: $e');
+      }
+    }
+
+    _log('clearUnreferencedPhotoFiles done ${_formatBytes(deletedBytes)}');
+    return deletedBytes;
   }
 
   static String formatBytes(int bytes) => _formatBytes(bytes);
@@ -238,8 +285,15 @@ class StorageDiagnosticsService {
         name == 'backup_build' ||
         name == 'backup_restore' ||
         name == 'backup_fallback' ||
+        name == _videoThumbsCacheDirName ||
         name.contains(appId) ||
         name == 'hive_backup.zip';
+  }
+
+  static bool _isInsideDirectory(String filePath, String directoryPath) {
+    if (filePath.isEmpty) return false;
+    return p.equals(filePath, directoryPath) ||
+        p.isWithin(directoryPath, filePath);
   }
 
   static Future<int> _scopedTempSize(
@@ -300,19 +354,6 @@ class StorageDiagnosticsService {
     }
     _log('scoped prefs size => ${_formatBytes(total)}');
     return total;
-  }
-
-  static Future<void> _clearDirectory(Directory dir) async {
-    if (!await dir.exists()) {
-      return;
-    }
-    await for (final entity in dir.list(recursive: false, followLinks: false)) {
-      try {
-        await entity.delete(recursive: true);
-      } catch (_) {
-        // ignore delete errors
-      }
-    }
   }
 
   static Future<void> _clearScopedTemp(

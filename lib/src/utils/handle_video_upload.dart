@@ -1,10 +1,12 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
 
 // ✅ Уже используешь в проекте — добавляем сюда для macOS превью
 import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
@@ -34,22 +36,24 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
     );
 
     if (previewPath == null) {
-      print('[Thumb] Error: previewPath is null');
+      debugPrint('[Thumb] Error: previewPath is null');
       return null;
     }
 
     final outFile = File(finalThumbnailPath);
     if (!await outFile.exists()) {
-      print('[Thumb] Error: итоговый thumbnail не существует: $finalThumbnailPath');
+      debugPrint(
+          '[Thumb] Error: итоговый thumbnail не существует: $finalThumbnailPath');
       return null;
     }
     final fileSize = await outFile.length();
     if (fileSize == 0) {
-      print('[Thumb] Error: thumbnail файл 0 байт: $finalThumbnailPath');
+      debugPrint('[Thumb] Error: thumbnail файл 0 байт: $finalThumbnailPath');
       return null;
     }
     if (!await _isValidJpegFile(outFile)) {
-      print('[Thumb] Error: thumbnail невалидный JPEG: $finalThumbnailPath');
+      debugPrint(
+          '[Thumb] Error: thumbnail невалидный JPEG: $finalThumbnailPath');
       return null;
     }
 
@@ -67,7 +71,7 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
       'videoHeight': videoSize.height,
     };
   } catch (e, st) {
-    print('Ошибка при генерации миниатюры видео: $e\n$st');
+    debugPrint('Ошибка при генерации миниатюры видео: $e\n$st');
     return null;
   }
 }
@@ -75,6 +79,7 @@ Future<Map<String, dynamic>?> generateVideoThumbnail(Photo video) async {
 Future<String?> convertVideoToMp4IfNeeded({
   required String inputPath,
   required String outputDir,
+  String? outputFileName,
 }) async {
   if (!Platform.isMacOS) return null;
 
@@ -84,7 +89,13 @@ Future<String?> convertVideoToMp4IfNeeded({
 
   final baseName = p.basenameWithoutExtension(inputPath).trim();
   final safeBase = baseName.isEmpty ? 'video' : baseName;
-  final outputPath = _uniqueOutputPath(outputDir, safeBase, '.mp4');
+  final desiredFileName = outputFileName?.trim().isNotEmpty == true
+      ? outputFileName!
+      : '$safeBase.mp4';
+  final outputPath = p.join(
+    outputDir,
+    uniqueFileNameInDirectory(Directory(outputDir), desiredFileName),
+  );
 
   final existing = File(outputPath);
   if (await existing.exists() && await existing.length() > 0) {
@@ -100,7 +111,7 @@ Future<String?> convertVideoToMp4IfNeeded({
     '-y ${_q(outputPath)}',
   ].join(' ');
 
-  print('[Convert][FFmpeg] $cmd');
+  debugPrint('[Convert][FFmpeg] $cmd');
 
   final session = await FFmpegKit.execute(cmd);
   final rc = await session.getReturnCode();
@@ -108,15 +119,15 @@ Future<String?> convertVideoToMp4IfNeeded({
   if (!ReturnCode.isSuccess(rc)) {
     final logs = await session.getLogs();
     for (final l in logs) {
-      print('[Convert][FFmpeg] ${l.getMessage()}');
+      debugPrint('[Convert][FFmpeg] ${l.getMessage()}');
     }
-    print('[Convert][FFmpeg] FAILED rc=$rc');
+    debugPrint('[Convert][FFmpeg] FAILED rc=$rc');
     return null;
   }
 
   final outFile = File(outputPath);
   if (!await outFile.exists() || await outFile.length() == 0) {
-    print('[Convert][FFmpeg] Output invalid: $outputPath');
+    debugPrint('[Convert][FFmpeg] Output invalid: $outputPath');
     return null;
   }
 
@@ -130,7 +141,7 @@ Future<String?> _createThumbnailFileCrossPlatform({
 }) async {
   final videoFile = File(videoPath);
   if (!await videoFile.exists()) {
-    print('[Thumb] Video not found: $videoPath');
+    debugPrint('[Thumb] Video not found: $videoPath');
     return null;
   }
 
@@ -162,17 +173,18 @@ Future<String?> _createThumbnailFileCrossPlatform({
   );
 
   if (generatedPath == null) {
-    print('[Thumb] video_thumbnail.thumbnailFile вернул null (platform=${Platform.operatingSystem})');
+    debugPrint(
+        '[Thumb] video_thumbnail.thumbnailFile вернул null (platform=${Platform.operatingSystem})');
     return null;
   }
 
   final genFile = File(generatedPath);
   if (!await genFile.exists()) {
-    print('[Thumb] generated thumbnail file not found: $generatedPath');
+    debugPrint('[Thumb] generated thumbnail file not found: $generatedPath');
     return null;
   }
   if (!await _isValidJpegFile(genFile)) {
-    print('[Thumb] generated thumbnail invalid JPEG: $generatedPath');
+    debugPrint('[Thumb] generated thumbnail invalid JPEG: $generatedPath');
     return null;
   }
 
@@ -201,7 +213,7 @@ Future<String?> _createThumbnailWithFfmpeg({
     '-y $safeOut',
   ].join(' ');
 
-  print('[Thumb][FFmpeg] $cmd');
+  debugPrint('[Thumb][FFmpeg] $cmd');
 
   final session = await FFmpegKit.execute(cmd);
   final rc = await session.getReturnCode();
@@ -209,23 +221,23 @@ Future<String?> _createThumbnailWithFfmpeg({
   if (!ReturnCode.isSuccess(rc)) {
     final logs = await session.getLogs();
     for (final l in logs) {
-      print('[Thumb][FFmpeg] ${l.getMessage()}');
+      debugPrint('[Thumb][FFmpeg] ${l.getMessage()}');
     }
-    print('[Thumb][FFmpeg] FAILED rc=$rc');
+    debugPrint('[Thumb][FFmpeg] FAILED rc=$rc');
     return null;
   }
 
   final outFile = File(outPath);
   if (!await outFile.exists()) {
-    print('[Thumb][FFmpeg] Output not found: $outPath');
+    debugPrint('[Thumb][FFmpeg] Output not found: $outPath');
     return null;
   }
   if (await outFile.length() == 0) {
-    print('[Thumb][FFmpeg] Output is 0 bytes: $outPath');
+    debugPrint('[Thumb][FFmpeg] Output is 0 bytes: $outPath');
     return null;
   }
   if (!await _isValidJpegFile(outFile)) {
-    print('[Thumb][FFmpeg] Output invalid JPEG: $outPath');
+    debugPrint('[Thumb][FFmpeg] Output invalid JPEG: $outPath');
     return null;
   }
 
@@ -233,16 +245,6 @@ Future<String?> _createThumbnailWithFfmpeg({
 }
 
 String _q(String s) => '"${s.replaceAll('"', r'\"')}"';
-
-String _uniqueOutputPath(String dir, String baseName, String ext) {
-  String candidate = p.join(dir, '$baseName$ext');
-  int i = 1;
-  while (File(candidate).existsSync()) {
-    candidate = p.join(dir, '$baseName ($i)$ext');
-    i++;
-  }
-  return candidate;
-}
 
 Future<bool> _isValidJpegFile(File file) async {
   try {
