@@ -483,15 +483,29 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     }
   }
 
+  Future<void> _toggleVideoPlayback() async {
+    final c = _videoController;
+    if (c == null || !c.value.isInitialized) return;
+    if (c.value.isPlaying) {
+      await c.pause();
+    } else {
+      await c.play();
+    }
+    if (mounted) setState(() {});
+  }
+
   Future<void> _trimVideoToNewFile() async {
     final c = _videoController;
     if (_saving || c == null || !c.value.isInitialized) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final navigator = Navigator.maybeOf(context);
+    final photoBloc = context.read<PhotoBloc>();
 
     final duration = c.value.duration;
     final startMs = (duration.inMilliseconds * _trimStartFrac).round();
     final endMs = (duration.inMilliseconds * _trimEndFrac).round();
     if (endMs <= startMs + 200) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger?.showSnackBar(
         const SnackBar(content: Text('Trim range is too small')),
       );
       return;
@@ -529,7 +543,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     if (!ReturnCode.isSuccess(rc)) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(content: Text('Trim failed')),
         );
       }
@@ -540,7 +554,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     if (!await outFile.exists() || await outFile.length() == 0) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(content: Text('Trim failed')),
         );
       }
@@ -572,7 +586,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
     if (mounted) {
       widget.onAddNewPhoto?.call(newPhoto);
-      context.read<PhotoBloc>().add(AddPhoto(newPhoto));
+      photoBloc.add(AddPhoto(newPhoto));
     }
 
     if (mounted) {
@@ -580,13 +594,16 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         _saving = false;
         _exportProgress = null;
       });
-      Navigator.of(context).pop();
+      navigator?.pop();
     }
   }
 
   Future<void> _exportVideoToNewFile() async {
     final c = _videoController;
     if (_saving || c == null || !c.value.isInitialized) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final navigator = Navigator.maybeOf(context);
+    final photoBloc = context.read<PhotoBloc>();
 
     setState(() {
       _saving = true;
@@ -684,7 +701,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     if (!ReturnCode.isSuccess(rc)) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(content: Text('Export failed')),
         );
       }
@@ -695,7 +712,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     if (!await outFile.exists() || await outFile.length() == 0) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(content: Text('Export failed')),
         );
       }
@@ -727,7 +744,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
 
     if (mounted) {
       widget.onAddNewPhoto?.call(newPhoto);
-      context.read<PhotoBloc>().add(AddPhoto(newPhoto));
+      photoBloc.add(AddPhoto(newPhoto));
     }
 
     if (mounted) {
@@ -735,12 +752,14 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         _saving = false;
         _exportProgress = null;
       });
-      Navigator.of(context).pop();
+      navigator?.pop();
     }
   }
 
   Future<void> _save(bool overwrite) async {
     if (_saving) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final navigator = Navigator.maybeOf(context);
 
     setState(() {
       _saving = true;
@@ -821,11 +840,11 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
           });
           await _loadCurrentSize();
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
+          messenger?.showSnackBar(
             const SnackBar(content: Text('Changes saved')),
           );
         } else {
-          Navigator.of(context).pop();
+          navigator?.pop();
         }
         return;
       }
@@ -894,7 +913,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
       if (outBytes.isEmpty) {
         if (!mounted) return;
         setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(content: Text('Failed to decode image')),
         );
         return;
@@ -925,16 +944,16 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
         });
         await _loadCurrentSize();
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger?.showSnackBar(
           const SnackBar(content: Text('Changes saved')),
         );
       } else {
-        Navigator.of(context).pop();
+        navigator?.pop();
       }
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger?.showSnackBar(
         SnackBar(content: Text('Save failed: $e')),
       );
     }
@@ -989,6 +1008,12 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
           ),
           _buildVideoInfoRow(),
           _buildVideoExportSettingsPanel(),
+          _buildCommentAndDesktopActions(
+            isMacOSDesktop: isMacOSDesktop,
+            panelAltColor: panelAltColor,
+            textColor: textColor,
+            subtleTextColor: subtleTextColor,
+          ),
         ],
       );
     }
@@ -1060,28 +1085,16 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                       ],
                       const SizedBox(width: 12),
                       Expanded(
-                        child: TextField(
-                          controller: _commentController,
+                        child: _buildCommentField(
+                          panelAltColor: panelAltColor,
+                          textColor: textColor,
+                          subtleTextColor: subtleTextColor,
                           maxLines: 1,
                           minLines: 1,
-                          textInputAction: TextInputAction.newline,
-                          style: TextStyle(color: textColor),
-                          decoration: InputDecoration(
-                            hintText: 'Comment',
-                            hintStyle: TextStyle(color: subtleTextColor),
-                            filled: true,
-                            fillColor: panelAltColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide.none,
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                          ),
                         ),
                       ),
+                      const SizedBox(width: 12),
+                      _buildActionButtons(compact: true),
                     ],
                   )
                 : Column(
@@ -1123,30 +1136,151 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      TextField(
-                        controller: _commentController,
+                      _buildCommentField(
+                        panelAltColor: panelAltColor,
+                        textColor: textColor,
+                        subtleTextColor: subtleTextColor,
                         maxLines: 3,
                         minLines: 2,
-                        textInputAction: TextInputAction.newline,
-                        style: TextStyle(color: textColor),
-                        decoration: InputDecoration(
-                          hintText: 'Comment',
-                          hintStyle: TextStyle(color: subtleTextColor),
-                          filled: true,
-                          fillColor: panelAltColor,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                        ),
                       ),
                     ],
                   ),
           ),
+        if (_currentSizeBytes == null && isMacOSDesktop)
+          _buildCommentAndDesktopActions(
+            isMacOSDesktop: isMacOSDesktop,
+            panelAltColor: panelAltColor,
+            textColor: textColor,
+            subtleTextColor: subtleTextColor,
+          ),
+      ],
+    );
+  }
+
+  Widget _buildCommentAndDesktopActions({
+    required bool isMacOSDesktop,
+    required Color panelAltColor,
+    required Color textColor,
+    required Color subtleTextColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: isMacOSDesktop
+          ? Row(
+              children: [
+                Expanded(
+                  child: _buildCommentField(
+                    panelAltColor: panelAltColor,
+                    textColor: textColor,
+                    subtleTextColor: subtleTextColor,
+                    maxLines: 1,
+                    minLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _buildActionButtons(compact: true),
+              ],
+            )
+          : _buildCommentField(
+              panelAltColor: panelAltColor,
+              textColor: textColor,
+              subtleTextColor: subtleTextColor,
+              maxLines: 3,
+              minLines: 2,
+            ),
+    );
+  }
+
+  Widget _buildCommentField({
+    required Color panelAltColor,
+    required Color textColor,
+    required Color subtleTextColor,
+    required int maxLines,
+    required int minLines,
+  }) {
+    return TextField(
+      controller: _commentController,
+      maxLines: maxLines,
+      minLines: minLines,
+      textInputAction: TextInputAction.newline,
+      style: TextStyle(color: textColor),
+      decoration: InputDecoration(
+        hintText: 'Comment',
+        hintStyle: TextStyle(color: subtleTextColor),
+        filled: true,
+        fillColor: panelAltColor,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionButtons({required bool compact}) {
+    final appColors = context.appThemeColors;
+    final primaryStyle = ElevatedButton.styleFrom(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 16 : 12,
+        vertical: compact ? 12 : 14,
+      ),
+    );
+    final secondaryStyle = OutlinedButton.styleFrom(
+      backgroundColor: appColors.surface.withValues(alpha: 0.92),
+      foregroundColor: appColors.text,
+      side: BorderSide(color: appColors.border),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 16 : 12,
+        vertical: compact ? 12 : 14,
+      ),
+    );
+
+    final buttons = _isVideo
+        ? <Widget>[
+            OutlinedButton(
+              onPressed: _saving ? null : _trimVideoToNewFile,
+              style: secondaryStyle,
+              child: const Text('Cut video'),
+            ),
+            ElevatedButton(
+              onPressed: _saving ? null : _exportVideoToNewFile,
+              style: primaryStyle,
+              child: const Text('Save as new file'),
+            ),
+          ]
+        : <Widget>[
+            OutlinedButton(
+              onPressed: _saving ? null : () => _save(false),
+              style: secondaryStyle,
+              child: const Text('Save as new file'),
+            ),
+            ElevatedButton(
+              onPressed: _saving ? null : () => _save(true),
+              style: primaryStyle,
+              child: const Text('Overwrite'),
+            ),
+          ];
+
+    if (compact) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          buttons[0],
+          const SizedBox(width: 10),
+          buttons[1],
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: buttons[0]),
+        const SizedBox(width: 12),
+        Expanded(child: buttons[1]),
       ],
     );
   }
@@ -1172,45 +1306,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                   ],
                 ),
               ),
-              child: Row(
-                children: [
-                  if (_isVideo)
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _saving ? null : _trimVideoToNewFile,
-                              child: const Text('Cut video'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: _saving ? null : _exportVideoToNewFile,
-                              child: const Text('Save new file'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  else ...[
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _save(false),
-                        child: const Text('Save as New'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton(
-                        onPressed: () => _save(true),
-                        child: const Text('Overwrite'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              child: _buildActionButtons(compact: false),
             ),
           ),
         ),
@@ -1258,7 +1354,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
               onCollages: () => Navigator.pushNamed(context, '/my_collages'),
               onTags: () => Navigator.pushNamed(context, '/all_tags'),
               onSettings: _openSettings,
-              title: 'Edit Photo',
+              title: 'EDIT',
               rightAfterSettings: IconButton(
                 tooltip: 'Close editor',
                 onPressed: _saving ? null : () => Navigator.of(context).pop(),
@@ -1284,7 +1380,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
               ),
             )
           : AppBar(
-              title: const Text('Edit Photo'),
+              title: const Text('EDIT'),
               actions: [
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -1303,7 +1399,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
             accentColor: accentColor,
             colorScheme: colorScheme,
           ),
-          _buildBottomActionBar(panelColor),
+          if (!isMacOSDesktop) _buildBottomActionBar(panelColor),
         ],
       ),
       body: Stack(
@@ -1485,7 +1581,31 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                   borderRadius: BorderRadius.circular(10),
                   child: ColoredBox(
                     color: Colors.black,
-                    child: VideoPlayer(controller),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _toggleVideoPlayback,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          VideoPlayer(controller),
+                          if (!controller.value.isPlaying)
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.42),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Icon(
+                                  Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
