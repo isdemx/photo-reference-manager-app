@@ -98,7 +98,7 @@ class _MacosMainScreenState extends State<MacosMainScreen> {
       body: Row(
         children: [
           AnimatedContainer(
-            width: _sidebarOpen ? 220 : 0,
+            width: _sidebarOpen ? MacosSidebar.preferredWidth : 0,
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeOut,
             child: _sidebarOpen

@@ -130,6 +130,9 @@ class BackupService {
 
   static bool get isRunning => _isRunning;
 
+  static bool get _usesDesktopSaveDialog =>
+      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
   static void cancelCurrent() {
     final token = _activeCancelToken;
     if (token == null) return;
@@ -480,7 +483,7 @@ class BackupService {
           isActive: true,
           isFinal: false,
           canceling: false,
-          phaseLabel: Platform.isMacOS
+          phaseLabel: _usesDesktopSaveDialog
               ? 'Choose where to save backup...'
               : _phaseLabel(_BackupPhase.sharing),
           progress: 100,
@@ -543,7 +546,7 @@ class BackupService {
           isActive: false,
           isFinal: true,
           canceling: false,
-          phaseLabel: Platform.isMacOS ? 'Save canceled' : 'Share canceled',
+          phaseLabel: _usesDesktopSaveDialog ? 'Save canceled' : 'Share canceled',
           progress: 100,
           copiedMediaFiles: progressNotifier.value?.copiedMediaFiles ?? 0,
           totalMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
@@ -554,7 +557,9 @@ class BackupService {
       messenger?.showSnackBar(
         SnackBar(
           content: Text(
-            Platform.isMacOS ? 'Backup save canceled' : 'Backup share canceled',
+            _usesDesktopSaveDialog
+                ? 'Backup save canceled'
+                : 'Backup share canceled',
           ),
         ),
       );
@@ -594,17 +599,20 @@ class BackupService {
   }) async {
     final fileName = p.basename(zipPath);
 
-    if (!kIsWeb && Platform.isMacOS) {
+    if (_usesDesktopSaveDialog) {
       print('[Backup] Открываем системное окно Save As...');
-      final destinationPath = await FilePicker.platform.saveFile(
+      final pickedPath = await FilePicker.platform.saveFile(
         dialogTitle: 'Save backup',
         fileName: fileName,
         type: FileType.custom,
         allowedExtensions: const ['zip'],
       );
-      if (destinationPath == null || destinationPath.isEmpty) {
+      if (pickedPath == null || pickedPath.isEmpty) {
         throw _BackupDeliveryCanceledException();
       }
+      final destinationPath = pickedPath.toLowerCase().endsWith('.zip')
+          ? pickedPath
+          : '$pickedPath.zip';
       if (destinationPath != zipPath) {
         await File(zipPath).copy(destinationPath);
       }

@@ -19,8 +19,10 @@ class MacosPalette {
     if (!isLight) {
       return colors.surfaceAlt;
     }
-    return Color.lerp(colors.surfaceAlt, colors.text, 0.14) ?? colors.surfaceAlt;
+    return Color.lerp(colors.surfaceAlt, colors.text, 0.14) ??
+        colors.surfaceAlt;
   }
+
   static Color border(BuildContext context) => context.appThemeColors.border;
   static Color subtle(BuildContext context) => context.appThemeColors.subtle;
   static Color text(BuildContext context) => context.appThemeColors.text;
@@ -51,7 +53,7 @@ class MacosTypography {
 }
 
 class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
-  static const double barHeight = 36.0;
+  static const double barHeight = 30.0;
   final VoidCallback onToggleSidebar;
   final VoidCallback onOpenNewWindow;
   final VoidCallback onBack;
@@ -100,13 +102,12 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: MacosPalette.topBar(context),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0x20000000),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: MacosPalette.border(context),
+                      width: 1,
                     ),
-                  ],
+                  ),
                 ),
                 child: const SizedBox(height: barHeight),
               ),
@@ -145,7 +146,7 @@ class MacosTopBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
                     const Spacer(),
-                    _TopBarIcon(icon: Iconsax.import_1, onTap: onUpload),
+                    _TopBarIcon(icon: Iconsax.add, onTap: onUpload),
                     const SizedBox(width: 8),
                     _TopBarIcon(icon: Iconsax.gallery, onTap: onAllPhotos),
                     const SizedBox(width: 8),
@@ -334,6 +335,9 @@ class MacosSectionHeader extends StatelessWidget {
 }
 
 class MacosSidebar extends StatelessWidget {
+  /// Desktop sidebar width (single source of truth for animated rails).
+  static const double preferredWidth = 168;
+
   final VoidCallback onMain;
   final VoidCallback onAllPhotos;
   final VoidCallback onCollages;
@@ -355,22 +359,21 @@ class MacosSidebar extends StatelessWidget {
     }
 
     return Container(
-      width: 220,
+      width: preferredWidth,
       decoration: BoxDecoration(
         color: MacosPalette.surface(context),
-        boxShadow: [
-          BoxShadow(
-            color: Color(0x22000000),
-            blurRadius: 12,
-            offset: Offset(2, 0),
+        border: Border(
+          right: BorderSide(
+            color: MacosPalette.border(context),
+            width: 1,
           ),
-        ],
+        ),
       ),
       child: Column(
         children: [
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
               children: [
                 Text('Navigate', style: MacosTypography.section(context)),
                 const SizedBox(height: 12),
@@ -400,7 +403,7 @@ class MacosSidebar extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             child: Column(
               children: [
                 Divider(height: 1, color: MacosPalette.border(context)),

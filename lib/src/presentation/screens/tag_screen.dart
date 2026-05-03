@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
@@ -13,6 +10,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/tags_helper
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_top_center_action.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
@@ -39,8 +37,7 @@ class _TagScreenState extends State<TagScreen> {
   bool _isMasonryLayout = true;
   bool _sortBySizeEnabled = false;
 
-  bool get _isDesktop =>
-      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  bool get _isDesktop => isDesktopPlatform;
 
   @override
   void initState() {
@@ -97,7 +94,7 @@ class _TagScreenState extends State<TagScreen> {
     return Row(
       children: [
         AnimatedContainer(
-          width: _sidebarOpen ? 220 : 0,
+          width: _sidebarOpen ? MacosSidebar.preferredWidth : 0,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
           child: _sidebarOpen

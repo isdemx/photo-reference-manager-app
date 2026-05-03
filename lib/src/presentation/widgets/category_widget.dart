@@ -60,12 +60,17 @@ class CategoryWidget extends StatelessWidget {
                         (showPrivate ||
                             (folder.isPrivate == null ||
                                 folder.isPrivate == false));
-                  }).toList();
+                  }).toList()
+                    ..sort(
+                      (a, b) =>
+                          a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+                    );
 
                   return LayoutBuilder(
                     builder: (context, constraints) {
                       // Ширина одной папки (адаптивная, между 200 и 300px)
-                      final double folderWidth = constraints.maxWidth < 600 ? 130.0 : 200.0;
+                      final double folderWidth =
+                          constraints.maxWidth < 600 ? 130.0 : 200.0;
                       final int crossAxisCount =
                           (constraints.maxWidth / folderWidth).floor();
 
@@ -74,7 +79,8 @@ class CategoryWidget extends StatelessWidget {
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount: folders.length + 1, // +1 для кнопки "+"
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: crossAxisCount, // Динамическое количество колонок
+                          crossAxisCount:
+                              crossAxisCount, // Динамическое количество колонок
                           childAspectRatio: 1, // Квадратные ячейки
                           mainAxisSpacing: 8.0,
                           crossAxisSpacing: 8.0,

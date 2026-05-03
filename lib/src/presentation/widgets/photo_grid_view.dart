@@ -1,6 +1,7 @@
 // lib/src/presentation/widgets/photo_grid_view.dart
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -15,6 +16,7 @@ import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
 
 import 'package:photographers_reference_app/src/presentation/helpers/custom_snack_bar.dart';
+import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/images_helpers.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/tags_helpers.dart';
 
@@ -24,16 +26,16 @@ import 'package:photographers_reference_app/src/presentation/screens/video_gener
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_photo.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/column_slider.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/desktop_context_menu.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/filter_panel.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_thumbnail.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_view_overlay.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 
 // Быстрое чтение размеров из заголовков (без полного декода пикселей)
 import 'package:image_size_getter/image_size_getter.dart';
@@ -75,10 +77,12 @@ class PhotoGridViewState extends State<PhotoGridView> {
   final Set<String> _dragToggledIds = {};
 
   // ---------------- Layout / prefs ----------------
-  bool get _isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
+  bool get _isDesktop => isDesktopPlatform;
   static const double _multiBarHeight = 96.0;
+  static const double _desktopBottomBarHeight = 42.0;
 
   int _columnCount = 3;
+  double _desktopTileExtent = 140.0;
   bool _isPinterestLayout = true;
   bool _showFilterPanel = false;
   bool _isSharing = false;
@@ -283,23 +287,39 @@ class PhotoGridViewState extends State<PhotoGridView> {
 
   void _onDonePressed() => _turnMultiSelectModeOff();
 
-  void _onSelectedViewPressed() {
-    if (_selectedPhotos.isEmpty) return;
+  void _onSelectedViewPressed() => _openFullscreenForPhotos(_selectedPhotos);
+
+  void _openFullscreenForPhotos(List<Photo> photos) {
+    if (photos.isEmpty || !mounted) return;
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            PhotoViewerScreen(photos: _selectedPhotos, initialIndex: 0),
+        builder: (_) => PhotoViewerScreen(photos: photos, initialIndex: 0),
       ),
     );
   }
 
-  Future<void> _onSelectedSharePressed(BuildContext context) async {
-    if (_selectedPhotos.isEmpty) return;
+  Future<void> _tagsDialogFor(List<Photo> photos) async {
+    final changed = await TagsHelpers.showAddTagToImagesDialog(context, photos);
+    if (!mounted) return;
+    if (changed && _isMultiSelect) _turnMultiSelectModeOff();
+  }
+
+  Future<void> _folderDialogFor(List<Photo> photos) async {
+    final res = await FoldersHelpers.showAddToFolderDialog(context, photos);
+    if (!mounted) return;
+    if (res) {
+      CustomSnackBar.showSuccess(context, 'Applied');
+      if (_isMultiSelect) _turnMultiSelectModeOff();
+    }
+  }
+
+  Future<void> _sharePhotos(BuildContext context, List<Photo> photos) async {
+    if (photos.isEmpty) return;
     setState(() => _isSharing = true);
     try {
-      final ok = await ImagesHelpers.sharePhotos(context, _selectedPhotos);
-      if (ok) _turnMultiSelectModeOff();
+      final ok = await ImagesHelpers.sharePhotos(context, photos);
+      if (ok && _isMultiSelect) _turnMultiSelectModeOff();
     } catch (_) {
       // ignore
     } finally {
@@ -307,8 +327,9 @@ class PhotoGridViewState extends State<PhotoGridView> {
     }
   }
 
-  Future<void> _onSelectedDownloadPressed(BuildContext context) async {
-    if (!_isMacOS || _selectedPhotos.isEmpty) return;
+  Future<void> _downloadPhotosToFolder(
+      BuildContext context, List<Photo> photos) async {
+    if (!_isDesktop || photos.isEmpty) return;
 
     final messenger = ScaffoldMessenger.of(context);
     final destinationDirectory = await FilePicker.platform.getDirectoryPath(
@@ -317,10 +338,10 @@ class PhotoGridViewState extends State<PhotoGridView> {
     if (destinationDirectory == null || destinationDirectory.isEmpty) return;
 
     setState(() => _isSharing = true);
-    final total = _selectedPhotos.length;
+    final total = photos.length;
     var copied = 0;
     try {
-      for (final photo in List<Photo>.from(_selectedPhotos)) {
+      for (final photo in List<Photo>.from(photos)) {
         try {
           final sourceFile = File(_resolveOriginalPhotoPath(photo));
           if (!await sourceFile.exists()) continue;
@@ -382,31 +403,272 @@ class PhotoGridViewState extends State<PhotoGridView> {
     if (photos.isEmpty) return;
     final ok =
         await ImagesHelpers.deleteImagesWithConfirmation(context, photos);
-    if (ok) _turnMultiSelectModeOff();
+    if (ok && _isMultiSelect) _turnMultiSelectModeOff();
   }
 
-  void _onVideoGeneratorPressed(BuildContext context) {
+  void _onVideoGeneratorPressed(BuildContext context) =>
+      _openVideoGenerator(context, _selectedPhotos);
+
+  void _openVideoGenerator(BuildContext context, List<Photo> photos) {
+    if (photos.isEmpty) return;
     showModalBottomSheet(
       context: context,
-      builder: (context) => VideoGeneratorWidget(photos: _selectedPhotos),
+      builder: (context) => VideoGeneratorWidget(photos: photos),
     );
   }
 
-  void _onCollageGeneratorPressed(BuildContext context) {
-    if (_selectedPhotos.isEmpty) return;
+  void _onCollageGeneratorPressed(BuildContext context) =>
+      _openCollageGenerator(context, _selectedPhotos);
+
+  void _openCollageGenerator(BuildContext context, List<Photo> photos) {
+    if (photos.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => Scaffold(
           body: PhotoCollageWidget(
             key: const ValueKey('photo_collage_widget'),
-            photos: _selectedPhotos,
+            photos: photos,
             allPhotos: widget.photos,
             startWithSelectedPhotos: true,
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildDesktopBottomBar(BuildContext context) {
+    final colors = context.appThemeColors;
+    final theme = Theme.of(context);
+    const minTileExtent = 72.0;
+    const maxTileExtent = 260.0;
+    final value = _desktopTileExtent.clamp(minTileExtent, maxTileExtent);
+    final sliderTheme = SliderTheme.of(context).copyWith(
+      trackHeight: 2,
+      activeTrackColor: colors.accent.withValues(alpha: 0.75),
+      inactiveTrackColor: colors.subtle.withValues(alpha: 0.24),
+      thumbColor: colors.text.withValues(alpha: 0.82),
+      overlayColor: colors.accent.withValues(alpha: 0.10),
+      valueIndicatorColor: colors.surfaceAlt,
+      valueIndicatorTextStyle: TextStyle(
+        color: colors.text,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      ),
+    );
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.surfaceAlt.withValues(alpha: 0.96),
+          border: Border(
+            top: BorderSide(
+              color: colors.border,
+              width: 1,
+            ),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: colors.overlay.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: SizedBox(
+          height: _desktopBottomBarHeight,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Row(
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 120),
+                  child: _isMultiSelect
+                      ? Row(
+                          key: const ValueKey('desktop-multiselect-actions'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _desktopBarIconButton(
+                              icon: Iconsax.eye,
+                              tooltip: 'View chosen media in Fullscreen',
+                              onPressed: _onSelectedViewPressed,
+                            ),
+                            _desktopBarIconButton(
+                              icon: Iconsax.tag,
+                              tooltip: 'Add / remove tag for selected photos',
+                              onPressed: () => _tagsDialogFor(_selectedPhotos),
+                            ),
+                            _desktopBarIconButton(
+                              icon: Iconsax.folder_add,
+                              tooltip: 'Add media to folder',
+                              onPressed: () =>
+                                  _folderDialogFor(_selectedPhotos),
+                            ),
+                            _desktopBarIconButton(
+                              icon: Iconsax.video_add,
+                              tooltip: 'Create video slideshow',
+                              onPressed: () =>
+                                  _onVideoGeneratorPressed(context),
+                            ),
+                            _desktopBarIconButton(
+                              icon: Iconsax.grid_3,
+                              tooltip: 'Create free collage',
+                              onPressed: () =>
+                                  _onCollageGeneratorPressed(context),
+                            ),
+                            _desktopBarIconButton(
+                              icon: Icons.file_download_outlined,
+                              tooltip: 'Download chosen media',
+                              onPressed: () => _downloadPhotosToFolder(
+                                context,
+                                _selectedPhotos,
+                              ),
+                            ),
+                            _desktopBarIconButton(
+                              icon: Iconsax.trash,
+                              tooltip: 'Delete chosen media',
+                              color: theme.colorScheme.error,
+                              onPressed: () =>
+                                  _onDeletePressed(context, _selectedPhotos),
+                            ),
+                          ],
+                        )
+                      : const SizedBox(
+                          key: ValueKey('desktop-no-multiselect-actions'),
+                        ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: 190,
+                  child: SliderTheme(
+                    data: sliderTheme,
+                    child: Slider(
+                      value: value,
+                      min: minTileExtent,
+                      max: maxTileExtent,
+                      divisions: (maxTileExtent - minTileExtent).round(),
+                      label: 'Size: ${_desktopTileExtent.round()}',
+                      onChanged: _updateDesktopTileExtent,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _desktopBarIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    Color? color,
+  }) {
+    final colors = context.appThemeColors;
+    return IconButton(
+      icon: Icon(icon, size: 18),
+      color: color ?? colors.text,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+      style: IconButton.styleFrom(
+        foregroundColor: color ?? colors.text,
+        hoverColor: colors.accent.withValues(alpha: 0.10),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+      ),
+    );
+  }
+
+  Future<void> _showDesktopPhotoContextMenu(
+    BuildContext context,
+    Photo photo,
+    Offset globalPosition,
+  ) async {
+    final choice = await DesktopContextMenu.show<String>(
+      context: context,
+      globalPosition: globalPosition,
+      items: [
+        DesktopContextMenu.item(
+          context: context,
+          value: 'view',
+          label: 'View fullscreen',
+        ),
+        DesktopContextMenu.divider(),
+        DesktopContextMenu.item(
+          context: context,
+          value: 'tag',
+          label: 'Add / remove tag',
+        ),
+        DesktopContextMenu.item(
+          context: context,
+          value: 'folder',
+          label: 'Add to folder',
+        ),
+        DesktopContextMenu.divider(),
+        DesktopContextMenu.item(
+          context: context,
+          value: 'video',
+          label: 'Create video slideshow',
+        ),
+        DesktopContextMenu.item(
+          context: context,
+          value: 'collage',
+          label: 'Create free collage',
+        ),
+        DesktopContextMenu.divider(),
+        DesktopContextMenu.item(
+          context: context,
+          value: 'export',
+          label: 'Download',
+        ),
+        DesktopContextMenu.item(
+          context: context,
+          value: 'delete',
+          label: 'Delete',
+          destructive: true,
+        ),
+      ],
+    );
+
+    if (choice == null || !context.mounted) return;
+
+    final batch = _isMultiSelect && _selectedPhotos.isNotEmpty
+        ? List<Photo>.from(_selectedPhotos)
+        : [photo];
+    switch (choice) {
+      case 'view':
+        _openFullscreenForPhotos(batch);
+        break;
+      case 'tag':
+        await _tagsDialogFor(batch);
+        break;
+      case 'folder':
+        await _folderDialogFor(batch);
+        break;
+      case 'video':
+        if (!context.mounted) return;
+        _openVideoGenerator(context, batch);
+        break;
+      case 'collage':
+        if (!context.mounted) return;
+        _openCollageGenerator(context, batch);
+        break;
+      case 'export':
+        if (!context.mounted) return;
+        await _downloadPhotosToFolder(context, batch);
+        break;
+      case 'delete':
+        if (!context.mounted) return;
+        await _onDeletePressed(context, batch);
+        break;
+    }
   }
 
   // ---------------- Drag-select ----------------
@@ -459,6 +721,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _columnCount = prefs.getInt('columnCount') ?? 3;
+      _desktopTileExtent = prefs.getDouble('desktopTileExtent') ?? 140.0;
       _isPinterestLayout = prefs.getBool('isPinterestLayout') ?? true;
     });
   }
@@ -466,6 +729,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
   Future<void> _savePreferences() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('columnCount', _columnCount);
+    await prefs.setDouble('desktopTileExtent', _desktopTileExtent);
     await prefs.setBool('isPinterestLayout', _isPinterestLayout);
   }
 
@@ -477,6 +741,90 @@ class PhotoGridViewState extends State<PhotoGridView> {
   void _updateColumnCount(int value) {
     setState(() => _columnCount = value);
     _savePreferences();
+  }
+
+  void _updateDesktopTileExtent(double value) {
+    setState(() => _desktopTileExtent = value);
+    _savePreferences();
+  }
+
+  Widget _buildPhotosSliver({
+    required List<Photo> photosFiltered,
+  }) {
+    if (!_isDesktop) {
+      return _buildPhotosGridSliver(
+        photosFiltered: photosFiltered,
+        crossAxisCount: _columnCount,
+      );
+    }
+
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 8.0;
+        final tileExtent = _desktopTileExtent.clamp(72.0, 260.0);
+        final availableWidth = constraints.crossAxisExtent;
+        final crossAxisCount = math.max(
+          1,
+          ((availableWidth + spacing) / (tileExtent + spacing)).floor(),
+        );
+        final usedWidth =
+            crossAxisCount * tileExtent + (crossAxisCount - 1) * spacing;
+        final trailingPadding = math.max(0.0, availableWidth - usedWidth);
+
+        return SliverPadding(
+          padding: EdgeInsets.only(right: trailingPadding),
+          sliver: _buildPhotosGridSliver(
+            photosFiltered: photosFiltered,
+            crossAxisCount: crossAxisCount,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPhotosGridSliver({
+    required List<Photo> photosFiltered,
+    required int crossAxisCount,
+  }) {
+    if (_isPinterestLayout) {
+      return SliverMasonryGrid.count(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: 8.0,
+        crossAxisSpacing: 8.0,
+        childCount: _visibleCount,
+        itemBuilder: (context, index) {
+          final photo = photosFiltered[index];
+          return _buildGridItem(
+            context,
+            index,
+            photo,
+            isPinterest: true,
+            currentList: photosFiltered,
+          );
+        },
+      );
+    }
+
+    return SliverGrid(
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        mainAxisSpacing: 8.0,
+        crossAxisSpacing: 8.0,
+      ),
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final photo = photosFiltered[index];
+          return _buildGridItem(
+            context,
+            index,
+            photo,
+            isPinterest: false,
+            currentList: photosFiltered,
+          );
+        },
+        childCount: _visibleCount,
+      ),
+    );
   }
 
   // ---------------- Пагинация видимого списка ----------------
@@ -690,6 +1038,9 @@ class PhotoGridViewState extends State<PhotoGridView> {
     final hasActiveFilters =
         filterState.filters.isNotEmpty && widget.showFilter;
     final sliderBottom = _isMultiSelect ? (_multiBarHeight + 16.0) : 26.0;
+    final gridBottomInset = _isDesktop
+        ? _desktopBottomBarHeight + 8.0
+        : (_isMultiSelect ? _multiBarHeight : 8.0);
 
     // Внутри build(), перед return Stack(...)
 // можно вычислить один раз текущий title:
@@ -825,57 +1176,24 @@ class PhotoGridViewState extends State<PhotoGridView> {
                           left: 8.0,
                           right: 8.0,
                           top: 8.0,
-                          bottom: _isMultiSelect ? _multiBarHeight : 8.0,
+                          bottom: gridBottomInset,
                         ),
-                        sliver: _isPinterestLayout
-                            ? SliverMasonryGrid.count(
-                                crossAxisCount: _columnCount,
-                                mainAxisSpacing: 8.0,
-                                crossAxisSpacing: 8.0,
-                                childCount: _visibleCount,
-                                itemBuilder: (context, index) {
-                                  final photo = photosFiltered[index];
-                                  return _buildGridItem(
-                                    context,
-                                    index,
-                                    photo,
-                                    isPinterest: true,
-                                    currentList: photosFiltered,
-                                  );
-                                },
-                              )
-                            : SliverGrid(
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: _columnCount,
-                                  mainAxisSpacing: 8.0,
-                                  crossAxisSpacing: 8.0,
-                                ),
-                                delegate: SliverChildBuilderDelegate(
-                                  (context, index) {
-                                    final photo = photosFiltered[index];
-                                    return _buildGridItem(
-                                      context,
-                                      index,
-                                      photo,
-                                      isPinterest: false,
-                                      currentList: photosFiltered,
-                                    );
-                                  },
-                                  childCount: _visibleCount,
-                                ),
-                              ),
+                        sliver: _buildPhotosSliver(
+                          photosFiltered: photosFiltered,
+                        ),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-            if (_isMacOS)
+            if (_isDesktop)
               AnimatedContainer(
                 width: _showFilterPanel ? 300 : 0,
                 duration: const Duration(milliseconds: 300),
-                padding: const EdgeInsets.only(bottom: 50),
+                padding: EdgeInsets.only(
+                  bottom: _isDesktop ? _desktopBottomBarHeight : 50,
+                ),
                 decoration: const BoxDecoration(
                   boxShadow: [BoxShadow(blurRadius: 4, color: Colors.black54)],
                 ),
@@ -905,13 +1223,15 @@ class PhotoGridViewState extends State<PhotoGridView> {
               child: CircularProgressIndicator(),
             ),
           ),
-        ColumnSlider(
-          initialCount: _columnCount,
-          columnCount: _columnCount,
-          bottomInset: sliderBottom,
-          onChanged: (value) => _updateColumnCount(value),
-        ),
-        if (_isMultiSelect)
+        if (!_isDesktop)
+          ColumnSlider(
+            initialCount: _columnCount,
+            columnCount: _columnCount,
+            bottomInset: sliderBottom,
+            onChanged: (value) => _updateColumnCount(value),
+          ),
+        if (_isDesktop) _buildDesktopBottomBar(context),
+        if (!_isDesktop && _isMultiSelect)
           Align(
             alignment: Alignment.bottomCenter,
             child: Container(
@@ -928,12 +1248,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
                   IconButton(
                     icon: const Icon(Iconsax.tag, color: Colors.white),
                     tooltip: 'Add / remove tag for selected photos',
-                    onPressed: () async {
-                      final changed =
-                          await TagsHelpers.showAddTagToImagesDialog(
-                              context, _selectedPhotos);
-                      if (changed) _turnMultiSelectModeOff();
-                    },
+                    onPressed: () => _tagsDialogFor(_selectedPhotos),
                   ),
                   AddToFolderWidget(
                     photos: _selectedPhotos,
@@ -954,15 +1269,17 @@ class PhotoGridViewState extends State<PhotoGridView> {
                   ),
                   IconButton(
                     icon: Icon(
-                      _isMacOS ? Icons.file_download_outlined : Iconsax.export,
+                      _isDesktop
+                          ? Icons.file_download_outlined
+                          : Iconsax.export,
                       color: Colors.white,
                     ),
-                    tooltip: _isMacOS
+                    tooltip: _isDesktop
                         ? 'Download chosen media'
                         : 'Share chosen media',
-                    onPressed: () => _isMacOS
-                        ? _onSelectedDownloadPressed(context)
-                        : _onSelectedSharePressed(context),
+                    onPressed: () => _isDesktop
+                        ? _downloadPhotosToFolder(context, _selectedPhotos)
+                        : _sharePhotos(context, _selectedPhotos),
                   ),
                   IconButton(
                     icon: const Icon(Iconsax.trash,
@@ -974,7 +1291,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
               ),
             ),
           ),
-        if (!_isMacOS && _showFilterPanel && widget.showFilter)
+        if (!_isDesktop && _showFilterPanel && widget.showFilter)
           Align(
             alignment: Alignment.topCenter,
             child: Container(
@@ -1021,6 +1338,33 @@ class PhotoGridViewState extends State<PhotoGridView> {
       }
     }
 
+    Widget thumbnail = PhotoThumbnail(
+      key: ValueKey('thumb_${photo.id}'),
+      photo: photo,
+      isPinterestLayout: isPinterest,
+      isSelected: isSelected,
+      fileSizeLabel: sizeLabel,
+      onPhotoTap: () => _onPhotoTap(context, index, currentList),
+      onLongPress: () {
+        vibrate();
+        _onThumbnailLongPress(context, photo);
+      },
+    );
+
+    if (_isDesktop) {
+      thumbnail = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onSecondaryTapDown: (details) {
+          _showDesktopPhotoContextMenu(
+            context,
+            photo,
+            details.globalPosition,
+          );
+        },
+        child: thumbnail,
+      );
+    }
+
     return Container(
       key: itemKey,
       child: Stack(
@@ -1029,18 +1373,7 @@ class PhotoGridViewState extends State<PhotoGridView> {
             aspectRatio: ratio > 0 ? ratio : 1.0,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: PhotoThumbnail(
-                key: ValueKey('thumb_${photo.id}'),
-                photo: photo,
-                isPinterestLayout: isPinterest,
-                isSelected: isSelected,
-                fileSizeLabel: sizeLabel,
-                onPhotoTap: () => _onPhotoTap(context, index, currentList),
-                onLongPress: () {
-                  vibrate();
-                  _onThumbnailLongPress(context, photo);
-                },
-              ),
+              child: thumbnail,
             ),
           ),
           if (isSelected)

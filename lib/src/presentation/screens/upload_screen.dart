@@ -1,6 +1,5 @@
 import 'package:exif/exif.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart'; // kIsWeb
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,6 +11,7 @@ import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dar
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart'; // <-- generateVideoThumbnail() здесь
 import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path_package;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -54,7 +54,7 @@ class _UploadScreenState extends State<UploadScreen> {
 
     try {
       // Если мы на iOS/Android, используем image_picker
-      if ((Platform.isIOS || Platform.isAndroid) && !kIsWeb) {
+      if (isMobilePlatform) {
         final media = await _picker.pickMultipleMedia();
         if (media.isNotEmpty) {
           selectedFiles = media;
@@ -66,19 +66,14 @@ class _UploadScreenState extends State<UploadScreen> {
           allowMultiple: true,
           // Можно оставить только изображения, либо расширить для видео
           type: FileType.custom,
-          allowedExtensions: (Platform.isIOS || Platform.isAndroid)
-              ? [
-                  'jpg', 'jpeg', 'png', 'gif', 'heic', 'heif', // фото
-                  'mp4', 'mov', 'avi', 'mkv', 'webm' // видео
-                ]
-              : [
-                  'jpg',
-                  'jpeg',
-                  'png',
-                  'gif',
-                  'heic',
-                  'heif',
-                ],
+          allowedExtensions: [
+            'jpg',
+            'jpeg',
+            'png',
+            'gif',
+            'heic',
+            'heif',
+          ],
         );
         if (result != null && result.files.isNotEmpty) {
           selectedFiles = result.files

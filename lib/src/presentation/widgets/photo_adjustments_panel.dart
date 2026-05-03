@@ -1,10 +1,10 @@
-import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage/action_icon_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage/mini_slider_widget.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class PhotoAdjustmentsPanel extends StatelessWidget {
   final VoidCallback onRotateLeft;
@@ -56,7 +56,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isIOS = Platform.isIOS;
+    final isMobile = isMobilePlatform;
     final appColors = context.appThemeColors;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
@@ -203,7 +203,7 @@ class PhotoAdjustmentsPanel extends StatelessWidget {
                 ),
             ];
 
-            if (isIOS) {
+            if (isMobile) {
               return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [

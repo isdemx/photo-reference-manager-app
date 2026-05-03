@@ -11,6 +11,7 @@ import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/repositories/photo_repository.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
 import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class PhotoRepositoryImpl implements PhotoRepository {
   final Box<Photo> photoBox;
@@ -56,7 +57,7 @@ class PhotoRepositoryImpl implements PhotoRepository {
         final ext = path_package.extension(newFile.path).toLowerCase();
         final isGif = ext == '.gif';
 
-        if (photo.mediaType == 'image' && Platform.isIOS && !isGif) {
+        if (photo.mediaType == 'image' && isMobilePlatform && !isGif) {
           // Обрабатываем только изображения
           if (compressSizeKb != 0) {
             final fileSizeKb = newFile.lengthSync() ~/ 1024;

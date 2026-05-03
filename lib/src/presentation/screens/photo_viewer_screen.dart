@@ -28,6 +28,7 @@ import 'package:photographers_reference_app/src/utils/date_format.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -93,7 +94,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   bool _sidebarOpen = true;
 
   int _nonce(Photo p) => _reloadNonce[p.id] ?? 0;
-  bool get _isMacOSDesktop => Platform.isMacOS;
+  bool get _isDesktop => isDesktopPlatform;
 
   void _bumpNonce(Photo p) {
     _reloadNonce[p.id] = (_reloadNonce[p.id] ?? 0) + 1;
@@ -140,8 +141,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     _loadSidebarPref();
 
     _currentIndex = widget.initialIndex;
-    _miniatureWidth = Platform.isIOS ? 40.0 : 20.0;
-    _thumbnailWidth = Platform.isIOS ? 20.0 : 20.0;
+    _miniatureWidth = isMobilePlatform ? 40.0 : 20.0;
+    _thumbnailWidth = isMobilePlatform ? 20.0 : 20.0;
     _pageController = PageController(initialPage: _currentIndex);
     _thumbnailScrollController = ScrollController();
 
@@ -180,7 +181,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       });
     });
 
-    if (Platform.isMacOS) {
+    if (_isDesktop) {
       try {
         WakelockPlus.enable();
       } catch (_) {
@@ -375,7 +376,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   void _toggleActions() {
     setState(() {
       _showActions = !_showActions;
-      if (!Platform.isMacOS) {
+      if (!_isDesktop) {
         if (_showActions) {
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
           WakelockPlus.disable();
@@ -399,7 +400,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Future<void> _downloadSelectedPhotos() async {
-    if (!Platform.isMacOS || _selectedPhotos.isEmpty) return;
+    if (!_isDesktop || _selectedPhotos.isEmpty) return;
 
     final destinationDirectory = await FilePicker.platform.getDirectoryPath(
       dialogTitle: 'Choose download folder',
@@ -468,7 +469,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   }
 
   Future<void> _downloadOriginalPhoto(Photo photo) async {
-    if (!Platform.isMacOS) return;
+    if (!_isDesktop) return;
 
     final sourcePath = _resolvePhotoPath(photo);
     final sourceFile = File(sourcePath);
@@ -570,7 +571,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     if (!_showActions) return 0.0;
     final safeBottom = MediaQuery.of(context).padding.bottom;
     final barHeight = _bottomBarHeightPx > 0 ? _bottomBarHeightPx : 140.0;
-    final extraLift = Platform.isIOS ? -40.0 : 0.0;
+    final extraLift = isMobilePlatform ? -40.0 : 0.0;
     final padding = barHeight + safeBottom + 8 + extraLift;
     debugPrint(
       '[PhotoViewer] galleryBottomPadding=$padding barHeight=$barHeight safeBottom=$safeBottom extraLift=$extraLift',
@@ -784,9 +785,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           },
           child: Scaffold(
             backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-            extendBodyBehindAppBar: !_isMacOSDesktop,
+            extendBodyBehindAppBar: !_isDesktop,
             appBar: _showActions
-                ? (_isMacOSDesktop
+                ? (_isDesktop
                     ? MacosTopBar(
                         onToggleSidebar: _toggleSidebar,
                         onOpenNewWindow: () {
@@ -901,11 +902,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         ],
                       ))
                 : null,
-            body: _isMacOSDesktop
+            body: _isDesktop
                 ? Row(
                     children: [
                       AnimatedContainer(
-                        width: sidebarVisible ? 220 : 0,
+                        width: sidebarVisible ? MacosSidebar.preferredWidth : 0,
                         duration: const Duration(milliseconds: 200),
                         curve: Curves.easeOut,
                         child: sidebarVisible
@@ -939,7 +940,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                             _enableSelectPhotoMode(!_selectPhotoMode);
                           },
                           onVerticalDragEnd: (details) {
-                            if (Platform.isMacOS) return;
+                            if (_isDesktop) return;
 
                             const double velocityThreshold = 1000;
                             if (details.primaryVelocity != null &&
@@ -953,7 +954,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                               Positioned.fill(
                                 child: Padding(
                                   padding: EdgeInsets.only(
-                                    top: _showActions && !_isMacOSDesktop
+                                    top: _showActions && !_isDesktop
                                         ? kToolbarHeight +
                                             MediaQuery.of(context).padding.top
                                         : 0,
@@ -973,8 +974,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                                     thumbnailController:
                                         _thumbnailScrollController,
                                     thumbnailsKey: _thumbnailsKey,
-                                    showThumbnails:
-                                        _showActions && !Platform.isMacOS,
+                                    showThumbnails: _showActions && !_isDesktop,
                                     scaleStateController: _scaleStateController,
                                     onTap: _toggleActions,
                                     onIndexChanged: (index) {
@@ -1004,7 +1004,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                                     ? (_bottomBarHeightPx > 0
                                             ? _bottomBarHeightPx + 8
                                             : 200) -
-                                        (Platform.isIOS ? -50.0 : 0.0)
+                                        (isMobilePlatform ? -50.0 : 0.0)
                                     : 24,
                                 child: IgnorePointer(
                                   ignoring: true,
@@ -1052,7 +1052,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                                     child: _buildBottomBar(currentPhoto),
                                   ),
                                 ),
-                              if (_showActions && _isMacOSDesktop)
+                              if (_showActions && _isDesktop)
                                 Positioned(
                                   top: MacosTopBar.barHeight + 8,
                                   right: 12,
@@ -1097,7 +1097,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       _enableSelectPhotoMode(!_selectPhotoMode);
                     },
                     onVerticalDragEnd: (details) {
-                      if (Platform.isMacOS) return;
+                      if (_isDesktop) return;
 
                       const double velocityThreshold = 1000;
                       if (details.primaryVelocity != null &&
@@ -1110,7 +1110,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         Positioned.fill(
                           child: Padding(
                             padding: EdgeInsets.only(
-                              top: _showActions && !_isMacOSDesktop
+                              top: _showActions && !_isDesktop
                                   ? kToolbarHeight +
                                       MediaQuery.of(context).padding.top
                                   : 0,
@@ -1129,7 +1129,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                               pageController: _pageController,
                               thumbnailController: _thumbnailScrollController,
                               thumbnailsKey: _thumbnailsKey,
-                              showThumbnails: _showActions && !Platform.isMacOS,
+                              showThumbnails: _showActions && !_isDesktop,
                               scaleStateController: _scaleStateController,
                               onTap: _toggleActions,
                               onIndexChanged: (index) {
@@ -1159,7 +1159,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                               ? (_bottomBarHeightPx > 0
                                       ? _bottomBarHeightPx + 8
                                       : 200) -
-                                  (Platform.isIOS ? -50.0 : 0.0)
+                                  (isMobilePlatform ? -50.0 : 0.0)
                               : 24,
                           child: IgnorePointer(
                             ignoring: true,
@@ -1206,7 +1206,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                               child: _buildBottomBar(currentPhoto),
                             ),
                           ),
-                        if (_showActions && _isMacOSDesktop)
+                        if (_showActions && _isDesktop)
                           Positioned(
                             top: MacosTopBar.barHeight + 8,
                             right: 12,

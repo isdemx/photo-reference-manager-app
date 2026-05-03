@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,6 +13,7 @@ import 'package:photographers_reference_app/src/presentation/screens/upload_scre
 import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 import 'package:photographers_reference_app/src/services/window_service.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class AllPhotosScreen extends StatefulWidget {
   const AllPhotosScreen({Key? key}) : super(key: key);
@@ -30,8 +29,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
   final GlobalKey<PhotoGridViewState> _gridKey =
       GlobalKey<PhotoGridViewState>();
 
-  bool get _isDesktop =>
-      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  bool get _isDesktop => isDesktopPlatform;
 
   @override
   void initState() {
@@ -214,7 +212,7 @@ class _AllPhotosScreenState extends State<AllPhotosScreen> {
                     ? Row(
                         children: [
                           AnimatedContainer(
-                            width: _sidebarOpen ? 220 : 0,
+                            width: _sidebarOpen ? MacosSidebar.preferredWidth : 0,
                             duration: const Duration(milliseconds: 200),
                             curve: Curves.easeOut,
                             child: _sidebarOpen

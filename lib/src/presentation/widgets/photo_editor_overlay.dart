@@ -25,6 +25,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/video_contr
 import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
 import 'package:photographers_reference_app/src/utils/handle_video_upload.dart';
 import 'package:photographers_reference_app/src/utils/media_file_name_helper.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
@@ -1198,11 +1199,16 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     required int maxLines,
     required int minLines,
   }) {
+    final isMobile = isMobilePlatform;
     return TextField(
       controller: _commentController,
       maxLines: maxLines,
       minLines: minLines,
-      textInputAction: TextInputAction.newline,
+      keyboardType: isMobile ? TextInputType.text : TextInputType.multiline,
+      textInputAction:
+          isMobile ? TextInputAction.done : TextInputAction.newline,
+      onSubmitted: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+      onEditingComplete: () => FocusManager.instance.primaryFocus?.unfocus(),
       style: TextStyle(color: textColor),
       decoration: InputDecoration(
         hintText: 'Comment',
@@ -1319,7 +1325,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     final String path = widget.photo.isStoredInApp
         ? PhotoPathHelper().getFullPath(widget.photo.fileName)
         : widget.photo.path;
-    final bool isMacOSDesktop = !kIsWeb && Platform.isMacOS;
+    final bool isMacOSDesktop = isDesktopPlatform;
     final theme = Theme.of(context);
     final appColors = context.appThemeColors;
     final colorScheme = theme.colorScheme;
@@ -1334,6 +1340,7 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
     final accentColor = appColors.accent;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: editorBackground,
       appBar: isMacOSDesktop
           ? MacosTopBar(
@@ -1388,154 +1395,167 @@ class _PhotoEditorOverlayState extends State<PhotoEditorOverlay> {
                 )
               ],
             ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildEditorPanels(
-            isMacOSDesktop: isMacOSDesktop,
-            panelAltColor: panelAltColor,
-            textColor: textColor,
-            subtleTextColor: subtleTextColor,
-            accentColor: accentColor,
-            colorScheme: colorScheme,
-          ),
-          if (!isMacOSDesktop) _buildBottomActionBar(panelColor),
-        ],
+      bottomNavigationBar: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        padding: EdgeInsets.only(
+          bottom:
+              isMacOSDesktop ? 0.0 : MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildEditorPanels(
+              isMacOSDesktop: isMacOSDesktop,
+              panelAltColor: panelAltColor,
+              textColor: textColor,
+              subtleTextColor: subtleTextColor,
+              accentColor: accentColor,
+              colorScheme: colorScheme,
+            ),
+            if (!isMacOSDesktop) _buildBottomActionBar(panelColor),
+          ],
+        ),
       ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          Stack(
-            children: [
-              Positioned.fill(
-                child: _isVideo
-                    ? _buildVideoEditor()
-                    : Opacity(
-                        opacity: _opacity.clamp(0.0, 1.0),
-                        child: ColorFiltered(
-                          colorFilter: combinedColorFilter(
-                            _brightness,
-                            _saturation,
-                            _contrast,
-                            _temp,
-                            _hue,
-                          ),
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()
-                              ..rotateZ(_rotation)
-                              ..scale(_flipX ? -1.0 : 1.0, _flipY ? -1.0 : 1.0),
-                            child: ExtendedImage.file(
-                              File(path),
-                              fit: BoxFit.contain,
-                              mode: ExtendedImageMode.editor,
-                              cacheRawData: true,
-                              extendedImageEditorKey: _editorKey,
-                              initEditorConfigHandler: (_) => EditorConfig(
-                                maxScale: 5.0,
-                                speed: 1.0,
-                                animationDuration:
-                                    const Duration(milliseconds: 200),
-                                cropRectPadding: const EdgeInsets.fromLTRB(
-                                  20,
-                                  20,
-                                  20,
-                                  20,
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Stack(
+              children: [
+                Positioned.fill(
+                  child: _isVideo
+                      ? _buildVideoEditor()
+                      : Opacity(
+                          opacity: _opacity.clamp(0.0, 1.0),
+                          child: ColorFiltered(
+                            colorFilter: combinedColorFilter(
+                              _brightness,
+                              _saturation,
+                              _contrast,
+                              _temp,
+                              _hue,
+                            ),
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.identity()
+                                ..rotateZ(_rotation)
+                                ..scale(
+                                    _flipX ? -1.0 : 1.0, _flipY ? -1.0 : 1.0),
+                              child: ExtendedImage.file(
+                                File(path),
+                                fit: BoxFit.contain,
+                                mode: ExtendedImageMode.editor,
+                                cacheRawData: true,
+                                extendedImageEditorKey: _editorKey,
+                                initEditorConfigHandler: (_) => EditorConfig(
+                                  maxScale: 5.0,
+                                  speed: 1.0,
+                                  animationDuration:
+                                      const Duration(milliseconds: 200),
+                                  cropRectPadding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    20,
+                                    20,
+                                    20,
+                                  ),
+                                  hitTestSize: 20,
+                                  cornerColor: textColor,
+                                  lineColor: subtleTextColor,
+                                  initCropRectType: InitCropRectType.imageRect,
+                                  cropLayerPainter:
+                                      const EditorCropLayerPainter(),
                                 ),
-                                hitTestSize: 20,
-                                cornerColor: textColor,
-                                lineColor: subtleTextColor,
-                                initCropRectType: InitCropRectType.imageRect,
-                                cropLayerPainter:
-                                    const EditorCropLayerPainter(),
                               ),
                             ),
                           ),
                         ),
+                ),
+                if (widget.hasPrevious)
+                  Positioned(
+                    left: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: _EditorNavButton(
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        onTap: _openPrevious,
                       ),
-              ),
-              if (widget.hasPrevious)
-                Positioned(
-                  left: 12,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: _EditorNavButton(
-                      icon: Icons.arrow_back_ios_new_rounded,
-                      onTap: _openPrevious,
                     ),
                   ),
-                ),
-              if (widget.hasNext)
-                Positioned(
-                  right: 12,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: _EditorNavButton(
-                      icon: Icons.arrow_forward_ios_rounded,
-                      onTap: _openNext,
+                if (widget.hasNext)
+                  Positioned(
+                    right: 12,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: _EditorNavButton(
+                        icon: Icons.arrow_forward_ios_rounded,
+                        onTap: _openNext,
+                      ),
                     ),
                   ),
-                ),
-            ],
-          ),
-          if (_saving) ...[
-            Positioned.fill(
-              child: AbsorbPointer(
-                absorbing: true,
-                child: Container(
-                  color:
-                      appColors.overlay.withValues(alpha: isDark ? 0.62 : 0.38),
-                ),
-              ),
+              ],
             ),
-            Positioned.fill(
-              child: Center(
-                child: Container(
-                  width: 260,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: panelColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: appColors.border),
+            if (_saving) ...[
+              Positioned.fill(
+                child: AbsorbPointer(
+                  absorbing: true,
+                  child: Container(
+                    color: appColors.overlay
+                        .withValues(alpha: isDark ? 0.62 : 0.38),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(strokeWidth: 3),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        _savingText,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 14,
-                          height: 1.2,
+                ),
+              ),
+              Positioned.fill(
+                child: Center(
+                  child: Container(
+                    width: 260,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: panelColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: appColors.border),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 28,
+                          height: 28,
+                          child: CircularProgressIndicator(strokeWidth: 3),
                         ),
-                      ),
-                      if (_exportProgress != null) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 12),
                         Text(
-                          '${(_exportProgress! * 100).toStringAsFixed(0)}%',
+                          _savingText,
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: subtleTextColor,
-                            fontSize: 12,
+                            color: textColor,
+                            fontSize: 14,
+                            height: 1.2,
                           ),
                         ),
+                        if (_exportProgress != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            '${(_exportProgress! * 100).toStringAsFixed(0)}%',
+                            style: TextStyle(
+                              color: subtleTextColor,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

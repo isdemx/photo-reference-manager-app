@@ -1,13 +1,11 @@
-import 'dart:io';
-
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:photographers_reference_app/backup.service.dart';
 
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class DragDropImportOverlay extends StatefulWidget {
   final Widget child;
@@ -60,8 +58,7 @@ class _DragDropImportOverlayState extends State<DragDropImportOverlay> {
   }
 
   bool _isDesktop() {
-    if (kIsWeb) return false;
-    return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+    return isDesktopPlatform;
   }
 }
 

@@ -29,6 +29,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_
 import 'package:photographers_reference_app/src/presentation/widgets/photo_gallery_core.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class _VideoThumbUi {
   double startFrac;
@@ -100,7 +101,8 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
 
   bool _multiSelect = false;
   final List<Photo> _selectedPhotos = [];
-  final Map<String, _VideoThumbUi> _videoThumbStates = <String, _VideoThumbUi>{};
+  final Map<String, _VideoThumbUi> _videoThumbStates =
+      <String, _VideoThumbUi>{};
   final Map<String, bool> _videoHover = <String, bool>{};
   final Map<String, bool> _controlsHover = <String, bool>{};
   final Map<String, double> _ratioById = {};
@@ -130,7 +132,7 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                 if (photoState is! PhotoLoaded) return const _Loader();
                 final appColors = context.appThemeColors;
                 final media = MediaQuery.of(context);
-                final isMobile = Platform.isIOS || Platform.isAndroid;
+                final isMobile = isMobilePlatform;
                 final isMobileLandscape =
                     isMobile && media.size.width > media.size.height;
                 if (!_didInitFiltersOpenForLayout) {
@@ -182,312 +184,218 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                   },
                   child: Scaffold(
                     appBar: AppBar(
-                    title: GestureDetector(
-                      onTap: () =>
-                          setState(() => _filtersOpen = !_filtersOpen),
-                      child: Wrap(
-                        spacing: Platform.isIOS ? 4 : 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (!Platform.isIOS) ...[
-                            Icon(Icons.filter_list,
-                                color: appColors.subtle, size: 18),
-                            Text(
-                              'Filters',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(color: appColors.text),
-                            ),
-                          ],
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Platform.isIOS ? 6 : 8,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: appColors.surfaceAlt.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: appColors.border),
-                            ),
-                            child: Icon(
-                              _filtersOpen
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: appColors.subtle,
-                              size: 16,
-                            ),
-                          ),
-                          if (!Platform.isIOS) const SizedBox(width: 8),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: appColors.surfaceAlt.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: appColors.border),
-                            ),
-                            child: ToggleButtons(
-                              isSelected: [_tagLogicAnd == false, _tagLogicAnd],
-                              onPressed: (index) {
-                                setState(() => _tagLogicAnd = index == 1);
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              borderColor: Colors.transparent,
-                              selectedBorderColor: Colors.transparent,
-                              fillColor: appColors.text.withValues(alpha: 0.9),
-                              color: appColors.subtle,
-                              selectedColor: appColors.canvas,
-                              constraints: const BoxConstraints(
-                                minHeight: 24,
-                                minWidth: 30,
+                      title: GestureDetector(
+                        onTap: () =>
+                            setState(() => _filtersOpen = !_filtersOpen),
+                        child: Wrap(
+                          spacing: isMobile ? 4 : 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (!isMobile) ...[
+                              Icon(Icons.filter_list,
+                                  color: appColors.subtle, size: 18),
+                              Text(
+                                'Filters',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(color: appColors.text),
                               ),
-                              children: const [
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text('OR', style: TextStyle(fontSize: 11)),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 8),
-                                  child: Text('AND', style: TextStyle(fontSize: 11)),
-                                ),
-                              ],
-                            ),
-                          ),
-                          RawChip(
-                            label: const Text('Not Ref'),
-                            selected: _showNotRef,
-                            showCheckmark: false,
-                            avatar: _showNotRef
-                                ? const Padding(
-                                    padding: EdgeInsets.only(left: 2, right: 2),
-                                    child: Icon(
-                                      Icons.check,
-                                      size: 12,
-                                      color: Colors.white,
-                                      shadows: [
-                                        Shadow(
-                                          color: Color(0x66000000),
-                                          blurRadius: 2,
-                                          offset: Offset(0, 1),
-                                        ),
-                                        Shadow(
-                                          color: Color(0x44000000),
-                                          blurRadius: 6,
-                                          offset: Offset(0, 0),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : null,
-                            onSelected: (_) {
-                              setState(() {
-                                _showNotRef = !_showNotRef;
-                              });
-                            },
-                            selectedColor: const Color(0xFFC86565),
-                            backgroundColor: const Color(0xFFB98989),
-                            labelStyle: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                            visualDensity: const VisualDensity(
-                              horizontal: -2,
-                              vertical: -2,
-                            ),
-                            shape: const StadiumBorder(),
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Platform.isIOS ? 4 : 6,
-                              vertical: 0,
-                            ),
-                            labelPadding: EdgeInsets.only(
-                              right: Platform.isIOS ? 4 : 6,
-                            ),
-                          ),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: appColors.surfaceAlt.withValues(alpha: 0.92),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: appColors.border),
-                            ),
-                            child: ToggleButtons(
-                              isSelected: [
-                                _layoutMode == _PickerLayoutMode.grid,
-                                _layoutMode == _PickerLayoutMode.masonry,
-                              ],
-                              onPressed: (index) {
-                                setState(() {
-                                  _layoutMode = index == 0
-                                      ? _PickerLayoutMode.grid
-                                      : _PickerLayoutMode.masonry;
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              borderColor: Colors.transparent,
-                              selectedBorderColor: Colors.transparent,
-                              fillColor: appColors.text.withValues(alpha: 0.9),
-                              color: appColors.subtle,
-                              selectedColor: appColors.canvas,
-                              constraints: const BoxConstraints(
-                                minHeight: 24,
-                                minWidth: 30,
+                            ],
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 6 : 8,
+                                vertical: 2,
                               ),
-                              children: const [
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 6),
-                                  child: Icon(Icons.grid_on, size: 14),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 6),
-                                  child: Icon(Icons.view_agenda, size: 14),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (Platform.isIOS)
-                            IconButton(
-                              onPressed: () =>
-                                  setState(() => _selectedTagIds.clear()),
-                              icon: Icon(Icons.clear,
-                                  size: 16, color: appColors.subtle),
-                              tooltip: 'Clear',
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(
-                                minWidth: 30,
-                                minHeight: 30,
+                              decoration: BoxDecoration(
+                                color: appColors.surfaceAlt
+                                    .withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: appColors.border),
                               ),
-                            )
-                          else
-                            TextButton.icon(
-                              onPressed: () =>
-                                  setState(() => _selectedTagIds.clear()),
-                              icon: Icon(Icons.clear,
-                                  size: 14, color: appColors.subtle),
-                              label: Text(
-                                'Clear',
-                                style: TextStyle(
-                                    color: appColors.subtle, fontSize: 11),
+                              child: Icon(
+                                _filtersOpen
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: appColors.subtle,
+                                size: 16,
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                    actions: _multiSelect
-                        ? [
-                            IconButton(
-                              icon: const Icon(Icons.done),
-                              tooltip: 'Add selected',
-                              onPressed: () {
-                                final contextFileNames = photos
-                                    .map((e) => e.fileName)
-                                    .toList(growable: false);
-                                final indexByFileName = <String, int>{
-                                  for (int i = 0;
-                                      i < contextFileNames.length;
-                                      i++)
-                                    contextFileNames[i]: i,
-                                };
-                                final contextId = const Uuid().v4();
-                                final results = _selectedPhotos
-                                    .map(
-                                      (p) => PhotoPickResult(
-                                        photo: p,
-                                        contextId: contextId,
-                                        contextFileNames: contextFileNames,
-                                        indexInContext:
-                                            indexByFileName[p.fileName] ?? 0,
+                            if (!isMobile) const SizedBox(width: 8),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: appColors.surfaceAlt
+                                    .withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: appColors.border),
+                              ),
+                              child: ToggleButtons(
+                                isSelected: [
+                                  _tagLogicAnd == false,
+                                  _tagLogicAnd
+                                ],
+                                onPressed: (index) {
+                                  setState(() => _tagLogicAnd = index == 1);
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                borderColor: Colors.transparent,
+                                selectedBorderColor: Colors.transparent,
+                                fillColor:
+                                    appColors.text.withValues(alpha: 0.9),
+                                color: appColors.subtle,
+                                selectedColor: appColors.canvas,
+                                constraints: const BoxConstraints(
+                                  minHeight: 24,
+                                  minWidth: 30,
+                                ),
+                                children: const [
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 8),
+                                    child: Text('OR',
+                                        style: TextStyle(fontSize: 11)),
+                                  ),
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 8),
+                                    child: Text('AND',
+                                        style: TextStyle(fontSize: 11)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            RawChip(
+                              label: const Text('Not Ref'),
+                              selected: _showNotRef,
+                              showCheckmark: false,
+                              avatar: _showNotRef
+                                  ? const Padding(
+                                      padding:
+                                          EdgeInsets.only(left: 2, right: 2),
+                                      child: Icon(
+                                        Icons.check,
+                                        size: 12,
+                                        color: Colors.white,
+                                        shadows: [
+                                          Shadow(
+                                            color: Color(0x66000000),
+                                            blurRadius: 2,
+                                            offset: Offset(0, 1),
+                                          ),
+                                          Shadow(
+                                            color: Color(0x44000000),
+                                            blurRadius: 6,
+                                            offset: Offset(0, 0),
+                                          ),
+                                        ],
                                       ),
                                     )
-                                    .toList(growable: false);
-                                widget.onMultiSelectDone?.call(results);
-                                _exitMultiSelect();
+                                  : null,
+                              onSelected: (_) {
+                                setState(() {
+                                  _showNotRef = !_showNotRef;
+                                });
                               },
+                              selectedColor: const Color(0xFFC86565),
+                              backgroundColor: const Color(0xFFB98989),
+                              labelStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                              visualDensity: const VisualDensity(
+                                horizontal: -2,
+                                vertical: -2,
+                              ),
+                              shape: const StadiumBorder(),
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isMobile ? 4 : 6,
+                                vertical: 0,
+                              ),
+                              labelPadding: EdgeInsets.only(
+                                right: isMobile ? 4 : 6,
+                              ),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.close),
-                              tooltip: 'Cancel multi-select',
-                              onPressed: _exitMultiSelect,
-                            )
-                          ]
-                        : null,
-                  ),
-                  body: Column(
-                    children: [
-                      // ------------------ панель фильтра (сворачиваемая) ----------------
-                      AnimatedSize(
-                        duration: const Duration(milliseconds: 200),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topCenter,
-                        child: _filtersOpen
-                            ? Container(
-                                width: double.infinity,
-                                constraints: BoxConstraints(
-                                  maxHeight: isMobileLandscape
-                                      ? media.size.height * 0.46
-                                      : double.infinity,
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: appColors.surfaceAlt
+                                    .withValues(alpha: 0.92),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: appColors.border),
+                              ),
+                              child: ToggleButtons(
+                                isSelected: [
+                                  _layoutMode == _PickerLayoutMode.grid,
+                                  _layoutMode == _PickerLayoutMode.masonry,
+                                ],
+                                onPressed: (index) {
+                                  setState(() {
+                                    _layoutMode = index == 0
+                                        ? _PickerLayoutMode.grid
+                                        : _PickerLayoutMode.masonry;
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                borderColor: Colors.transparent,
+                                selectedBorderColor: Colors.transparent,
+                                fillColor:
+                                    appColors.text.withValues(alpha: 0.9),
+                                color: appColors.subtle,
+                                selectedColor: appColors.canvas,
+                                constraints: const BoxConstraints(
+                                  minHeight: 24,
+                                  minWidth: 30,
                                 ),
-                                color: appColors.surface.withValues(
-                                  alpha: isMobileLandscape ? 0.96 : 0.88,
-                                ),
-                                padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
-                                child: SingleChildScrollView(
-                                  child: _FilterPanel(
-                                    folders: folders,
-                                    allTags: visibleTags,
-                                    folderId: _folderId,
-                                    categories: categories,
-                                    onFolderChanged: (v) =>
-                                        setState(() => _folderId = v),
-                                    selectedTagIds: _selectedTagIds,
-                                    tagLogicAnd: _tagLogicAnd,
-                                    onToggleLogic: () => setState(
-                                        () => _tagLogicAnd = !_tagLogicAnd),
-                                    onClearAllTags: () {
-                                      setState(() => _selectedTagIds.clear());
-                                    },
-                                    onToggleTag: (tagId) {
-                                      setState(() {
-                                        if (_selectedTagIds.contains(tagId)) {
-                                          _selectedTagIds.remove(tagId);
-                                        } else {
-                                          _selectedTagIds.add(tagId);
-                                        }
-                                      });
-                                    },
+                                children: const [
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 6),
+                                    child: Icon(Icons.grid_on, size: 14),
                                   ),
+                                  Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 6),
+                                    child: Icon(Icons.view_agenda, size: 14),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (isMobile)
+                              IconButton(
+                                onPressed: () =>
+                                    setState(() => _selectedTagIds.clear()),
+                                icon: Icon(Icons.clear,
+                                    size: 16, color: appColors.subtle),
+                                tooltip: 'Clear',
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                  minWidth: 30,
+                                  minHeight: 30,
                                 ),
                               )
-                            : const SizedBox.shrink(),
+                            else
+                              TextButton.icon(
+                                onPressed: () =>
+                                    setState(() => _selectedTagIds.clear()),
+                                icon: Icon(Icons.clear,
+                                    size: 14, color: appColors.subtle),
+                                label: Text(
+                                  'Clear',
+                                  style: TextStyle(
+                                      color: appColors.subtle, fontSize: 11),
+                                ),
+                              ),
+                          ],
+                        ),
                       ),
-
-                      // ------------------ сетка фото + оверлейный слайдер --------------
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            if (!_viewerMode) _buildGridOrMasonry(photos),
-                            if (_viewerMode)
-                              _EmbeddedPhotoViewer(
-                                photos: photos,
-                                startIndex: _viewerIndex,
-                                isSelected: (p) => _selectedPhotos.contains(p),
-                                selectedPhotos: _selectedPhotos,
-                                isMultiSelect: _multiSelect,
-                                onClose: () {
-                                  setState(() => _viewerMode = false);
-                                },
-                                onAddCurrent: (p) => _addSingle(p, photos),
-                                onFolderAdded: () {
-                                  context.read<PhotoBloc>().add(LoadPhotos());
-                                  setState(() {});
-                                },
-                                onToggleMulti: () {
-                                  if (_multiSelect) return;
-                                  setState(() => _multiSelect = true);
-                                },
-                                onToggleSelect: (p) => _toggle(p),
-                                onAddSelected: () {
-                                  if (_selectedPhotos.isEmpty) return;
+                      actions: _multiSelect
+                          ? [
+                              IconButton(
+                                icon: const Icon(Icons.done),
+                                tooltip: 'Add selected',
+                                onPressed: () {
                                   final contextFileNames = photos
                                       .map((e) => e.fileName)
                                       .toList(growable: false);
@@ -512,28 +420,142 @@ class _PhotoPickerWidgetState extends State<PhotoPickerWidget>
                                   widget.onMultiSelectDone?.call(results);
                                   _exitMultiSelect();
                                 },
-                                onIndexChanged: (i) {
-                                  _viewerIndex = i;
-                                },
-                                onShowTags: (p) async {
-                                  final changed = await TagsHelpers
-                                      .showAddTagToImagesDialog(
-                                    context,
-                                    [p],
-                                  );
-                                  if (changed && mounted) {
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close),
+                                tooltip: 'Cancel multi-select',
+                                onPressed: _exitMultiSelect,
+                              )
+                            ]
+                          : null,
+                    ),
+                    body: Column(
+                      children: [
+                        // ------------------ панель фильтра (сворачиваемая) ----------------
+                        AnimatedSize(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          alignment: Alignment.topCenter,
+                          child: _filtersOpen
+                              ? Container(
+                                  width: double.infinity,
+                                  constraints: BoxConstraints(
+                                    maxHeight: isMobileLandscape
+                                        ? media.size.height * 0.46
+                                        : double.infinity,
+                                  ),
+                                  color: appColors.surface.withValues(
+                                    alpha: isMobileLandscape ? 0.96 : 0.88,
+                                  ),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(8, 8, 8, 10),
+                                  child: SingleChildScrollView(
+                                    child: _FilterPanel(
+                                      folders: folders,
+                                      allTags: visibleTags,
+                                      folderId: _folderId,
+                                      categories: categories,
+                                      onFolderChanged: (v) =>
+                                          setState(() => _folderId = v),
+                                      selectedTagIds: _selectedTagIds,
+                                      tagLogicAnd: _tagLogicAnd,
+                                      onToggleLogic: () => setState(
+                                          () => _tagLogicAnd = !_tagLogicAnd),
+                                      onClearAllTags: () {
+                                        setState(() => _selectedTagIds.clear());
+                                      },
+                                      onToggleTag: (tagId) {
+                                        setState(() {
+                                          if (_selectedTagIds.contains(tagId)) {
+                                            _selectedTagIds.remove(tagId);
+                                          } else {
+                                            _selectedTagIds.add(tagId);
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(),
+                        ),
+
+                        // ------------------ сетка фото + оверлейный слайдер --------------
+                        Expanded(
+                          child: Stack(
+                            children: [
+                              if (!_viewerMode) _buildGridOrMasonry(photos),
+                              if (_viewerMode)
+                                _EmbeddedPhotoViewer(
+                                  photos: photos,
+                                  startIndex: _viewerIndex,
+                                  isSelected: (p) =>
+                                      _selectedPhotos.contains(p),
+                                  selectedPhotos: _selectedPhotos,
+                                  isMultiSelect: _multiSelect,
+                                  onClose: () {
+                                    setState(() => _viewerMode = false);
+                                  },
+                                  onAddCurrent: (p) => _addSingle(p, photos),
+                                  onFolderAdded: () {
                                     context.read<PhotoBloc>().add(LoadPhotos());
                                     setState(() {});
-                                  }
-                                },
-                              ),
-                          ],
+                                  },
+                                  onToggleMulti: () {
+                                    if (_multiSelect) return;
+                                    setState(() => _multiSelect = true);
+                                  },
+                                  onToggleSelect: (p) => _toggle(p),
+                                  onAddSelected: () {
+                                    if (_selectedPhotos.isEmpty) return;
+                                    final contextFileNames = photos
+                                        .map((e) => e.fileName)
+                                        .toList(growable: false);
+                                    final indexByFileName = <String, int>{
+                                      for (int i = 0;
+                                          i < contextFileNames.length;
+                                          i++)
+                                        contextFileNames[i]: i,
+                                    };
+                                    final contextId = const Uuid().v4();
+                                    final results = _selectedPhotos
+                                        .map(
+                                          (p) => PhotoPickResult(
+                                            photo: p,
+                                            contextId: contextId,
+                                            contextFileNames: contextFileNames,
+                                            indexInContext:
+                                                indexByFileName[p.fileName] ??
+                                                    0,
+                                          ),
+                                        )
+                                        .toList(growable: false);
+                                    widget.onMultiSelectDone?.call(results);
+                                    _exitMultiSelect();
+                                  },
+                                  onIndexChanged: (i) {
+                                    _viewerIndex = i;
+                                  },
+                                  onShowTags: (p) async {
+                                    final changed = await TagsHelpers
+                                        .showAddTagToImagesDialog(
+                                      context,
+                                      [p],
+                                    );
+                                    if (changed && mounted) {
+                                      context
+                                          .read<PhotoBloc>()
+                                          .add(LoadPhotos());
+                                      setState(() {});
+                                    }
+                                  },
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              );
+                );
               },
             );
           },
@@ -1184,8 +1206,8 @@ class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
                         ),
                         tooltip: 'Add/remove from multi',
                         icon: _SelectionIndicator(
-                          selected: widget
-                              .isSelected(widget.photos[_currentIndex]),
+                          selected:
+                              widget.isSelected(widget.photos[_currentIndex]),
                         ),
                       ),
                   ],
@@ -1219,9 +1241,8 @@ class _EmbeddedPhotoViewerState extends State<_EmbeddedPhotoViewer> {
                       IconButton(
                         icon: Icon(
                           Icons.check,
-                          color: widget.isMultiSelect
-                              ? Colors.blue
-                              : Colors.white,
+                          color:
+                              widget.isMultiSelect ? Colors.blue : Colors.white,
                         ),
                         tooltip: widget.isMultiSelect
                             ? 'Add selected photos'
@@ -1336,10 +1357,10 @@ class _TagQuickButton extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(6),
           child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Iconsax.tag, size: 10, color: Colors.white),
-          ],
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Iconsax.tag, size: 10, color: Colors.white),
+            ],
           ),
         ),
       ),

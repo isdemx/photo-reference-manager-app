@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
@@ -19,6 +18,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/collage_pho
 import 'package:photographers_reference_app/src/services/navigation_history_service.dart';
 import 'package:photographers_reference_app/src/services/window_service.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class MyCollagesScreen extends StatefulWidget {
   const MyCollagesScreen({Key? key}) : super(key: key);
@@ -39,8 +39,7 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
   static const double _maxTileWidth = 360;
   bool _sidebarOpen = true;
 
-  bool get _isDesktop =>
-      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  bool get _isDesktop => isDesktopPlatform;
 
   @override
   void initState() {
@@ -149,7 +148,7 @@ class _MyCollagesScreenState extends State<MyCollagesScreen> {
     return Row(
       children: [
         AnimatedContainer(
-          width: _sidebarOpen ? 220 : 0,
+          width: _sidebarOpen ? MacosSidebar.preferredWidth : 0,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
           child: _sidebarOpen

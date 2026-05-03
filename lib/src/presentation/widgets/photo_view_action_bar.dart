@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
@@ -7,6 +5,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/add_tag_wid
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_edit_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_to_folder_widget.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_tags_view_widget.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class ActionBar extends StatelessWidget {
   final Photo photo;
@@ -102,7 +101,7 @@ class ActionBar extends StatelessWidget {
                     ),
                     child: const Icon(Iconsax.grid_2, color: Colors.white),
                   ),
-                  if (Platform.isMacOS)
+                  if (isDesktopPlatform)
                     ElevatedButton(
                       onPressed: onDownloadMulti,
                       style: ElevatedButton.styleFrom(
@@ -158,7 +157,7 @@ class ActionBar extends StatelessWidget {
                     onPressed: onAddToCollage,
                     tooltip: 'Add to collage',
                   ),
-                  if (Platform.isMacOS && onDownload != null)
+                  if (isDesktopPlatform && onDownload != null)
                     IconButton(
                       icon: const Icon(
                         Icons.file_download_outlined,

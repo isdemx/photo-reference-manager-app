@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -19,6 +17,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/category_wi
 import 'package:photographers_reference_app/src/presentation/widgets/settings_dialog.dart';
 import 'package:photographers_reference_app/src/presentation/screens/macos_main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -69,9 +68,34 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  Widget _buildAddCategoryButton(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: () => CategoriesHelpers.showAddCategoryDialog(context),
+          style: TextButton.styleFrom(
+            foregroundColor: context.appThemeColors.subtle,
+            visualDensity: VisualDensity.compact,
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            minimumSize: const Size(0, 40),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            textStyle: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          icon: const Icon(Iconsax.add, size: 17),
+          label: const Text('Add new category'),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (!kIsWeb && Platform.isMacOS) {
+    if (isDesktopPlatform) {
       return MacosMainScreen(onOpenSettings: () => _openSettings(context));
     }
     return Scaffold(
@@ -172,14 +196,7 @@ class _MainScreenState extends State<MainScreen> {
         actions: [
           IconButton(
             icon: const Icon(Iconsax.add),
-            tooltip: 'Add new category',
-            onPressed: () {
-              CategoriesHelpers.showAddCategoryDialog(context);
-            },
-          ),
-          IconButton(
-            icon: const Icon(Iconsax.import_1),
-            tooltip: 'Download photos/videos',
+            tooltip: 'Add photos/videos',
             onPressed: () {
               Navigator.push(
                 context,
@@ -240,36 +257,39 @@ class _MainScreenState extends State<MainScreen> {
                         (categories.length == 1 &&
                             categories.first.name == "General")) &&
                     photos.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'Welcome to Refma!\n\nTo get started, upload your first image using the "Upload" button below. You can also create categories and folders to organize your images efficiently.\n\nUse the "+" button in the app bar to create new category, and within each category, you can add folders to manage your collection.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 16.0),
-                          ),
-                          const SizedBox(height: 20),
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.pushNamed(context, '/upload');
-                            },
-                            child: const Text('Upload'),
-                          ),
-                        ],
+                  return ListView(
+                    children: [
+                      _buildAddCategoryButton(context),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 80, 16, 16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text(
+                              'Welcome to Refma!\n\nTo get started, upload your first image using the "+" button above. You can also create categories and folders to organize your images efficiently.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 16.0),
+                            ),
+                            const SizedBox(height: 20),
+                            ElevatedButton(
+                              onPressed: () {
+                                Navigator.pushNamed(context, '/upload');
+                              },
+                              child: const Text('Upload'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+                    ],
                   );
                 }
 
-                return ListView.builder(
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    return CategoryWidget(category: category);
-                  },
+                return ListView(
+                  children: [
+                    _buildAddCategoryButton(context),
+                    for (final category in categories)
+                      CategoryWidget(category: category),
+                  ],
                 );
               }
 

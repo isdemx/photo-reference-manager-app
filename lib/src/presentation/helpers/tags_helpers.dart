@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:iconsax/iconsax.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
+import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:uuid/uuid.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
@@ -284,7 +286,7 @@ class TagsHelpers {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final tags = (tagState as TagLoaded).tags;
+                final tags = tagState.tags;
 
                 final categories = catState is TagCategoryLoaded
                     ? List<TagCategory>.from(catState.categories)
@@ -327,283 +329,398 @@ class TagsHelpers {
                   ),
                 ].where((s) => s.tags.isNotEmpty).toList();
 
+                void closeDialog() {
+                  Navigator.of(dialogCtx).pop(anyChanged);
+                }
+
                 return Dialog(
                   backgroundColor: Colors.transparent,
-                  insetPadding: EdgeInsets.zero,
+                  insetPadding: isDesktopPlatform
+                      ? const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 28,
+                        )
+                      : EdgeInsets.zero,
                   child: SafeArea(
                     child: LayoutBuilder(
                       builder: (context, constraints) {
-                        final isMacOS =
-                            defaultTargetPlatform == TargetPlatform.macOS;
+                        final isDesktop = isDesktopPlatform;
                         final size = MediaQuery.of(context).size;
-                        final maxWidth = isMacOS
-                            ? (size.width * 0.6).clamp(420.0, 900.0)
+                        final colors = context.appThemeColors;
+                        final maxWidth = isDesktop
+                            ? (size.width * 0.46).clamp(460.0, 720.0)
                             : size.width;
-                        final maxHeight = isMacOS
-                            ? (size.height * 0.9).clamp(420.0, size.height)
+                        final maxHeight = isDesktop
+                            ? (size.height * 0.76).clamp(420.0, 680.0)
                             : size.height;
 
-                        return Align(
-                          alignment: Alignment.center,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: maxWidth,
-                              maxHeight: maxHeight,
-                            ),
-                            child: Container(
-                              width: maxWidth,
-                              height: maxHeight,
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  // Верхняя панель: заголовок + крестик
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          title,
-                                          style: const TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                      IconButton(
-                                        tooltip: 'Close',
-                                        icon: const Icon(Icons.close,
-                                            color: Colors.white),
-                                        onPressed: () =>
-                                            Navigator.of(dialogCtx).pop(false),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    subtitle,
-                                    style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Colors.white70,
+                        return CallbackShortcuts(
+                          bindings: <ShortcutActivator, VoidCallback>{
+                            const SingleActivator(LogicalKeyboardKey.escape):
+                                closeDialog,
+                            const SingleActivator(LogicalKeyboardKey.enter):
+                                closeDialog,
+                          },
+                          child: Focus(
+                            autofocus: true,
+                            child: Align(
+                              alignment: Alignment.center,
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: maxWidth,
+                                  maxHeight: maxHeight,
+                                ),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    color: colors.surface,
+                                    borderRadius: BorderRadius.circular(
+                                      isDesktop ? 10 : 0,
                                     ),
+                                    border: Border.all(color: colors.border),
+                                    boxShadow: isDesktop
+                                        ? const [
+                                            BoxShadow(
+                                              color: Color(0x66000000),
+                                              blurRadius: 24,
+                                              offset: Offset(0, 14),
+                                            ),
+                                          ]
+                                        : null,
                                   ),
-                                  const SizedBox(height: 16),
-
-                                  if (allowNewTagCreation)
-                                    _NewTagInlineEditor(
-                                      controller: controller,
-                                      categories: categories,
-                                      onCategoryChanged: (val) {
-                                        selectedCategoryId = val;
-                                      },
-                                      onSubmitAdd: () {
-                                        final String tagName =
-                                            controller.text.trim();
-                                        if (tagName.isNotEmpty &&
-                                            singlePhoto != null) {
-                                          _addTagToBloc(
-                                            dialogCtx,
-                                            tagName,
-                                            singlePhoto,
-                                            tagCategoryId:
-                                                selectedCategoryId, // ← передаём выбранную категорию
-                                          );
-                                          anyChanged = true;
-                                          controller.clear();
-                                        }
-                                      },
+                                  child: Padding(
+                                    padding: EdgeInsets.fromLTRB(
+                                      isDesktop ? 18 : 16,
+                                      isDesktop ? 14 : 16,
+                                      isDesktop ? 18 : 16,
+                                      isDesktop ? 14 : 16,
                                     ),
-
-                                  // Список секций с тегами
-                                  Expanded(
-                                    child: sections.isEmpty
-                                        ? const Center(
-                                            child: Text(
-                                              'No tags yet',
-                                              style: TextStyle(
-                                                color: Colors.white54,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    title,
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          isDesktop ? 16 : 18,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: colors.text,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 3),
+                                                  Text(
+                                                    subtitle,
+                                                    style: TextStyle(
+                                                      fontSize:
+                                                          isDesktop ? 12 : 13,
+                                                      color: colors.subtle,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          )
-                                        : Scrollbar(
-                                            thumbVisibility: true,
-                                            child: ListView.builder(
-                                              itemCount: sections.length,
-                                              itemBuilder: (_, index) {
-                                                final s = sections[index];
-                                                return Padding(
-                                                  padding: const EdgeInsets.only(
-                                                      bottom: 16),
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment
-                                                            .start,
-                                                    children: [
-                                                      Text(
-                                                        s.title,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                          fontSize: 15,
-                                                          color: Colors.white,
+                                            IconButton(
+                                              tooltip: 'Close',
+                                              visualDensity:
+                                                  VisualDensity.compact,
+                                              icon: Icon(
+                                                Icons.close,
+                                                color: colors.subtle,
+                                                size: isDesktop ? 18 : 22,
+                                              ),
+                                              onPressed: closeDialog,
+                                            ),
+                                          ],
+                                        ),
+                                        Divider(
+                                          height: isDesktop ? 18 : 20,
+                                          color: colors.border,
+                                        ),
+                                        if (allowNewTagCreation)
+                                          _NewTagInlineEditor(
+                                            controller: controller,
+                                            categories: categories,
+                                            onCategoryChanged: (val) {
+                                              selectedCategoryId = val;
+                                            },
+                                            onSubmitAdd: () {
+                                              final tagName =
+                                                  controller.text.trim();
+                                              if (tagName.isNotEmpty &&
+                                                  singlePhoto != null) {
+                                                _addTagToBloc(
+                                                  dialogCtx,
+                                                  tagName,
+                                                  singlePhoto,
+                                                  tagCategoryId:
+                                                      selectedCategoryId,
+                                                );
+                                                anyChanged = true;
+                                                controller.clear();
+                                              }
+                                            },
+                                            onDone:
+                                                isDesktop ? closeDialog : null,
+                                          ),
+                                        Expanded(
+                                          child: sections.isEmpty
+                                              ? Center(
+                                                  child: Text(
+                                                    'No tags yet',
+                                                    style: TextStyle(
+                                                      color: colors.subtle,
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                )
+                                              : Scrollbar(
+                                                  thumbVisibility: true,
+                                                  child: ListView.builder(
+                                                    padding: EdgeInsets.only(
+                                                      top: isDesktop ? 2 : 4,
+                                                      right: isDesktop ? 10 : 6,
+                                                    ),
+                                                    itemCount: sections.length,
+                                                    itemBuilder: (_, index) {
+                                                      final section =
+                                                          sections[index];
+                                                      return Padding(
+                                                        padding:
+                                                            EdgeInsets.only(
+                                                          bottom: isDesktop
+                                                              ? 14
+                                                              : 16,
                                                         ),
-                                                      ),
-                                                      const SizedBox(height: 6),
-                                                      Wrap(
-                                                        spacing: 4,
-                                                        runSpacing: 1,
-                                                        children: s.tags.map((tag) {
-                                                          final allHave = photos.every(
-                                                            (p) => p.tagIds
-                                                                .contains(tag.id),
-                                                          );
-                                                          final someHave = photos.any(
-                                                            (p) => p.tagIds
-                                                                .contains(tag.id),
-                                                          );
+                                                        child: Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Text(
+                                                              section.title,
+                                                              style: TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                fontSize:
+                                                                    isDesktop
+                                                                        ? 12
+                                                                        : 15,
+                                                                color: colors
+                                                                    .subtle,
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 7,
+                                                            ),
+                                                            Wrap(
+                                                              spacing: isDesktop
+                                                                  ? 6
+                                                                  : 4,
+                                                              runSpacing:
+                                                                  isDesktop
+                                                                      ? 6
+                                                                      : 1,
+                                                              children: section
+                                                                  .tags
+                                                                  .map((tag) {
+                                                                final allHave =
+                                                                    photos
+                                                                        .every(
+                                                                  (p) => p
+                                                                      .tagIds
+                                                                      .contains(
+                                                                    tag.id,
+                                                                  ),
+                                                                );
+                                                                final someHave =
+                                                                    photos.any(
+                                                                  (p) => p
+                                                                      .tagIds
+                                                                      .contains(
+                                                                    tag.id,
+                                                                  ),
+                                                                );
+                                                                final isSelected = multiAssign
+                                                                    ? allHave
+                                                                    : photos
+                                                                        .first
+                                                                        .tagIds
+                                                                        .contains(
+                                                                            tag.id);
 
-                                                          // selected для single/multi
-                                                          final isSelected = multiAssign
-                                                              ? allHave
-                                                              : photos.first.tagIds
-                                                                  .contains(tag.id);
+                                                                IconData? icon;
+                                                                if (multiAssign) {
+                                                                  if (allHave) {
+                                                                    icon = Icons
+                                                                        .check;
+                                                                  } else if (someHave) {
+                                                                    icon = Icons
+                                                                        .remove;
+                                                                  }
+                                                                }
 
-                                                          IconData? icon;
-                                                          if (multiAssign) {
-                                                            if (allHave) {
-                                                              icon = Icons.check;
-                                                            } else if (someHave) {
-                                                              icon = Icons.remove;
-                                                            }
-                                                          }
-
-                                                          return ChoiceChip(
-                                                            shape:
-                                                                const StadiumBorder(),
-                                                            avatar: icon != null
-                                                                ? Icon(
-                                                                    icon,
-                                                                    size: 14,
-                                                                    color: Colors.white,
+                                                                return ChoiceChip(
+                                                                  visualDensity:
+                                                                      VisualDensity
+                                                                          .compact,
+                                                                  materialTapTargetSize:
+                                                                      MaterialTapTargetSize
+                                                                          .shrinkWrap,
+                                                                  side:
+                                                                      BorderSide(
+                                                                    color: isSelected
+                                                                        ? Colors
+                                                                            .white38
+                                                                        : Colors
+                                                                            .black26,
+                                                                  ),
+                                                                  shape:
+                                                                      const StadiumBorder(),
+                                                                  avatar: icon !=
+                                                                          null
+                                                                      ? Icon(
+                                                                          icon,
+                                                                          size: isDesktop
+                                                                              ? 13
+                                                                              : 14,
+                                                                          color:
+                                                                              Colors.white,
+                                                                          shadows:
+                                                                              _tagIconShadows,
+                                                                        )
+                                                                      : null,
+                                                                  label: Text(
+                                                                    tag.name,
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                  ),
+                                                                  selected:
+                                                                      isSelected,
+                                                                  selectedColor:
+                                                                      Color(tag
+                                                                              .colorValue)
+                                                                          .withValues(
+                                                                    alpha: 0.74,
+                                                                  ),
+                                                                  backgroundColor:
+                                                                      Color(tag
+                                                                          .colorValue),
+                                                                  labelStyle:
+                                                                      TextStyle(
+                                                                    color: Colors
+                                                                        .white,
+                                                                    fontSize:
+                                                                        isDesktop
+                                                                            ? 11
+                                                                            : 12,
                                                                     shadows:
                                                                         _tagIconShadows,
-                                                                  )
-                                                                : null,
-                                                            label: Text(
-                                                              tag.name,
-                                                              overflow:
-                                                                  TextOverflow.ellipsis,
-                                                            ),
-                                                            selected: isSelected,
-                                                            selectedColor:
-                                                                Color(tag.colorValue)
-                                                                    .withOpacity(0.7),
-                                                            backgroundColor:
-                                                                Color(tag.colorValue),
-                                                            labelStyle: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 12,
-                                                              shadows:
-                                                                  _tagIconShadows,
-                                                            ),
-                                                            padding:
-                                                                const EdgeInsets.symmetric(
-                                                              horizontal: 8,
-                                                              vertical: 2,
-                                                            ),
-                                                            onSelected: (selected) {
-                                                              final photoBloc =
-                                                                  dialogCtx.read<
-                                                                      PhotoBloc>();
+                                                                  ),
+                                                                  padding:
+                                                                      EdgeInsets
+                                                                          .symmetric(
+                                                                    horizontal:
+                                                                        isDesktop
+                                                                            ? 7
+                                                                            : 8,
+                                                                    vertical:
+                                                                        isDesktop
+                                                                            ? 0
+                                                                            : 2,
+                                                                  ),
+                                                                  onSelected:
+                                                                      (selected) {
+                                                                    final photoBloc =
+                                                                        dialogCtx
+                                                                            .read<PhotoBloc>();
 
-                                                              if (!multiAssign) {
-                                                                // Один кадр: просто тумблер
-                                                                final p = photos.first;
-                                                                if (selected) {
-                                                                  if (!p.tagIds
-                                                                      .contains(
-                                                                          tag.id)) {
-                                                                    p.tagIds
-                                                                        .add(tag.id);
-                                                                    photoBloc.add(
-                                                                        UpdatePhoto(p));
-                                                                  }
-                                                                } else {
-                                                                  if (p.tagIds.contains(
-                                                                      tag.id)) {
-                                                                    p.tagIds
-                                                                        .remove(tag.id);
-                                                                    photoBloc.add(
-                                                                        UpdatePhoto(p));
-                                                                  }
-                                                                }
-                                                                anyChanged = true;
-                                                              } else {
-                                                                // Мультивыбор: логика all/some
-                                                                for (final p
-                                                                    in photos) {
-                                                                  if (allHave ||
-                                                                      someHave) {
-                                                                    p.tagIds
-                                                                        .remove(tag.id);
-                                                                  } else {
-                                                                    if (!p.tagIds
-                                                                        .contains(
-                                                                            tag.id)) {
-                                                                      p.tagIds
-                                                                          .add(tag.id);
+                                                                    if (!multiAssign) {
+                                                                      final p =
+                                                                          photos
+                                                                              .first;
+                                                                      if (selected) {
+                                                                        if (!p
+                                                                            .tagIds
+                                                                            .contains(tag.id)) {
+                                                                          p.tagIds
+                                                                              .add(tag.id);
+                                                                          photoBloc
+                                                                              .add(UpdatePhoto(p));
+                                                                        }
+                                                                      } else {
+                                                                        if (p
+                                                                            .tagIds
+                                                                            .contains(tag.id)) {
+                                                                          p.tagIds
+                                                                              .remove(tag.id);
+                                                                          photoBloc
+                                                                              .add(UpdatePhoto(p));
+                                                                        }
+                                                                      }
+                                                                      anyChanged =
+                                                                          true;
+                                                                    } else {
+                                                                      for (final p
+                                                                          in photos) {
+                                                                        if (allHave ||
+                                                                            someHave) {
+                                                                          p.tagIds
+                                                                              .remove(tag.id);
+                                                                        } else if (!p
+                                                                            .tagIds
+                                                                            .contains(tag.id)) {
+                                                                          p.tagIds
+                                                                              .add(tag.id);
+                                                                        }
+                                                                        photoBloc
+                                                                            .add(UpdatePhoto(p));
+                                                                      }
+                                                                      anyChanged =
+                                                                          true;
                                                                     }
-                                                                  }
-                                                                  photoBloc.add(
-                                                                      UpdatePhoto(p));
-                                                                }
-                                                                anyChanged = true;
-                                                              }
 
-                                                              (tagCtx as Element)
-                                                                  .markNeedsBuild();
-                                                            },
-                                                          );
-                                                        }).toList(),
-                                                      ),
-                                                    ],
+                                                                    (tagCtx as Element)
+                                                                        .markNeedsBuild();
+                                                                  },
+                                                                );
+                                                              }).toList(),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      );
+                                                    },
                                                   ),
-                                                );
-                                              },
+                                                ),
+                                        ),
+                                        Divider(
+                                          height: isDesktop ? 18 : 20,
+                                          color: colors.border,
+                                        ),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: FilledButton(
+                                            onPressed: closeDialog,
+                                            child: Text(
+                                              allowNewTagCreation
+                                                  ? 'Done'
+                                                  : 'OK',
                                             ),
                                           ),
-                                  ),
-
-                                  // Нижняя панель с кнопками
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(dialogCtx).pop(false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      if (allowNewTagCreation)
-                                        ElevatedButton(
-                                          onPressed: () {
-                                            // Просто закрываем диалог.
-                                            // Само добавление тега делается через onSubmitAdd
-                                            // внутри _NewTagInlineEditor, когда юзер жмёт
-                                            // на кнопку [+] рядом с инпутом.
-                                            Navigator.of(dialogCtx).pop(anyChanged);
-                                          },
-                                          child: const Text('Done'),
-                                        )
-                                      else
-                                        ElevatedButton(
-                                          onPressed: () =>
-                                              Navigator.of(dialogCtx).pop(anyChanged),
-                                          child: const Text('OK'),
                                         ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
@@ -681,14 +798,15 @@ class _NewTagInlineEditor extends StatefulWidget {
   final List<TagCategory> categories;
   final ValueChanged<String?> onCategoryChanged;
   final VoidCallback onSubmitAdd;
+  final VoidCallback? onDone;
 
   const _NewTagInlineEditor({
-    Key? key,
     required this.controller,
     required this.categories,
     required this.onCategoryChanged,
     required this.onSubmitAdd,
-  }) : super(key: key);
+    this.onDone,
+  });
 
   @override
   State<_NewTagInlineEditor> createState() => _NewTagInlineEditorState();
@@ -698,6 +816,13 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
     with SingleTickerProviderStateMixin {
   bool _showCategory = false;
   String? _selectedCategoryId;
+  final FocusNode _tagInputFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _tagInputFocusNode.dispose();
+    super.dispose();
+  }
 
   void _toggleCategoryVisibility(bool value) {
     if (widget.categories.isEmpty) return;
@@ -722,44 +847,99 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
     });
   }
 
+  void _cancelTagInput() {
+    widget.onCategoryChanged(null);
+    setState(() {
+      widget.controller.clear();
+      _showCategory = false;
+      _selectedCategoryId = null;
+    });
+  }
+
+  void _handleEscapePressed() {
+    final hasDraft = widget.controller.text.trim().isNotEmpty ||
+        _showCategory ||
+        _selectedCategoryId != null;
+    if (hasDraft) {
+      _cancelTagInput();
+      return;
+    }
+    widget.onDone?.call();
+  }
+
+  void _handleEnterPressed() {
+    if (widget.controller.text.trim().isEmpty) {
+      widget.onDone?.call();
+      return;
+    }
+    _handleAddPressed();
+  }
+
   @override
   Widget build(BuildContext context) {
     final hasCategories = widget.categories.isNotEmpty;
+    final isDesktop = isDesktopPlatform;
+    final colors = context.appThemeColors;
 
     // при отсутствии категорий вторая строка всегда видна (иначе некуда нажать Add)
     final rowVisible = !hasCategories ? true : _showCategory;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final editor = Column(
+      crossAxisAlignment:
+          isDesktop ? CrossAxisAlignment.start : CrossAxisAlignment.stretch,
       children: [
-        // Первая строка — только инпут имени
-        Focus(
-          onFocusChange: (hasFocus) {
-            if (hasFocus && hasCategories) {
-              _toggleCategoryVisibility(true);
-            }
-          },
-          child: TextField(
-            controller: widget.controller,
-            style: const TextStyle(color: Colors.white, fontSize: 13),
-            decoration: InputDecoration(
-              hintText: 'Tag name',
-              hintStyle: const TextStyle(color: Colors.white54),
-              isDense: true,
-              enabledBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.white24),
-              ),
-              focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.white),
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: isDesktop ? 360 : double.infinity,
+          ),
+          child: CallbackShortcuts(
+            bindings: <ShortcutActivator, VoidCallback>{
+              const SingleActivator(LogicalKeyboardKey.escape):
+                  _handleEscapePressed,
+              const SingleActivator(LogicalKeyboardKey.enter):
+                  _handleEnterPressed,
+            },
+            child: Focus(
+              onFocusChange: (hasFocus) {
+                if (hasFocus && hasCategories) {
+                  _toggleCategoryVisibility(true);
+                }
+              },
+              child: TextField(
+                focusNode: _tagInputFocusNode,
+                controller: widget.controller,
+                style: TextStyle(
+                  color: colors.text,
+                  fontSize: isDesktop ? 12 : 13,
+                ),
+                textInputAction: TextInputAction.send,
+                decoration: InputDecoration(
+                  hintText: 'Tag name',
+                  hintStyle: TextStyle(color: colors.subtle),
+                  filled: true,
+                  fillColor: colors.surfaceAlt,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: isDesktop ? 10 : 12,
+                    vertical: isDesktop ? 9 : 11,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: colors.accent),
+                  ),
+                ),
+                onSubmitted: (_) => _handleEnterPressed(),
               ),
             ),
-            onSubmitted: (_) => _handleAddPressed(),
           ),
         ),
-
-        // Вторая строка — категория + кнопка Add (всё вместе анимированно выезжает)
         AnimatedSize(
-          duration: const Duration(milliseconds: 200),
+          duration:
+              isDesktop ? Duration.zero : const Duration(milliseconds: 200),
           curve: Curves.easeInOut,
           child: !rowVisible
               ? const SizedBox.shrink()
@@ -770,18 +950,26 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                       if (hasCategories)
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: _selectedCategoryId,
+                            initialValue: _selectedCategoryId,
                             isExpanded: true,
-                            dropdownColor: Colors.grey[900],
-                            decoration: const InputDecoration(
+                            dropdownColor: colors.surface,
+                            style: TextStyle(
+                              color: colors.text,
+                              fontSize: isDesktop ? 12 : 13,
+                            ),
+                            decoration: InputDecoration(
                               labelText: 'Category (optional)',
-                              labelStyle: TextStyle(color: Colors.white70),
+                              labelStyle: TextStyle(color: colors.subtle),
+                              filled: true,
+                              fillColor: colors.surfaceAlt,
                               isDense: true,
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Colors.white24),
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: colors.border),
                               ),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Colors.white),
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide(color: colors.accent),
                               ),
                             ),
                             items: widget.categories
@@ -790,8 +978,7 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                                     value: c.id,
                                     child: Text(
                                       c.name,
-                                      style:
-                                          const TextStyle(color: Colors.white),
+                                      style: TextStyle(color: colors.text),
                                     ),
                                   ),
                                 )
@@ -804,24 +991,19 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                             },
                           ),
                         ),
-
                       if (hasCategories) const SizedBox(width: 8),
-
-                      // Кнопка добавления тега (на второй строке, стилизована под dark UI)
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 8,
                           ),
-                          backgroundColor: Colors.white10,
-                          foregroundColor: Colors.white,
+                          backgroundColor: colors.surfaceAlt,
+                          foregroundColor: colors.text,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            side: const BorderSide(
-                              color: Colors.white24,
-                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            side: BorderSide(color: colors.border),
                           ),
                         ),
                         onPressed: _handleAddPressed,
@@ -838,9 +1020,17 @@ class _NewTagInlineEditorState extends State<_NewTagInlineEditor>
                   ),
                 ),
         ),
-
         const SizedBox(height: 8),
       ],
+    );
+
+    if (!isDesktop) return editor;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: editor,
+      ),
     );
   }
 }

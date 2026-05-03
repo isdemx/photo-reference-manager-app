@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/video_controls_widget.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../domain/entities/photo.dart';
@@ -99,11 +100,9 @@ class _GalleryVideoPageState extends State<GalleryVideoPage>
     final c = _c;
     if (c == null || !c.value.isInitialized) return;
 
-    final bool isMobile = Platform.isIOS || Platform.isAndroid;
-
     // На macOS/desktop не считаем "inactive/hidden" поводом ставить видео на паузу —
     // это часто просто потеря фокуса окна.
-    if (isMobile) {
+    if (isMobilePlatform) {
       if (state == AppLifecycleState.paused ||
           state == AppLifecycleState.inactive ||
           state == AppLifecycleState.hidden) {

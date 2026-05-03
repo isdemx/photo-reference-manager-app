@@ -87,7 +87,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
       final size = await StorageDiagnosticsService.getCacheSizeBytes().timeout(
         const Duration(seconds: 20),
       );
-      _log('cache size calculation success ${StorageDiagnosticsService.formatBytes(size)}');
+      _log(
+          'cache size calculation success ${StorageDiagnosticsService.formatBytes(size)}');
       if (!mounted) return;
       setState(() {
         _cacheSizeBytes = size;
@@ -118,7 +119,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
           await StorageDiagnosticsService.getAppFootprintBytes().timeout(
         const Duration(seconds: 20),
       );
-      _log('app size calculation success ${StorageDiagnosticsService.formatBytes(size)}');
+      _log(
+          'app size calculation success ${StorageDiagnosticsService.formatBytes(size)}');
       if (!mounted) return;
       setState(() {
         _appSizeBytes = size;
@@ -369,6 +371,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       onTap: () async {
+                        final messenger = ScaffoldMessenger.maybeOf(context);
                         setState(() {
                           _cacheLoading = true;
                           _appSizeLoading = true;
@@ -380,7 +383,8 @@ class _SettingsDialogState extends State<SettingsDialog> {
                         await _loadCacheSize();
                         await _loadAppSize();
                         if (!mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        if (messenger?.mounted != true) return;
+                        messenger!.showSnackBar(
                           const SnackBar(
                             content: Text('Cache cleared'),
                           ),

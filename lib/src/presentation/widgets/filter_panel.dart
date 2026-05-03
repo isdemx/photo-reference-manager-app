@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, TargetPlatform;
 
 import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/domain/entities/tag_category.dart';
@@ -9,6 +7,7 @@ import 'package:photographers_reference_app/src/domain/entities/tag_category.dar
 import 'package:photographers_reference_app/src/presentation/bloc/filter_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_category_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 class FilterPanel extends StatelessWidget {
   final List<Tag> tags;
@@ -18,7 +17,7 @@ class FilterPanel extends StatelessWidget {
   final VoidCallback onToggleLogic;
   final Widget? extraAction;
 
-  bool get isMacOS => defaultTargetPlatform == TargetPlatform.macOS;
+  bool get isMacOS => isDesktopPlatform;
 
   const FilterPanel({
     super.key,

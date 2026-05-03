@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:desktop_drop/desktop_drop.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:iconsax/iconsax.dart';
@@ -8,7 +7,6 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
-import 'package:photographers_reference_app/src/domain/entities/tag.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/tag_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/folders_helpers.dart';
@@ -17,6 +15,7 @@ import 'package:photographers_reference_app/src/presentation/helpers/photo_save_
 import 'package:photographers_reference_app/src/presentation/screens/main_screen.dart';
 import 'package:photographers_reference_app/src/presentation/screens/upload_screen.dart';
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_top_center_action.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/photo_grid_view.dart';
@@ -42,8 +41,7 @@ class _FolderScreenState extends State<FolderScreen> {
   final GlobalKey<PhotoGridViewState> _photoGridKey =
       GlobalKey<PhotoGridViewState>();
 
-  bool get _isDesktop =>
-      !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+  bool get _isDesktop => isDesktopPlatform;
 
   @override
   void initState() {
@@ -173,7 +171,7 @@ class _FolderScreenState extends State<FolderScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           MacosTopCenterAction(
-            icon: Iconsax.import_1,
+            icon: Iconsax.add,
             onTap: _openFolderUpload,
             tooltip: 'Upload to this folder',
           ),
@@ -207,7 +205,7 @@ class _FolderScreenState extends State<FolderScreen> {
     return Row(
       children: [
         AnimatedContainer(
-          width: _sidebarOpen ? 220 : 0,
+          width: _sidebarOpen ? MacosSidebar.preferredWidth : 0,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
           child: _sidebarOpen
@@ -289,7 +287,7 @@ class _FolderScreenState extends State<FolderScreen> {
                                 title: Text(widget.folder.name),
                                 actions: [
                                   IconButton(
-                                    icon: const Icon(Iconsax.import_1),
+                                    icon: const Icon(Iconsax.add),
                                     tooltip: 'Upload to this folder',
                                     onPressed: _openFolderUpload,
                                   ),

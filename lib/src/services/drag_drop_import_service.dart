@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:photographers_reference_app/src/domain/entities/photo.dart';
 import 'package:photographers_reference_app/src/presentation/helpers/photo_save_helper.dart';
 import 'package:photographers_reference_app/src/utils/_determine_media_type.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 enum ImportStage {
   idle,
@@ -39,7 +40,8 @@ class ImportStatus {
 
   double get progress => total == 0 ? 0.0 : completed / total;
 
-  bool get isActive => stage == ImportStage.loading || stage == ImportStage.converting;
+  bool get isActive =>
+      stage == ImportStage.loading || stage == ImportStage.converting;
   bool get isFinal =>
       stage == ImportStage.done ||
       stage == ImportStage.canceled ||
@@ -78,7 +80,8 @@ class DragDropImportService {
     required BuildContext context,
   }) {
     if (!_isDesktop()) return;
-    final filtered = files.where((f) => !_shouldSkipDroppedFile(f.path)).toList();
+    final filtered =
+        files.where((f) => !_shouldSkipDroppedFile(f.path)).toList();
     if (filtered.isEmpty) return;
     _queue.add(_ImportJob(files: filtered, context: context));
     _processQueue();
@@ -247,8 +250,7 @@ class DragDropImportService {
   }
 
   bool _isDesktop() {
-    if (kIsWeb) return false;
-    return Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+    return isDesktopPlatform;
   }
 }
 

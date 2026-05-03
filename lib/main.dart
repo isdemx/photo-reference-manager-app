@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
 import 'dart:ui';
-import 'dart:io';
 import 'package:flutter/foundation.dart' hide Category;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -62,6 +61,7 @@ import 'package:photographers_reference_app/src/services/navigation_history_serv
 import 'package:photographers_reference_app/src/presentation/theme/app_theme.dart';
 import 'package:photographers_reference_app/src/services/window_service.dart';
 import 'package:photographers_reference_app/src/services/app_reload_service.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 bool _ratingPromptScheduled = false;
@@ -95,7 +95,7 @@ void main(List<String> args) async {
     };
     // ВТОРОЙ движок (новое окно) требует ручной регистрации плагинов
     DartPluginRegistrant.ensureInitialized();
-    if (!kIsWeb && Platform.isIOS) {
+    if (isMobilePlatform) {
       await SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
       ]);
@@ -126,17 +126,13 @@ void main(List<String> args) async {
     final bool isChildWindow =
         ((initialArgs['route'] as String?) ?? '').isNotEmpty;
     _openLog('isChildWindow=$isChildWindow route=${initialArgs['route']}');
-    if (!kIsWeb &&
-        (Platform.isMacOS || Platform.isWindows || Platform.isLinux)) {
+    if (isDesktopPlatform) {
       await windowManager.ensureInitialized();
     }
-    if (!kIsWeb &&
-        (Platform.isMacOS || Platform.isWindows || Platform.isLinux) &&
-        !isChildWindow) {
-      if (Platform.isMacOS) {
+    if (isDesktopPlatform && !isChildWindow) {
+      if (isMacOSDesktopPlatform) {
         try {
-          final themePreference =
-              await ThemeSettingsService().loadPreference();
+          final themePreference = await ThemeSettingsService().loadPreference();
           final resolvedBrightness = switch (themePreference) {
             AppThemePreference.dark => Brightness.dark,
             AppThemePreference.light => Brightness.light,
@@ -168,8 +164,7 @@ void main(List<String> args) async {
     final initialData = await _loadAppBootstrapData();
 
     // 5) Запуск приложения
-    final shouldShowWindowAfterFirstFrame = !kIsWeb &&
-        Platform.isMacOS &&
+    final shouldShowWindowAfterFirstFrame = isMacOSDesktopPlatform &&
         !isMultiWindowLaunch &&
         ((initialArgs['route'] as String?) ?? '').isNotEmpty;
     runApp(_AppBootstrap(
@@ -510,8 +505,7 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool noDesktopTransitions =
-        !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+    final bool noDesktopTransitions = isDesktopPlatform;
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider(create: (_) => CategoryRepositoryImpl(categoryBox)),

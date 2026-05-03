@@ -51,6 +51,7 @@ import 'package:photographers_reference_app/src/utils/edit_build_crop_handlers.d
 import 'package:photographers_reference_app/src/utils/edit_combined_color_filter.dart';
 import 'package:photographers_reference_app/src/utils/longpress_vibrating.dart';
 import 'package:photographers_reference_app/src/utils/photo_path_helper.dart';
+import 'package:photographers_reference_app/src/utils/platform_utils.dart';
 
 ////////////////////////////////////////////////////////////////
 /// SECTION: Models (State)
@@ -773,7 +774,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Timer? _arrowRepeatTick;
   LogicalKeyboardKey? _heldArrowKey;
 
-  bool get _showDesktopTopBar => !kIsWeb && Platform.isMacOS && !_isFullscreen;
+  bool get _showDesktopTopBar => isDesktopPlatform && !_isFullscreen;
 
   void _popCollageRoute() {
     if (!Platform.isIOS) {
@@ -1186,7 +1187,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   bool get _canPanCanvasByTouch {
-    return Platform.isIOS &&
+    return isMobilePlatform &&
         !_overviewMode &&
         !_instaSelectionMode &&
         !_showViewZoneOverlay &&
@@ -1505,11 +1506,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final next = !_isFullscreen;
     setState(() {
       _isFullscreen = next;
-      if (Platform.isIOS) {
+      if (isMobilePlatform) {
         _iosCollageControlsExpanded = false;
       }
     });
-    if (Platform.isIOS) {
+    if (isMobilePlatform) {
       if (next) {
         await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
         WakelockPlus.enable();
@@ -1519,9 +1520,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       }
       return;
     }
-    if (!Platform.isMacOS) return;
+    if (!isDesktopPlatform) return;
     try {
-      if (next) {
+      if (next && isMacOSDesktopPlatform) {
         WakelockPlus.enable();
         _wasMaximizedBeforeFullscreen = await windowManager.isMaximized();
         await windowManager.setTitleBarStyle(
@@ -1529,7 +1530,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           windowButtonVisibility: false,
         );
         await windowManager.maximize();
-      } else {
+      } else if (isMacOSDesktopPlatform) {
         WakelockPlus.disable();
         await windowManager.setTitleBarStyle(
           TitleBarStyle.hidden,
@@ -1543,12 +1544,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   Future<void> _toggleIOSOrientation() async {
-    if (!Platform.isIOS) return;
+    if (!isMobilePlatform) return;
 
     final nextLandscape = !_isIOSLandscape;
     final currentViewport = _viewportSize();
-    final canvasAnchor =
-        _screenToCanvas(currentViewport.center(Offset.zero));
+    final canvasAnchor = _screenToCanvas(currentViewport.center(Offset.zero));
     final scale = TransformMath.getScale(_transformationController.value)
         .clamp(_minCollageScale, _maxCollageScale)
         .toDouble();
@@ -1969,12 +1969,12 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final sliceCount = rect == null ? 1 : _instaCarouselSliceCount(rect);
     final viewport = _viewportSize();
     final media = MediaQuery.of(context);
-    final isIOS = Platform.isIOS;
+    final isMobile = isMobilePlatform;
     final isLandscape = media.size.width > media.size.height;
-    final bottomControlsReserve = isIOS
-        ? media.padding.bottom + (isLandscape ? 88.0 : 158.0)
-        : 56.0;
-    final maxButtonTop = math.max(12.0, viewport.height - bottomControlsReserve);
+    final bottomControlsReserve =
+        isMobile ? media.padding.bottom + (isLandscape ? 88.0 : 158.0) : 56.0;
+    final maxButtonTop =
+        math.max(12.0, viewport.height - bottomControlsReserve);
     final buttonLeft = screenRect.isEmpty
         ? 16.0
         : screenRect.left
@@ -1982,9 +1982,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
             .toDouble();
     final buttonTop = screenRect.isEmpty
         ? 16.0
-        : (screenRect.bottom + 10)
-            .clamp(12.0, maxButtonTop)
-            .toDouble();
+        : (screenRect.bottom + 10).clamp(12.0, maxButtonTop).toDouble();
 
     return Positioned.fill(
       child: Stack(
@@ -2377,7 +2375,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Size _currentCanvasSize() {
     final base = _viewportSize();
-    if (Platform.isIOS) {
+    if (isMobilePlatform) {
       return const Size.square(_iosCanvasSide);
     }
     return Size(
@@ -2423,7 +2421,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   Offset _screenToCanvas(Offset screen) {
-    final topInset = Platform.isIOS && !_isFullscreen
+    final topInset = isMobilePlatform && !_isFullscreen
         ? MediaQuery.of(context).padding.top
         : 0.0;
     final inv = Matrix4.inverted(_transformationController.value);
@@ -2433,7 +2431,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   Offset _canvasToScreen(Offset canvas) {
-    final topInset = Platform.isIOS && !_isFullscreen
+    final topInset = isMobilePlatform && !_isFullscreen
         ? MediaQuery.of(context).padding.top
         : 0.0;
     final v = Vector3(canvas.dx, canvas.dy, 0);
@@ -2498,7 +2496,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   void _applyDefaultAddedPhotoScale(CollagePhotoState item) {
-    if (Platform.isIOS) {
+    if (isMobilePlatform) {
       item.scale = _screenContainScaleForItem(item) / 6.0;
       return;
     }
@@ -2509,7 +2507,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final size = _viewportSize();
     final screenScale = _collageScale == 0 ? 1.0 : _collageScale;
     final containScale = _screenContainScaleForItem(item);
-    final scale = Platform.isIOS ? containScale / 6.0 : containScale;
+    final scale = isMobilePlatform ? containScale / 6.0 : containScale;
 
     final screenW = item.baseWidth * scale * screenScale;
     final screenH = item.baseHeight * scale * screenScale;
@@ -2586,7 +2584,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     final isSomePhotoInEditMode = sorted.any((it) => it.isEditing);
 
-    final bool isIOS = Platform.isIOS;
+    final bool isMobile = isMobilePlatform;
     final double bottomInset = MediaQuery.of(context).padding.bottom;
 
     final videoOverlays = _overviewMode
@@ -2615,492 +2613,497 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         focusNode: _focusNode,
         autofocus: true,
         onKeyEvent: (node, event) {
-        if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
-            event.logicalKey == LogicalKeyboardKey.arrowLeft) {
-          if (event is KeyUpEvent) {
-            _cancelArrowRepeat();
+          if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+              event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+            if (event is KeyUpEvent) {
+              _cancelArrowRepeat();
+              return KeyEventResult.handled;
+            }
+            if (event is KeyDownEvent) {
+              final next = event.logicalKey == LogicalKeyboardKey.arrowRight;
+              _switchPhotoInActiveContainer(next: next);
+              _startArrowRepeat(event.logicalKey);
+              return KeyEventResult.handled;
+            }
+            if (event is KeyRepeatEvent) {
+              _startArrowRepeat(event.logicalKey);
+              return KeyEventResult.handled;
+            }
             return KeyEventResult.handled;
           }
-          if (event is KeyDownEvent) {
-            final next = event.logicalKey == LogicalKeyboardKey.arrowRight;
-            _switchPhotoInActiveContainer(next: next);
-            _startArrowRepeat(event.logicalKey);
+
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+          if (_handleViewZoneHotkeys(event)) {
             return KeyEventResult.handled;
           }
-          if (event is KeyRepeatEvent) {
-            _startArrowRepeat(event.logicalKey);
+
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+            if (_activeItemIndex != null &&
+                _activeItemIndex! >= 0 &&
+                _activeItemIndex! < _items.length) {
+              final item = _items[_activeItemIndex!];
+              if (item.isEditing) {
+                _exitEditingMode();
+                return KeyEventResult.handled;
+              }
+            }
+          }
+
+          if (event.logicalKey == LogicalKeyboardKey.keyF) {
+            _toggleFullscreen();
             return KeyEventResult.handled;
           }
-          return KeyEventResult.handled;
-        }
 
-        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          if (event.logicalKey == LogicalKeyboardKey.keyA) {
+            _showAllPhotosSheet();
+            return KeyEventResult.handled;
+          }
 
-        if (_handleViewZoneHotkeys(event)) {
-          return KeyEventResult.handled;
-        }
+          if (event.logicalKey == LogicalKeyboardKey.keyZ) {
+            if (_showViewZoneOverlay) {
+              _exitViewZoneOverlay();
+            } else {
+              _showViewZonePanel();
+            }
+            return KeyEventResult.handled;
+          }
 
-        if (event.logicalKey == LogicalKeyboardKey.enter ||
-            event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-          if (_activeItemIndex != null &&
-              _activeItemIndex! >= 0 &&
-              _activeItemIndex! < _items.length) {
-            final item = _items[_activeItemIndex!];
-            if (item.isEditing) {
-              _exitEditingMode();
+          if (event.logicalKey == LogicalKeyboardKey.keyO) {
+            _toggleOverviewMode();
+            return KeyEventResult.handled;
+          }
+
+          if (event.logicalKey == LogicalKeyboardKey.keyB) {
+            _showColorPickerDialog();
+            return KeyEventResult.handled;
+          }
+
+          if (event.logicalKey == LogicalKeyboardKey.keyS) {
+            _onSaveCollageToDb();
+            return KeyEventResult.handled;
+          }
+
+          if (event.logicalKey == LogicalKeyboardKey.keyP) {
+            setState(() => _isPrivate = !_isPrivate);
+            return KeyEventResult.handled;
+          }
+
+          if (event.logicalKey == LogicalKeyboardKey.keyI) {
+            _onGenerateCollage();
+            return KeyEventResult.handled;
+          }
+
+          if (event.logicalKey == LogicalKeyboardKey.space) {
+            _toggleActiveVideoPlayPause();
+            return KeyEventResult.handled;
+          }
+
+          final label = event.logicalKey.keyLabel;
+          final isPlus = label == '+' || label == '=';
+          final isMinus = label == '-' || label == '_';
+
+          if (isPlus ||
+              event.logicalKey == LogicalKeyboardKey.equal ||
+              event.logicalKey == LogicalKeyboardKey.numpadAdd) {
+            if (isPlus ||
+                HardwareKeyboard.instance.isShiftPressed ||
+                event.logicalKey == LogicalKeyboardKey.numpadAdd) {
+              if (_showViewZoneOverlay) {
+                _pendingViewZoneIndex = null;
+                _skipViewZoneRestore = false;
+                _pendingZoomMultiplier = 1.1;
+                _viewZoneSheetController?.close();
+              } else {
+                _zoomByStep(1.1);
+              }
               return KeyEventResult.handled;
             }
           }
-        }
 
-        if (event.logicalKey == LogicalKeyboardKey.keyF) {
-          _toggleFullscreen();
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyA) {
-          _showAllPhotosSheet();
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyZ) {
-          if (_showViewZoneOverlay) {
-            _exitViewZoneOverlay();
-          } else {
-            _showViewZonePanel();
-          }
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyO) {
-          _toggleOverviewMode();
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyB) {
-          _showColorPickerDialog();
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyS) {
-          _onSaveCollageToDb();
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyP) {
-          setState(() => _isPrivate = !_isPrivate);
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.keyI) {
-          _onGenerateCollage();
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.space) {
-          _toggleActiveVideoPlayPause();
-          return KeyEventResult.handled;
-        }
-
-        final label = event.logicalKey.keyLabel;
-        final isPlus = label == '+' || label == '=';
-        final isMinus = label == '-' || label == '_';
-
-        if (isPlus ||
-            event.logicalKey == LogicalKeyboardKey.equal ||
-            event.logicalKey == LogicalKeyboardKey.numpadAdd) {
-          if (isPlus ||
-              HardwareKeyboard.instance.isShiftPressed ||
-              event.logicalKey == LogicalKeyboardKey.numpadAdd) {
+          if (isMinus ||
+              event.logicalKey == LogicalKeyboardKey.minus ||
+              event.logicalKey == LogicalKeyboardKey.numpadSubtract) {
             if (_showViewZoneOverlay) {
               _pendingViewZoneIndex = null;
               _skipViewZoneRestore = false;
-              _pendingZoomMultiplier = 1.1;
+              _pendingZoomMultiplier = 0.9;
               _viewZoneSheetController?.close();
             } else {
-              _zoomByStep(1.1);
+              _zoomByStep(0.9);
             }
             return KeyEventResult.handled;
           }
-        }
 
-        if (isMinus ||
-            event.logicalKey == LogicalKeyboardKey.minus ||
-            event.logicalKey == LogicalKeyboardKey.numpadSubtract) {
-          if (_showViewZoneOverlay) {
-            _pendingViewZoneIndex = null;
-            _skipViewZoneRestore = false;
-            _pendingZoomMultiplier = 0.9;
-            _viewZoneSheetController?.close();
-          } else {
-            _zoomByStep(0.9);
+          final shift = HardwareKeyboard.instance.isShiftPressed;
+
+          if (event.logicalKey == LogicalKeyboardKey.comma && shift) {
+            _seekActiveVideoBySeconds(-5);
+            return KeyEventResult.handled;
           }
-          return KeyEventResult.handled;
-        }
+          if (event.logicalKey == LogicalKeyboardKey.period && shift) {
+            _seekActiveVideoBySeconds(5);
+            return KeyEventResult.handled;
+          }
 
-        final shift = HardwareKeyboard.instance.isShiftPressed;
+          if (event.logicalKey == LogicalKeyboardKey.comma) {
+            _seekActiveVideoBySeconds(-5);
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.period) {
+            _seekActiveVideoBySeconds(5);
+            return KeyEventResult.handled;
+          }
 
-        if (event.logicalKey == LogicalKeyboardKey.comma && shift) {
-          _seekActiveVideoBySeconds(-5);
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.period && shift) {
-          _seekActiveVideoBySeconds(5);
-          return KeyEventResult.handled;
-        }
-
-        if (event.logicalKey == LogicalKeyboardKey.comma) {
-          _seekActiveVideoBySeconds(-5);
-          return KeyEventResult.handled;
-        }
-        if (event.logicalKey == LogicalKeyboardKey.period) {
-          _seekActiveVideoBySeconds(5);
-          return KeyEventResult.handled;
-        }
-
-        return KeyEventResult.ignored;
-      },
+          return KeyEventResult.ignored;
+        },
         child: Scaffold(
-        key: _scaffoldKey,
-        appBar: _showDesktopTopBar ? _desktopTopBar() : null,
-        body: Stack(
-          children: [
-            Column(
-              children: [
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      _canvasViewportSize =
-                          Size(constraints.maxWidth, constraints.maxHeight);
-                      final canvasSize = _currentCanvasSize();
-                      final topInset = isIOS && !_isFullscreen
-                          ? MediaQuery.of(context).padding.top
-                          : 0.0;
+          key: _scaffoldKey,
+          appBar: _showDesktopTopBar ? _desktopTopBar() : null,
+          body: Stack(
+            children: [
+              Column(
+                children: [
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        _canvasViewportSize =
+                            Size(constraints.maxWidth, constraints.maxHeight);
+                        final canvasSize = _currentCanvasSize();
+                        final topInset = isMobile && !_isFullscreen
+                            ? MediaQuery.of(context).padding.top
+                            : 0.0;
 
-                      return Listener(
-                        behavior: HitTestBehavior.opaque,
-                        onPointerPanZoomStart: (_) {
-                          if (_overviewMode) return;
-                          _isTrackpadPanZoomActive = true;
-                        },
-                        onPointerPanZoomUpdate: (e) {
-                          if (_overviewMode) return;
-                          if (_isItemScaleGestureActive &&
-                              !_isTrackpadPanZoomActive) {
-                            return;
-                          }
-                          _isTrackpadPanZoomActive = true;
-                          if (e.panDelta != Offset.zero) {
-                            final next = _transformationController.value.clone()
-                              ..translate(e.panDelta.dx, e.panDelta.dy);
-                            _setTransform(next);
-                          }
-                        },
-                        onPointerPanZoomEnd: (_) {
-                          if (_overviewMode) return;
-                          _isTrackpadPanZoomActive = false;
-                          _saveCollageScale(_collageScale);
-                        },
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onTap: () {
+                        return Listener(
+                          behavior: HitTestBehavior.opaque,
+                          onPointerPanZoomStart: (_) {
                             if (_overviewMode) return;
-                            _exitEditingMode();
+                            _isTrackpadPanZoomActive = true;
                           },
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: Container(color: Colors.grey[900]),
-                              ),
-                              Positioned.fill(
-                                child: Padding(
-                                  padding: EdgeInsets.only(top: topInset),
-                                  child: InteractiveViewer(
-                                    transformationController:
-                                        _transformationController,
-                                    boundaryMargin:
-                                        const EdgeInsets.all(999999),
-                                    minScale: _minCollageScale,
-                                    maxScale: _maxCollageScale,
-                                    scaleEnabled: false,
-                                    panEnabled: false,
-                                    clipBehavior: Clip.none,
-                                    onInteractionEnd: (_) {
-                                      _setTransform(
-                                          _transformationController.value);
-                                      _saveCollageScale(_collageScale);
-                                    },
-                                    child: IgnorePointer(
-                                      ignoring: _overviewMode,
-                                      child: RepaintBoundary(
-                                        key: _collageKey,
-                                        child: SizedBox(
-                                          width: canvasSize.width,
-                                          height: canvasSize.height,
-                                          child: Stack(
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Positioned.fill(
-                                                child: GestureDetector(
-                                                  behavior:
-                                                      HitTestBehavior.opaque,
-                                                  onPanStart:
-                                                      _startTouchCanvasPan,
-                                                  onPanUpdate:
-                                                      _updateTouchCanvasPan,
-                                                  onPanEnd: (_) =>
-                                                      _endTouchCanvasPan(),
-                                                  onPanCancel:
-                                                      _endTouchCanvasPan,
-                                                  child: Container(
-                                                    color: _backgroundColor,
-                                                  ),
-                                                ),
-                                              ),
-                                              for (final item in sorted)
-                                                _buildPhotoItem(item),
-                                              if (_showViewZoneOverlay)
+                          onPointerPanZoomUpdate: (e) {
+                            if (_overviewMode) return;
+                            if (_isItemScaleGestureActive &&
+                                !_isTrackpadPanZoomActive) {
+                              return;
+                            }
+                            _isTrackpadPanZoomActive = true;
+                            if (e.panDelta != Offset.zero) {
+                              final next = _transformationController.value
+                                  .clone()
+                                ..translate(e.panDelta.dx, e.panDelta.dy);
+                              _setTransform(next);
+                            }
+                          },
+                          onPointerPanZoomEnd: (_) {
+                            if (_overviewMode) return;
+                            _isTrackpadPanZoomActive = false;
+                            _saveCollageScale(_collageScale);
+                          },
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.translucent,
+                            onTap: () {
+                              if (_overviewMode) return;
+                              _exitEditingMode();
+                            },
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Container(color: Colors.grey[900]),
+                                ),
+                                Positioned.fill(
+                                  child: Padding(
+                                    padding: EdgeInsets.only(top: topInset),
+                                    child: InteractiveViewer(
+                                      transformationController:
+                                          _transformationController,
+                                      boundaryMargin:
+                                          const EdgeInsets.all(999999),
+                                      minScale: _minCollageScale,
+                                      maxScale: _maxCollageScale,
+                                      scaleEnabled: false,
+                                      panEnabled: false,
+                                      clipBehavior: Clip.none,
+                                      onInteractionEnd: (_) {
+                                        _setTransform(
+                                            _transformationController.value);
+                                        _saveCollageScale(_collageScale);
+                                      },
+                                      child: IgnorePointer(
+                                        ignoring: _overviewMode,
+                                        child: RepaintBoundary(
+                                          key: _collageKey,
+                                          child: SizedBox(
+                                            width: canvasSize.width,
+                                            height: canvasSize.height,
+                                            child: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
                                                 Positioned.fill(
-                                                  child: CustomPaint(
-                                                    painter: _ViewZonesPainter(
-                                                      zones: _viewZones,
-                                                      colors: _viewZoneColors,
-                                                      viewportSize:
-                                                          _viewportSize(),
-                                                      strokeWidth: math.max(
-                                                        1.0,
-                                                        2 /
-                                                            (_collageScale == 0
-                                                                ? 1
-                                                                : _collageScale),
-                                                      ),
+                                                  child: GestureDetector(
+                                                    behavior:
+                                                        HitTestBehavior.opaque,
+                                                    onPanStart:
+                                                        _startTouchCanvasPan,
+                                                    onPanUpdate:
+                                                        _updateTouchCanvasPan,
+                                                    onPanEnd: (_) =>
+                                                        _endTouchCanvasPan(),
+                                                    onPanCancel:
+                                                        _endTouchCanvasPan,
+                                                    child: Container(
+                                                      color: _backgroundColor,
                                                     ),
                                                   ),
                                                 ),
-                                              if (_showViewZoneOverlay)
-                                                Positioned.fill(
-                                                  child: GestureDetector(
-                                                    behavior: HitTestBehavior
-                                                        .translucent,
-                                                    onTap: _exitViewZoneOverlay,
+                                                for (final item in sorted)
+                                                  _buildPhotoItem(item),
+                                                if (_showViewZoneOverlay)
+                                                  Positioned.fill(
+                                                    child: CustomPaint(
+                                                      painter:
+                                                          _ViewZonesPainter(
+                                                        zones: _viewZones,
+                                                        colors: _viewZoneColors,
+                                                        viewportSize:
+                                                            _viewportSize(),
+                                                        strokeWidth: math.max(
+                                                          1.0,
+                                                          2 /
+                                                              (_collageScale ==
+                                                                      0
+                                                                  ? 1
+                                                                  : _collageScale),
+                                                        ),
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              if (_showViewZoneOverlay)
-                                                ..._buildViewZoneHandles(),
-                                            ],
+                                                if (_showViewZoneOverlay)
+                                                  Positioned.fill(
+                                                    child: GestureDetector(
+                                                      behavior: HitTestBehavior
+                                                          .translucent,
+                                                      onTap:
+                                                          _exitViewZoneOverlay,
+                                                    ),
+                                                  ),
+                                                if (_showViewZoneOverlay)
+                                                  ..._buildViewZoneHandles(),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              ...videoOverlays,
-                              ...rotationOverlays,
-                              if (_overviewMode)
-                                const Positioned.fill(
-                                  child: ModalBarrier(
-                                    dismissible: false,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              if (_overviewMode) _buildOverviewGrid(_items),
-                              if (!isSomePhotoInEditMode &&
-                                  (_showForInitDeleteIcon ||
-                                      _draggingIndex != null))
-                                Positioned(
-                                  left: 0,
-                                  right: 0,
-                                  bottom: 50,
-                                  child: Center(
-                                    child: Container(
-                                      key: _deleteIconKey,
-                                      width: 64,
-                                      height: 64,
-                                      decoration: BoxDecoration(
-                                        color: _deleteHover
-                                            ? Colors.red
-                                            : Colors.white30,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.delete,
-                                          color: Colors.black),
+                                ...videoOverlays,
+                                ...rotationOverlays,
+                                if (_overviewMode)
+                                  const Positioned.fill(
+                                    child: ModalBarrier(
+                                      dismissible: false,
+                                      color: Colors.black,
                                     ),
                                   ),
-                                ),
-                              if (_showTutorial)
-                                Positioned.fill(
-                                  child: Container(
-                                    color: Colors.black.withOpacity(0.8),
+                                if (_overviewMode) _buildOverviewGrid(_items),
+                                if (!isSomePhotoInEditMode &&
+                                    (_showForInitDeleteIcon ||
+                                        _draggingIndex != null))
+                                  Positioned(
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 50,
                                     child: Center(
-                                      child: SingleChildScrollView(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            const Icon(Icons.touch_app,
-                                                size: 60, color: Colors.white),
-                                            const SizedBox(height: 20),
-                                            const Text(
-                                              'Move with one finger\n'
-                                              'Zoom with two fingers\n'
-                                              'Long Press to toggle Edit Mode\n'
-                                              'Rotate + Brightness + Saturation + Temperature + Hue\n'
-                                              'Crop corners when in Edit Mode\n'
-                                              'Tap to bring to front\n'
-                                              'Press check to save image',
-                                              textAlign: TextAlign.center,
-                                              style: TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 15,
-                                                fontWeight: FontWeight.bold,
+                                      child: Container(
+                                        key: _deleteIconKey,
+                                        width: 64,
+                                        height: 64,
+                                        decoration: BoxDecoration(
+                                          color: _deleteHover
+                                              ? Colors.red
+                                              : Colors.white30,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.delete,
+                                            color: Colors.black),
+                                      ),
+                                    ),
+                                  ),
+                                if (_showTutorial)
+                                  Positioned.fill(
+                                    child: Container(
+                                      color: Colors.black.withOpacity(0.8),
+                                      child: Center(
+                                        child: SingleChildScrollView(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.touch_app,
+                                                  size: 60,
+                                                  color: Colors.white),
+                                              const SizedBox(height: 20),
+                                              const Text(
+                                                'Move with one finger\n'
+                                                'Zoom with two fingers\n'
+                                                'Long Press to toggle Edit Mode\n'
+                                                'Rotate + Brightness + Saturation + Temperature + Hue\n'
+                                                'Crop corners when in Edit Mode\n'
+                                                'Tap to bring to front\n'
+                                                'Press check to save image',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
                                               ),
-                                            ),
-                                            const SizedBox(height: 20),
-                                            ElevatedButton(
-                                              onPressed: () async {
-                                                if (!mounted) return;
-                                                setState(() =>
-                                                    _showTutorial = false);
-                                                await _markTutorialPassed();
-                                              },
-                                              child: const Text('Got it'),
-                                            ),
-                                          ],
+                                              const SizedBox(height: 20),
+                                              ElevatedButton(
+                                                onPressed: () async {
+                                                  if (!mounted) return;
+                                                  setState(() =>
+                                                      _showTutorial = false);
+                                                  await _markTutorialPassed();
+                                                },
+                                                child: const Text('Got it'),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
-            if (_instaSelectionMode) _buildInstaSelectionOverlay(),
-            if (isSomePhotoInEditMode && editingPhoto != null)
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 12 + (isIOS ? bottomInset : 0.0),
-                child: PhotoAdjustmentsPanel(
-                  onRotateLeft: () =>
-                      setState(() => editingPhoto.rotation -= math.pi / 2),
-                  onRotateRight: () =>
-                      setState(() => editingPhoto.rotation += math.pi / 2),
-                  onFlipX: () => _toggleEditingFlipX(editingPhoto),
-                  onSendBackward: () => _sendItemBackward(editingPhoto),
-                  onBringForward: () => _sendItemForward(editingPhoto),
-                  onFlipY: null,
-                  onDone: () => _exitEditingMode(),
-                  onReset: () => _resetPhotoEditSettings(editingPhoto),
-                  brightness: editingPhoto.brightness,
-                  saturation: editingPhoto.saturation,
-                  temp: editingPhoto.temp,
-                  hue: editingPhoto.hue,
-                  contrast: editingPhoto.contrast,
-                  opacity: editingPhoto.opacity,
-                  onBrightnessChanged: (v) =>
-                      setState(() => editingPhoto.brightness = v),
-                  onSaturationChanged: (v) =>
-                      setState(() => editingPhoto.saturation = v),
-                  onTempChanged: (v) => setState(() => editingPhoto.temp = v),
-                  onHueChanged: (v) => setState(() => editingPhoto.hue = v),
-                  onContrastChanged: (v) =>
-                      setState(() => editingPhoto.contrast = v),
-                  onOpacityChanged: (v) =>
-                      setState(() => editingPhoto.opacity = v),
-                ),
-              )
-            else if (_draggingIndex == null) ...[
-              if (isIOS)
-                ...buildIOSCollageControlsOverlay(
-                  context: context,
-                  isFullscreen: _isFullscreen,
-                  controlsExpanded: _iosCollageControlsExpanded,
-                  bottomInset: bottomInset,
-                  sliderValue: _scaleToSliderValue(
-                    _collageScale.clamp(_minCollageScale, _maxCollageScale),
-                  ),
-                  onSliderChanged: _handleCollageZoomSliderChanged,
-                  joystick: _buildMobileCanvasJoystick(),
-                  actions: _collageControlActions(
-                    includeViewZones: false,
-                    includeCancel: false,
-                  ),
-                  onToggleControls: () {
-                    setState(() {
-                      _iosCollageControlsExpanded =
-                          !_iosCollageControlsExpanded;
-                    });
-                  },
-                  onCollapseControls: () {
-                    setState(() => _iosCollageControlsExpanded = false);
-                  },
-                )
-              else if (Platform.isMacOS)
-                ...buildMacOSCollageControlsOverlay(
-                  isFullscreen: _isFullscreen,
-                  zoomControl: _buildFloatingZoomControl(),
-                  actionButtons: _buildFloatingActionButtons(),
-                  leftHover: _fullscreenBottomHoverLeft,
-                  rightHover: _fullscreenBottomHoverRight,
-                  onLeftHoverChanged: (value) {
-                    setState(() => _fullscreenBottomHoverLeft = value);
-                  },
-                  onRightHoverChanged: (value) {
-                    setState(() => _fullscreenBottomHoverRight = value);
-                  },
-                )
-              else
+                ],
+              ),
+              if (_instaSelectionMode) _buildInstaSelectionOverlay(),
+              if (isSomePhotoInEditMode && editingPhoto != null)
                 Positioned(
+                  left: 12,
                   right: 12,
-                  bottom: 12,
-                  child: _buildFloatingActionButtons(),
-                ),
-            ],
-            if (_isFullscreen && _draggingIndex == null)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: IconButton(
-                      icon: const Icon(Icons.fullscreen_exit,
-                          color: Colors.white),
-                      onPressed: _toggleFullscreen,
+                  bottom: 12 + (isMobile ? bottomInset : 0.0),
+                  child: PhotoAdjustmentsPanel(
+                    onRotateLeft: () =>
+                        setState(() => editingPhoto.rotation -= math.pi / 2),
+                    onRotateRight: () =>
+                        setState(() => editingPhoto.rotation += math.pi / 2),
+                    onFlipX: () => _toggleEditingFlipX(editingPhoto),
+                    onSendBackward: () => _sendItemBackward(editingPhoto),
+                    onBringForward: () => _sendItemForward(editingPhoto),
+                    onFlipY: null,
+                    onDone: () => _exitEditingMode(),
+                    onReset: () => _resetPhotoEditSettings(editingPhoto),
+                    brightness: editingPhoto.brightness,
+                    saturation: editingPhoto.saturation,
+                    temp: editingPhoto.temp,
+                    hue: editingPhoto.hue,
+                    contrast: editingPhoto.contrast,
+                    opacity: editingPhoto.opacity,
+                    onBrightnessChanged: (v) =>
+                        setState(() => editingPhoto.brightness = v),
+                    onSaturationChanged: (v) =>
+                        setState(() => editingPhoto.saturation = v),
+                    onTempChanged: (v) => setState(() => editingPhoto.temp = v),
+                    onHueChanged: (v) => setState(() => editingPhoto.hue = v),
+                    onContrastChanged: (v) =>
+                        setState(() => editingPhoto.contrast = v),
+                    onOpacityChanged: (v) =>
+                        setState(() => editingPhoto.opacity = v),
+                  ),
+                )
+              else if (_draggingIndex == null) ...[
+                if (isMobile)
+                  ...buildIOSCollageControlsOverlay(
+                    context: context,
+                    isFullscreen: _isFullscreen,
+                    controlsExpanded: _iosCollageControlsExpanded,
+                    bottomInset: bottomInset,
+                    sliderValue: _scaleToSliderValue(
+                      _collageScale.clamp(_minCollageScale, _maxCollageScale),
+                    ),
+                    onSliderChanged: _handleCollageZoomSliderChanged,
+                    joystick: _buildMobileCanvasJoystick(),
+                    actions: _collageControlActions(
+                      includeViewZones: false,
+                      includeCancel: false,
+                    ),
+                    onToggleControls: () {
+                      setState(() {
+                        _iosCollageControlsExpanded =
+                            !_iosCollageControlsExpanded;
+                      });
+                    },
+                    onCollapseControls: () {
+                      setState(() => _iosCollageControlsExpanded = false);
+                    },
+                  )
+                else if (isDesktopPlatform)
+                  ...buildMacOSCollageControlsOverlay(
+                    isFullscreen: _isFullscreen,
+                    zoomControl: _buildFloatingZoomControl(),
+                    actionButtons: _buildFloatingActionButtons(),
+                    leftHover: _fullscreenBottomHoverLeft,
+                    rightHover: _fullscreenBottomHoverRight,
+                    onLeftHoverChanged: (value) {
+                      setState(() => _fullscreenBottomHoverLeft = value);
+                    },
+                    onRightHoverChanged: (value) {
+                      setState(() => _fullscreenBottomHoverRight = value);
+                    },
+                  )
+                else
+                  Positioned(
+                    right: 12,
+                    bottom: 12,
+                    child: _buildFloatingActionButtons(),
+                  ),
+              ],
+              if (_isFullscreen && _draggingIndex == null)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: IconButton(
+                        icon: const Icon(Icons.fullscreen_exit,
+                            color: Colors.white),
+                        onPressed: _toggleFullscreen,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            if (!_isFullscreen &&
-                !_showDesktopTopBar &&
-                _draggingIndex == null) ...[
-              Positioned(
-                left: 12,
-                top: 12,
-                child: SafeArea(
-                  bottom: false,
-                  child: _buildFloatingHeader(),
+              if (!_isFullscreen &&
+                  !_showDesktopTopBar &&
+                  _draggingIndex == null) ...[
+                Positioned(
+                  left: 12,
+                  top: 12,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _buildFloatingHeader(),
+                  ),
                 ),
-              ),
-              Positioned(
-                right: 12,
-                top: 12,
-                child: SafeArea(
-                  bottom: false,
-                  child: _buildTopRightActions(),
+                Positioned(
+                  right: 12,
+                  top: 12,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _buildTopRightActions(),
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -3325,10 +3328,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Widget _buildFloatingActionButtons() {
     return CollageActionButtons(
       actions: _collageControlActions(
-        includeViewZones: !Platform.isIOS,
+        includeViewZones: !isMobilePlatform,
         includeCancel: true,
       ),
-      horizontal: Platform.isIOS || Platform.isMacOS,
+      horizontal: isMobilePlatform || isDesktopPlatform,
     );
   }
 
@@ -3395,7 +3398,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           onPressed: _showHelp,
         ),
         const SizedBox(width: 6),
-        if (!Platform.isIOS) ...[
+        if (!isMobilePlatform) ...[
           IconButton(
             style: IconButton.styleFrom(
               backgroundColor: Colors.transparent,
@@ -3415,7 +3418,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           ),
           const SizedBox(width: 6),
         ],
-        if (Platform.isIOS) ...[
+        if (isMobilePlatform) ...[
           IconButton(
             style: IconButton.styleFrom(
               backgroundColor: Colors.transparent,
@@ -4425,11 +4428,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   @override
   void dispose() {
-    if (Platform.isIOS && _isFullscreen) {
+    if (isMobilePlatform && _isFullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       WakelockPlus.disable();
     }
-    if (Platform.isIOS && _isIOSLandscape) {
+    if (isMobilePlatform && _isIOSLandscape) {
       SystemChrome.setPreferredOrientations(const [
         DeviceOrientation.portraitUp,
       ]);
