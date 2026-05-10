@@ -1,13 +1,14 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_archive/flutter_archive.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:hive/hive.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:archive/archive.dart' as archive;
+import 'package:archive/archive_io.dart' as archive_io;
 import 'package:photographers_reference_app/src/domain/entities/category.dart';
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 import 'package:photographers_reference_app/src/domain/entities/folder.dart';
@@ -125,6 +126,8 @@ class BackupProgressState {
 class BackupService {
   static final ValueNotifier<BackupProgressState?> progressNotifier =
       ValueNotifier<BackupProgressState?>(null);
+  static const MethodChannel _macosOpenFilesChannel =
+      MethodChannel('refma/macos_open_files');
   static _BackupCancelToken? _activeCancelToken;
   static bool _isRunning = false;
 
@@ -132,6 +135,77 @@ class BackupService {
 
   static bool get _usesDesktopSaveDialog =>
       !kIsWeb && (Platform.isMacOS || Platform.isWindows || Platform.isLinux);
+
+  static String _defaultBackupFileName() {
+    final safeStamp = DateTime.now().toIso8601String().replaceAll(':', '-');
+    return 'backup_$safeStamp.zip';
+  }
+
+  static String _ensureZipExtension(String path) {
+    return path.toLowerCase().endsWith('.zip') ? path : '$path.zip';
+  }
+
+  static String _shortError(Object error) {
+    final text = error.toString().replaceAll('\n', ' ');
+    return text.length <= 180 ? text : '${text.substring(0, 180)}...';
+  }
+
+  static String _formatBytes(int bytes) {
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var value = bytes.toDouble();
+    var unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+    final decimals = unitIndex == 0 ? 0 : 1;
+    return '${value.toStringAsFixed(decimals)} ${units[unitIndex]}';
+  }
+
+  static int _sumFileBytes(List<File> files) {
+    var total = 0;
+    for (final file in files) {
+      try {
+        total += file.lengthSync();
+      } catch (_) {}
+    }
+    return total;
+  }
+
+  static Future<int?> _availableDiskBytesForPath(String path) async {
+    if (kIsWeb || !Platform.isMacOS) return null;
+    try {
+      return await _macosOpenFilesChannel.invokeMethod<int>(
+        'getAvailableDiskBytes',
+        <String, Object?>{'path': path},
+      );
+    } catch (e, st) {
+      print('[Backup] Available disk lookup failed: $e');
+      print('[Backup] Available disk lookup stacktrace:\n$st');
+      return null;
+    }
+  }
+
+  static Future<String?> _pickDesktopBackupSavePath(String fileName) async {
+    if (!kIsWeb && Platform.isMacOS) {
+      try {
+        return await _macosOpenFilesChannel.invokeMethod<String>(
+          'saveBackupFile',
+          <String, Object?>{'fileName': fileName},
+        );
+      } catch (e, st) {
+        print('[Backup] Native macOS save panel failed: $e');
+        print('[Backup] Native macOS save panel stacktrace:\n$st');
+      }
+    }
+
+    return FilePicker.platform.saveFile(
+      dialogTitle: 'Save backup',
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: const ['zip'],
+    );
+  }
 
   static void cancelCurrent() {
     final token = _activeCancelToken;
@@ -172,6 +246,7 @@ class BackupService {
   static Future<String> _buildZip({
     void Function(_BackupProgressSnapshot progress)? onProgress,
     required _BackupCancelToken cancelToken,
+    String? destinationZipPath,
   }) async {
     print('[Backup] Начало создания ZIP...');
     final docs = await getApplicationDocumentsDirectory();
@@ -180,14 +255,6 @@ class BackupService {
 
     print('[Backup] documentsDir: ${docs.path}');
     print('[Backup] tempDir: ${tmp.path}');
-
-    final workDir = Directory(p.join(tmp.path, 'backup_build'));
-    if (await workDir.exists()) {
-      print('[Backup] Удаляем предыдущую временную папку...');
-      await workDir.delete(recursive: true);
-    }
-    await workDir.create(recursive: true);
-    print('[Backup] Создана временная рабочая папка: ${workDir.path}');
 
     void emitProgress({
       required _BackupPhase phase,
@@ -234,72 +301,110 @@ class BackupService {
         .toList();
 
     print('[Backup] Найдено Hive-файлов: ${hiveFiles.length}');
-    for (final f in hiveFiles) {
-      final dest = p.join(workDir.path, p.basename(f.path));
-      await f.copy(dest);
-      print('[Backup] Скопирован Hive-файл: ${f.path}');
-    }
 
     // Медиа
     final photosSrc = Directory(p.join(docs.path, 'photos'));
-    int totalMediaFiles = 0;
+    final mediaFiles = <File>[];
     if (await photosSrc.exists()) {
-      print('[Backup] Копируем директорию с фото...');
-      final mediaFiles =
-          photosSrc.listSync(recursive: true).whereType<File>().toList();
-      totalMediaFiles = mediaFiles.length;
-      var copiedMediaFiles = 0;
-      await _copyDirForBackup(
-        photosSrc,
-        Directory(p.join(workDir.path, 'photos')),
-        cancelToken: cancelToken,
-        onFileCopied: (relativePath) {
-          copiedMediaFiles += 1;
-          emitProgress(
-            phase: _BackupPhase.copyingMedia,
-            progress: totalMediaFiles == 0
-                ? 35
-                : (copiedMediaFiles / totalMediaFiles) * 35,
-            copiedMediaFiles: copiedMediaFiles,
-            totalMediaFiles: totalMediaFiles,
-            currentItemName: p.basename(relativePath),
-          );
-        },
+      print('[Backup] Сканируем директорию с фото...');
+      mediaFiles.addAll(
+        photosSrc.listSync(recursive: true).whereType<File>(),
       );
     } else {
       print('[Backup] Папка "photos" не найдена.');
     }
+    final totalFiles = hiveFiles.length + mediaFiles.length;
+    final totalMediaFiles = mediaFiles.length;
 
     // Упаковка
-    final zipPath = p.join(
-      tmp.path,
-      'backup_${DateTime.now().toIso8601String()}.zip',
-    );
+    final zipPath =
+        destinationZipPath ?? p.join(tmp.path, _defaultBackupFileName());
+    final sourceBytes = _sumFileBytes(hiveFiles) + _sumFileBytes(mediaFiles);
+    final availableBytes = await _availableDiskBytesForPath(zipPath);
+    final diagnostics = availableBytes == null
+        ? 'Source ${_formatBytes(sourceBytes)}'
+        : 'Source ${_formatBytes(sourceBytes)}, free ${_formatBytes(availableBytes)}';
 
     print('[Backup] Начинаем упаковку в: $zipPath');
+    print('[Backup] Диагностика размера: $diagnostics');
+
+    emitProgress(
+      phase: _BackupPhase.zipping,
+      progress: 0,
+      copiedMediaFiles: 0,
+      totalMediaFiles: totalMediaFiles,
+      currentItemName: diagnostics,
+    );
+
+    if (availableBytes != null && availableBytes < sourceBytes) {
+      throw Exception(
+        'Not enough free space for backup. $diagnostics. Path: $zipPath',
+      );
+    }
+
+    var processedFiles = 0;
+    void emitFileProgress(String fileName) {
+      processedFiles += 1;
+      final processedMediaFiles =
+          (processedFiles - hiveFiles.length).clamp(0, totalMediaFiles).toInt();
+      emitProgress(
+        phase: _BackupPhase.zipping,
+        progress: totalFiles == 0 ? 100 : (processedFiles / totalFiles) * 100,
+        copiedMediaFiles: processedMediaFiles,
+        totalMediaFiles: totalMediaFiles,
+        currentItemName: fileName,
+      );
+    }
 
     try {
-      await ZipFile.createFromDirectory(
-        sourceDir: workDir,
-        zipFile: File(zipPath),
-        recurseSubDirs: true,
-        onZipping: (filePath, isDir, progress) {
+      final zipFile = File(zipPath);
+      await zipFile.parent.create(recursive: true);
+      if (await zipFile.exists()) {
+        await zipFile.delete();
+      }
+
+      final encoder = archive_io.ZipFileEncoder();
+      encoder.create(
+        zipPath,
+        level: archive_io.ZipFileEncoder.store,
+      );
+      try {
+        for (final file in hiveFiles) {
           if (cancelToken.isCanceled) {
             print('[Backup] Отмена запрошена во время упаковки.');
-            return ZipFileOperation.cancel;
+            throw _BackupCanceledException();
           }
-          final name = p.basename(filePath);
-          print('[Backup] ${progress.toStringAsFixed(1)}% → $name');
-          emitProgress(
-            phase: _BackupPhase.zipping,
-            progress: 35 + (progress * 0.65),
-            copiedMediaFiles: totalMediaFiles,
-            totalMediaFiles: totalMediaFiles,
-            currentItemName: name,
+          final archiveName = p.basename(file.path);
+          await encoder.addFile(
+            file,
+            archiveName,
+            archive_io.ZipFileEncoder.store,
           );
-          return ZipFileOperation.includeItem;
-        },
-      );
+          emitFileProgress(archiveName);
+          print('[Backup] Добавлен Hive-файл: $archiveName');
+        }
+
+        for (final file in mediaFiles) {
+          if (cancelToken.isCanceled) {
+            print('[Backup] Отмена запрошена во время упаковки.');
+            throw _BackupCanceledException();
+          }
+          final rel = p.relative(file.path, from: photosSrc.path);
+          final archiveName = p.posix.join(
+            'photos',
+            rel.split(p.separator).join('/'),
+          );
+          await encoder.addFile(
+            file,
+            archiveName,
+            archive_io.ZipFileEncoder.store,
+          );
+          emitFileProgress(p.basename(rel));
+        }
+      } finally {
+        await encoder.close();
+      }
+
       if (cancelToken.isCanceled) {
         throw _BackupCanceledException();
       }
@@ -311,10 +416,6 @@ class BackupService {
       );
       return zipPath;
     } finally {
-      if (await workDir.exists()) {
-        await workDir.delete(recursive: true);
-        print('[Backup] Временная рабочая папка удалена.');
-      }
       if (cancelToken.isCanceled && await File(zipPath).exists()) {
         await File(zipPath).delete();
       }
@@ -333,30 +434,6 @@ class BackupService {
         await File(newPath).create(recursive: true);
         await ent.copy(newPath);
         onFileCopied?.call(rel);
-        print('[Backup] Скопирован файл: $rel');
-      } else if (ent is Directory) {
-        await Directory(newPath).create(recursive: true);
-        print('[Backup] Создана папка: $rel');
-      }
-    }
-  }
-
-  static Future<void> _copyDirForBackup(
-    Directory from,
-    Directory to, {
-    required _BackupCancelToken cancelToken,
-    required void Function(String relativePath) onFileCopied,
-  }) async {
-    await for (final ent in from.list(recursive: true)) {
-      if (cancelToken.isCanceled) {
-        throw _BackupCanceledException();
-      }
-      final rel = p.relative(ent.path, from: from.path);
-      final newPath = p.join(to.path, rel);
-      if (ent is File) {
-        await File(newPath).create(recursive: true);
-        await ent.copy(newPath);
-        onFileCopied(rel);
         print('[Backup] Скопирован файл: $rel');
       } else if (ent is Directory) {
         await Directory(newPath).create(recursive: true);
@@ -456,9 +533,35 @@ class BackupService {
       print('[Backup] Сбрасываем открытые Hive box-ы...');
       await _flushOpenBoxes();
 
+      String? destinationZipPath;
+      if (_usesDesktopSaveDialog) {
+        _updateProgress(
+          BackupProgressState(
+            visible: true,
+            isActive: true,
+            isFinal: false,
+            canceling: false,
+            phaseLabel: 'Choose where to save backup...',
+            progress: 0,
+            copiedMediaFiles: 0,
+            totalMediaFiles: 0,
+            eta: null,
+          ),
+        );
+        print('[Backup] Открываем системное окно Save As до упаковки...');
+        final pickedPath = await _pickDesktopBackupSavePath(
+          _defaultBackupFileName(),
+        );
+        if (pickedPath == null || pickedPath.isEmpty) {
+          throw _BackupDeliveryCanceledException();
+        }
+        destinationZipPath = _ensureZipExtension(pickedPath);
+      }
+
       print('[Backup] Стартуем _buildZip...');
       final zipPath = await _buildZip(
         cancelToken: cancelToken,
+        destinationZipPath: destinationZipPath,
         onProgress: (p) {
           _updateProgress(
             BackupProgressState(
@@ -477,29 +580,29 @@ class BackupService {
         },
       );
 
-      _updateProgress(
-        BackupProgressState(
-          visible: true,
-          isActive: true,
-          isFinal: false,
-          canceling: false,
-          phaseLabel: _usesDesktopSaveDialog
-              ? 'Choose where to save backup...'
-              : _phaseLabel(_BackupPhase.sharing),
-          progress: 100,
-          copiedMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
-          totalMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
-          currentItemName: p.basename(zipPath),
-          eta: Duration.zero,
-        ),
-      );
+      if (!_usesDesktopSaveDialog) {
+        _updateProgress(
+          BackupProgressState(
+            visible: true,
+            isActive: true,
+            isFinal: false,
+            canceling: false,
+            phaseLabel: _phaseLabel(_BackupPhase.sharing),
+            progress: 100,
+            copiedMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
+            totalMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
+            currentItemName: p.basename(zipPath),
+            eta: Duration.zero,
+          ),
+        );
 
-      await Future<void>.delayed(const Duration(milliseconds: 120));
+        await Future<void>.delayed(const Duration(milliseconds: 120));
 
-      await _deliverBackupFile(
-        zipPath: zipPath,
-        rootNavigator: rootNavigator,
-      );
+        await _deliverBackupFile(
+          zipPath: zipPath,
+          rootNavigator: rootNavigator,
+        );
+      }
 
       print('[Backup] Backup завершён успешно!');
       _updateProgress(
@@ -546,7 +649,8 @@ class BackupService {
           isActive: false,
           isFinal: true,
           canceling: false,
-          phaseLabel: _usesDesktopSaveDialog ? 'Save canceled' : 'Share canceled',
+          phaseLabel:
+              _usesDesktopSaveDialog ? 'Save canceled' : 'Share canceled',
           progress: 100,
           copiedMediaFiles: progressNotifier.value?.copiedMediaFiles ?? 0,
           totalMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
@@ -568,6 +672,7 @@ class BackupService {
     } catch (e, st) {
       print('[Backup] Ошибка при создании backup: $e');
       print('[Backup] Stacktrace:\n$st');
+      final errorText = _shortError(e);
       _updateProgress(
         BackupProgressState(
           visible: true,
@@ -578,12 +683,12 @@ class BackupService {
           progress: progressNotifier.value?.progress ?? 0,
           copiedMediaFiles: progressNotifier.value?.copiedMediaFiles ?? 0,
           totalMediaFiles: progressNotifier.value?.totalMediaFiles ?? 0,
-          currentItemName: progressNotifier.value?.currentItemName,
+          currentItemName: errorText,
           eta: null,
         ),
       );
       messenger?.showSnackBar(
-        const SnackBar(content: Text('Failed to create backup')),
+        SnackBar(content: Text('Failed to create backup: $errorText')),
       );
       await Future<void>.delayed(const Duration(seconds: 3));
       progressNotifier.value = null;
@@ -601,12 +706,7 @@ class BackupService {
 
     if (_usesDesktopSaveDialog) {
       print('[Backup] Открываем системное окно Save As...');
-      final pickedPath = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save backup',
-        fileName: fileName,
-        type: FileType.custom,
-        allowedExtensions: const ['zip'],
-      );
+      final pickedPath = await _pickDesktopBackupSavePath(fileName);
       if (pickedPath == null || pickedPath.isEmpty) {
         throw _BackupDeliveryCanceledException();
       }
@@ -813,7 +913,8 @@ class BackupService {
           extractedFiles += 1;
           updateRestoreProgress(
             phase: _RestorePhase.extracting,
-            progress: totalZipFiles == 0 ? 30 : (extractedFiles / totalZipFiles) * 30,
+            progress:
+                totalZipFiles == 0 ? 30 : (extractedFiles / totalZipFiles) * 30,
             processedFiles: extractedFiles,
             totalFiles: totalZipFiles,
           );

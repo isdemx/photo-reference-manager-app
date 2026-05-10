@@ -9,7 +9,6 @@ import 'package:photographers_reference_app/src/domain/entities/folder.dart';
 import 'package:photographers_reference_app/src/presentation/bloc/photo_bloc.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/add_folder_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 
 enum _FolderSortMode {
   newestFirst,
@@ -48,67 +47,110 @@ class FoldersHelpers {
         TextEditingController(text: folder.name);
     bool isPrivate = folder.isPrivate ??
         false; // Инициализация на основе текущего значения isPrivate
+    String selectedCategoryId = folder.categoryId;
 
     showDialog(
       context: context,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Edit Folder Name'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(hintText: 'Folder Name'),
+        return BlocBuilder<CategoryBloc, CategoryState>(
+          builder: (context, categoryState) {
+            final categories = categoryState is CategoryLoaded
+                ? List<Category>.from(categoryState.categories)
+                : <Category>[];
+            categories.sort(
+              (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+            );
+            final canMoveCategory = categories.isNotEmpty &&
+                categories.any((category) => category.id == selectedCategoryId);
+
+            return StatefulBuilder(
+              builder: (context, setState) {
+                return AlertDialog(
+                  title: const Text('Edit Folder'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: controller,
+                        decoration:
+                            const InputDecoration(hintText: 'Folder Name'),
+                      ),
+                      const SizedBox(height: 16.0),
+                      DropdownButtonFormField<String>(
+                        initialValue:
+                            canMoveCategory ? selectedCategoryId : null,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                          border: OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: [
+                          for (final category in categories)
+                            DropdownMenuItem<String>(
+                              value: category.id,
+                              child: Text(category.name),
+                            ),
+                        ],
+                        onChanged: canMoveCategory
+                            ? (value) {
+                                if (value == null) return;
+                                setState(() {
+                                  selectedCategoryId = value;
+                                });
+                              }
+                            : null,
+                      ),
+                      const SizedBox(height: 16.0),
+                      CheckboxListTile(
+                        title: const Text('Is Private (3 taps on logo to show'),
+                        value: isPrivate,
+                        contentPadding: EdgeInsets.zero,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            isPrivate = value ?? false;
+                          });
+                        },
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16.0),
-                  CheckboxListTile(
-                    title: const Text('Is Private (3 taps on logo to show'),
-                    value: isPrivate,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        isPrivate = value ?? false;
-                      });
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Iconsax.trash, color: Colors.red),
-                  tooltip: 'Delete folder (No media will be lost)',
-                  onPressed: () {
-                    Navigator.of(context)
-                        .pop(); // Закрываем диалог редактирования
-                    deleteFolderAfterConfirmation(
-                        context, folder); // Показываем диалог подтверждения
-                  },
-                ),
-                TextButton(
-                  onPressed: () {
-                    final String newName = controller.text.trim();
-                    if (newName.isNotEmpty) {
-                      // Обновляем имя папки и флаг приватности
-                      final updatedFolder = folder.copyWith(
-                        name: newName,
-                        isPrivate: isPrivate,
-                      );
-                      context
-                          .read<FolderBloc>()
-                          .add(UpdateFolder(updatedFolder));
-                      Navigator.of(context).pop(); // Закрываем диалог
-                    }
-                  },
-                  child: const Text('OK'),
-                ),
-                TextButton(
-                  onPressed: () =>
-                      Navigator.of(context).pop(), // Закрываем диалог
-                  child: const Text('Cancel'),
-                ),
-              ],
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Iconsax.trash, color: Colors.red),
+                      tooltip: 'Delete folder (No media will be lost)',
+                      onPressed: () {
+                        Navigator.of(context)
+                            .pop(); // Закрываем диалог редактирования
+                        deleteFolderAfterConfirmation(
+                            context, folder); // Показываем диалог подтверждения
+                      },
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        final String newName = controller.text.trim();
+                        if (newName.isNotEmpty) {
+                          // Обновляем имя папки, категорию и флаг приватности
+                          final updatedFolder = folder.copyWith(
+                            name: newName,
+                            categoryId: selectedCategoryId,
+                            isPrivate: isPrivate,
+                          );
+                          context
+                              .read<FolderBloc>()
+                              .add(UpdateFolder(updatedFolder));
+                          Navigator.of(context).pop(); // Закрываем диалог
+                        }
+                      },
+                      child: const Text('OK'),
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.of(context).pop(), // Закрываем диалог
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                );
+              },
             );
           },
         );
@@ -216,8 +258,7 @@ class FoldersHelpers {
                                   ),
                                   const SizedBox(width: 4),
                                   Text(
-                                    sortMode ==
-                                            _FolderSortMode.newestFirst
+                                    sortMode == _FolderSortMode.newestFirst
                                         ? 'Newest'
                                         : 'A-Z',
                                     style: const TextStyle(fontSize: 13),

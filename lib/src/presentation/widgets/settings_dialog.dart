@@ -308,7 +308,12 @@ class _SettingsDialogState extends State<SettingsDialog> {
                       ),
                       contentPadding: const EdgeInsets.symmetric(horizontal: 4),
                       onTap: () {
-                        BackupService.promptAndRun(context);
+                        final rootContext =
+                            Navigator.of(context, rootNavigator: true).context;
+                        Navigator.of(context).pop();
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          BackupService.promptAndRun(rootContext);
+                        });
                       },
                     ),
                     Divider(color: dividerColor, height: 1),

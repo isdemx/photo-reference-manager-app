@@ -63,6 +63,14 @@ class AppDelegate: FlutterAppDelegate {
           return
         }
         self.requestFolderAccess(folderPath: folderPath, result: result)
+      case "saveBackupFile":
+        let args = call.arguments as? [String: Any]
+        let fileName = args?["fileName"] as? String ?? "backup.zip"
+        self.saveBackupFile(fileName: fileName, result: result)
+      case "getAvailableDiskBytes":
+        let args = call.arguments as? [String: Any]
+        let path = args?["path"] as? String ?? NSHomeDirectory()
+        self.getAvailableDiskBytes(path: path, result: result)
       default:
         print("[RefmaOpenFiles][native] methodNotImplemented \(call.method)")
         result(FlutterMethodNotImplemented)
@@ -102,6 +110,64 @@ class AppDelegate: FlutterAppDelegate {
 
     pendingOpenFiles.append(contentsOf: normalized)
     flushPendingOpenFiles()
+  }
+
+  private func saveBackupFile(fileName: String, result: @escaping FlutterResult) {
+    DispatchQueue.main.async {
+      let panel = NSSavePanel()
+      panel.title = "Save backup"
+      panel.message = "Choose where Refma should save the backup ZIP file."
+      panel.nameFieldStringValue = fileName
+      panel.allowedFileTypes = ["zip"]
+      panel.canCreateDirectories = true
+      panel.isExtensionHidden = false
+      panel.prompt = "Save"
+
+      let response = panel.runModal()
+      guard response == .OK, let selectedURL = panel.url else {
+        print("[RefmaOpenFiles][native] saveBackupFile cancelled")
+        result(nil)
+        return
+      }
+
+      print("[RefmaOpenFiles][native] saveBackupFile path=\(selectedURL.path)")
+      if selectedURL.startAccessingSecurityScopedResource() {
+        self.activeSecurityScopedURLs.append(selectedURL)
+      }
+      result(selectedURL.path)
+    }
+  }
+
+  private func getAvailableDiskBytes(path: String, result: @escaping FlutterResult) {
+    DispatchQueue.global(qos: .utility).async {
+      do {
+        let url = URL(fileURLWithPath: path)
+        let values = try url.resourceValues(forKeys: [
+          .volumeAvailableCapacityForImportantUsageKey,
+          .volumeAvailableCapacityKey
+        ])
+        if let available = values.volumeAvailableCapacityForImportantUsage {
+          DispatchQueue.main.async {
+            result(Int64(available))
+          }
+          return
+        }
+        if let available = values.volumeAvailableCapacity {
+          DispatchQueue.main.async {
+            result(Int64(available))
+          }
+          return
+        }
+        DispatchQueue.main.async {
+          result(nil)
+        }
+      } catch {
+        print("[RefmaOpenFiles][native] getAvailableDiskBytes failed path=\(path) error=\(error)")
+        DispatchQueue.main.async {
+          result(nil)
+        }
+      }
+    }
   }
 
   private func requestFolderAccess(folderPath: String, result: @escaping FlutterResult) {
