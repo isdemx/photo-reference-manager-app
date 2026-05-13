@@ -70,6 +70,102 @@ class CollageDrawingStroke extends HiveObject {
       };
 }
 
+@HiveType(typeId: 104)
+class CollageTextItem extends HiveObject {
+  static const int alignLeft = 0;
+  static const int alignCenter = 1;
+  static const int alignRight = 2;
+
+  @HiveField(0)
+  String id;
+
+  @HiveField(1)
+  String text;
+
+  @HiveField(2)
+  double offsetX;
+
+  @HiveField(3)
+  double offsetY;
+
+  @HiveField(4)
+  double width;
+
+  @HiveField(5)
+  double fontSize;
+
+  @HiveField(6)
+  int colorValue;
+
+  @HiveField(7)
+  double opacity;
+
+  @HiveField(8)
+  String fontFamily;
+
+  @HiveField(9)
+  bool bold;
+
+  @HiveField(10)
+  bool italic;
+
+  @HiveField(11)
+  int textAlign;
+
+  @HiveField(12)
+  int zIndex;
+
+  CollageTextItem({
+    required this.id,
+    required this.text,
+    required this.offsetX,
+    required this.offsetY,
+    required this.width,
+    required this.fontSize,
+    required this.colorValue,
+    required this.opacity,
+    required this.fontFamily,
+    required this.bold,
+    required this.italic,
+    required this.textAlign,
+    required this.zIndex,
+  });
+
+  factory CollageTextItem.fromJson(Map<String, dynamic> json) {
+    return CollageTextItem(
+      id: json['id'] as String,
+      text: (json['text'] as String?) ?? '',
+      offsetX: (json['offsetX'] as num).toDouble(),
+      offsetY: (json['offsetY'] as num).toDouble(),
+      width: (json['width'] as num?)?.toDouble() ?? 280.0,
+      fontSize: (json['fontSize'] as num?)?.toDouble() ?? 32.0,
+      colorValue: (json['colorValue'] as int?) ?? 0xFFFFFFFF,
+      opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
+      fontFamily: (json['fontFamily'] as String?) ?? 'system',
+      bold: (json['bold'] as bool?) ?? false,
+      italic: (json['italic'] as bool?) ?? false,
+      textAlign: (json['textAlign'] as int?) ?? alignCenter,
+      zIndex: (json['zIndex'] as int?) ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'text': text,
+        'offsetX': offsetX,
+        'offsetY': offsetY,
+        'width': width,
+        'fontSize': fontSize,
+        'colorValue': colorValue,
+        'opacity': opacity,
+        'fontFamily': fontFamily,
+        'bold': bold,
+        'italic': italic,
+        'textAlign': textAlign,
+        'zIndex': zIndex,
+      };
+}
+
 @HiveType(typeId: 101)
 class CollageItem extends HiveObject {
   @HiveField(0)
@@ -311,6 +407,9 @@ class Collage extends HiveObject {
   @HiveField(12)
   List<CollageDrawingStroke>? drawingStrokes;
 
+  @HiveField(13)
+  List<CollageTextItem>? textItems;
+
   Collage(
       {required this.id,
       required this.title,
@@ -324,7 +423,8 @@ class Collage extends HiveObject {
       this.canvasOffsetY,
       this.canvasScale,
       this.viewZones,
-      this.drawingStrokes});
+      this.drawingStrokes,
+      this.textItems});
 
   factory Collage.fromJson(Map<String, dynamic> json) => Collage(
         id: json['id'],
@@ -350,6 +450,9 @@ class Collage extends HiveObject {
         drawingStrokes: (json['drawingStrokes'] as List<dynamic>?)
             ?.map((e) => CollageDrawingStroke.fromJson(e))
             .toList(),
+        textItems: (json['textItems'] as List<dynamic>?)
+            ?.map((e) => CollageTextItem.fromJson(e))
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -366,5 +469,6 @@ class Collage extends HiveObject {
         'canvasScale': canvasScale,
         'viewZones': viewZones?.map((e) => e.toJson()).toList(),
         'drawingStrokes': drawingStrokes?.map((e) => e.toJson()).toList(),
+        'textItems': textItems?.map((e) => e.toJson()).toList(),
       };
 }

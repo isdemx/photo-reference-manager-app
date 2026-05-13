@@ -61,6 +61,76 @@ class CollageDrawingStrokeAdapter extends TypeAdapter<CollageDrawingStroke> {
           typeId == other.typeId;
 }
 
+class CollageTextItemAdapter extends TypeAdapter<CollageTextItem> {
+  @override
+  final int typeId = 104;
+
+  @override
+  CollageTextItem read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return CollageTextItem(
+      id: fields[0] as String,
+      text: fields[1] as String? ?? '',
+      offsetX: (fields[2] as num).toDouble(),
+      offsetY: (fields[3] as num).toDouble(),
+      width: (fields[4] as num?)?.toDouble() ?? 280.0,
+      fontSize: (fields[5] as num?)?.toDouble() ?? 32.0,
+      colorValue: fields[6] as int? ?? 0xFFFFFFFF,
+      opacity: (fields[7] as num?)?.toDouble() ?? 1.0,
+      fontFamily: fields[8] as String? ?? 'system',
+      bold: fields[9] as bool? ?? false,
+      italic: fields[10] as bool? ?? false,
+      textAlign: fields[11] as int? ?? CollageTextItem.alignCenter,
+      zIndex: fields[12] as int? ?? 0,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, CollageTextItem obj) {
+    writer
+      ..writeByte(13)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.text)
+      ..writeByte(2)
+      ..write(obj.offsetX)
+      ..writeByte(3)
+      ..write(obj.offsetY)
+      ..writeByte(4)
+      ..write(obj.width)
+      ..writeByte(5)
+      ..write(obj.fontSize)
+      ..writeByte(6)
+      ..write(obj.colorValue)
+      ..writeByte(7)
+      ..write(obj.opacity)
+      ..writeByte(8)
+      ..write(obj.fontFamily)
+      ..writeByte(9)
+      ..write(obj.bold)
+      ..writeByte(10)
+      ..write(obj.italic)
+      ..writeByte(11)
+      ..write(obj.textAlign)
+      ..writeByte(12)
+      ..write(obj.zIndex);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CollageTextItemAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
 class CollageItemAdapter extends TypeAdapter<CollageItem> {
   @override
   final int typeId = 101;
@@ -188,13 +258,14 @@ class CollageAdapter extends TypeAdapter<Collage> {
       canvasScale: fields[10] as double?,
       viewZones: (fields[11] as List?)?.cast<CollageViewZoneEntry>(),
       drawingStrokes: (fields[12] as List?)?.cast<CollageDrawingStroke>(),
+      textItems: (fields[13] as List?)?.cast<CollageTextItem>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Collage obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -220,7 +291,9 @@ class CollageAdapter extends TypeAdapter<Collage> {
       ..writeByte(11)
       ..write(obj.viewZones)
       ..writeByte(12)
-      ..write(obj.drawingStrokes);
+      ..write(obj.drawingStrokes)
+      ..writeByte(13)
+      ..write(obj.textItems);
   }
 
   @override

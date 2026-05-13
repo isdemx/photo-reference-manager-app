@@ -36,6 +36,7 @@ import 'package:photographers_reference_app/src/presentation/widgets/collage_con
 import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_shared.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_drawing_painter.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_drawing_toolbar.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_text_toolbar.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_top_center_action.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
@@ -372,6 +373,7 @@ class CollagePersistService {
     required List<_ViewZone?> viewZones,
     required Rect? previewCropRect,
     required List<CollageDrawingStroke> drawingStrokes,
+    required List<CollageTextItem> textItems,
   }) async {
     final now = DateTime.now();
 
@@ -445,6 +447,7 @@ class CollagePersistService {
         canvasScale: canvasScale,
         viewZones: zoneEntries,
         drawingStrokes: drawingStrokes,
+        textItems: textItems,
       );
 
       collageBloc.add(AddCollage(newCollage));
@@ -474,6 +477,7 @@ class CollagePersistService {
         canvasScale: canvasScale,
         viewZones: zoneEntries,
         drawingStrokes: drawingStrokes,
+        textItems: textItems,
       );
 
       collageBloc.add(UpdateCollage(updated));
@@ -765,6 +769,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Rect _deleteRect = Rect.zero;
   bool _deleteHover = false;
   int? _draggingIndex; // индекс в _items (не в sorted!)
+  String? _draggingTextItemId;
   late final DragDropImportService _importService;
 
   // --- Modes ---
@@ -864,8 +869,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       _controller.clearEditing();
       _isItemScaleGestureActive = false;
       _draggingIndex = null;
+      _draggingTextItemId = null;
       _deleteHover = false;
       _tapDrag.clearAll();
+      _clearActiveTextItem();
       for (final key in _controlsHover.keys) {
         _controlsHover[key] = false;
       }
@@ -940,6 +947,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Map<String, List<double>> _drawingMoveStartPointValues =
       <String, List<double>>{};
   bool _drawingSelectionMoved = false;
+  final List<CollageTextItem> _textItems = <CollageTextItem>[];
+  final TextEditingController _textEditingController = TextEditingController();
+  final FocusNode _textFocusNode = FocusNode();
+  String? _activeTextItemId;
 
   Size _canvasViewportSize = Size.zero;
   static const double _videoControlsHeight = 34.0;
@@ -1021,6 +1032,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _drawingStrokes.clear();
     _drawingUndoStack.clear();
     _clearDrawingSelectionFields();
+    _textItems.clear();
+    _clearActiveTextItem();
     _maxZIndex = 0;
     _activeItemIndex = null;
     _controller.maxZIndex = 0;
@@ -1034,6 +1047,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _drawingStrokes.clear();
     _drawingUndoStack.clear();
     _clearDrawingSelectionFields();
+    _textItems.clear();
+    _clearActiveTextItem();
     _pendingInitialLayout = true;
 
     final filtered = widget.photos.where(
@@ -1225,6 +1240,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     return isMobilePlatform &&
         !_overviewMode &&
         !_drawingMode &&
+        _activeTextItemId == null &&
         !_instaSelectionMode &&
         !_showViewZoneOverlay &&
         !_isSavingInstaCarousel &&
@@ -1301,6 +1317,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       ..addAll(collage.drawingStrokes ?? const <CollageDrawingStroke>[]);
     _drawingUndoStack.clear();
     _clearDrawingSelectionFields();
+    _textItems
+      ..clear()
+      ..addAll(collage.textItems ?? const <CollageTextItem>[]);
+    _clearActiveTextItem();
 
     for (final src in collage.items) {
       final photo = widget.allPhotos.firstWhere(
@@ -1361,6 +1381,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final zIndexes = <int>[
       for (final item in _items) item.zIndex,
       for (final stroke in _drawingStrokes) stroke.zIndex,
+      for (final text in _textItems) text.zIndex,
     ];
     _maxZIndex = zIndexes.isEmpty ? 0 : zIndexes.reduce(math.max);
     _controller.maxZIndex = _maxZIndex;
@@ -1388,6 +1409,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       _drawingStrokes.clear();
       _drawingUndoStack.clear();
       _clearDrawingSelectionFields();
+      _textItems.clear();
+      _clearActiveTextItem();
       _maxZIndex = 0;
       _activeItemIndex = null;
       setState(() {});
@@ -1398,6 +1421,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _drawingStrokes.clear();
     _drawingUndoStack.clear();
     _clearDrawingSelectionFields();
+    _textItems.clear();
+    _clearActiveTextItem();
 
     final filtered = widget.photos.where(
       (p) => p.mediaType == 'image' || p.mediaType == 'video',
@@ -1895,6 +1920,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Future<void> _onGenerateCollage() async {
     _controller.clearEditing();
     _drawingMode = false;
+    final activeText = _activeTextItem;
+    if (activeText != null && activeText.text.trim().isEmpty) {
+      _textItems.removeWhere((item) => item.id == activeText.id);
+    }
+    _clearActiveTextItem();
     setState(() {});
     await CollageSaveHelper.saveCollage(
       _collageKey,
@@ -1914,6 +1944,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       _drawingSelectionLastPoint = null;
       _movingDrawingSelection = false;
       _selectedDrawingStrokeIds.clear();
+      _clearActiveTextItem();
       if (next) {
         _controller.clearEditing();
         _draggingIndex = null;
@@ -2055,16 +2086,17 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   void _startDrawingSelection(DragStartDetails details) {
     final point = _clampCanvasPoint(details.localPosition);
+    final existing = _drawingSelectionRect;
+    final additive = HardwareKeyboard.instance.isShiftPressed;
+    final canMove = existing != null &&
+        existing.contains(point) &&
+        _selectedDrawingStrokeIds.isNotEmpty;
     setState(() {
       _activeDrawingStrokeId = null;
-      final existing = _drawingSelectionRect;
-      final additive = HardwareKeyboard.instance.isShiftPressed;
-      final canMove = existing != null &&
-          existing.contains(point) &&
-          _selectedDrawingStrokeIds.isNotEmpty;
       _movingDrawingSelection = canMove;
       _drawingSelectionLastPoint = point;
       _drawingSelectionMoved = false;
+      _deleteHover = false;
       _drawingMoveStartPointValues = canMove
           ? {
               for (final stroke in _drawingStrokes)
@@ -2083,6 +2115,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         }
       }
     });
+    if (canMove) {
+      _scheduleDeleteRectUpdate();
+    }
   }
 
   void _updateDrawingSelection(DragUpdateDetails details) {
@@ -2093,6 +2128,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         if (last == null) {
           _drawingSelectionLastPoint = point;
           return;
+        }
+        final wasHover = _deleteHover;
+        _deleteHover = _deleteRect.contains(details.globalPosition);
+        if (_deleteHover && !wasHover) {
+          vibrate(5);
         }
         final delta = point - last;
         if (delta == Offset.zero) return;
@@ -2119,6 +2159,23 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   void _endDrawingSelection() {
     setState(() {
+      if (_movingDrawingSelection &&
+          _deleteHover &&
+          _selectedDrawingStrokeIds.isNotEmpty) {
+        final removed = _drawingStrokes
+            .where((stroke) => _selectedDrawingStrokeIds.contains(stroke.id))
+            .map(_cloneDrawingStroke)
+            .toList(growable: false);
+        if (removed.isNotEmpty) {
+          _drawingUndoStack.add(_DrawingUndoEntry.restoreStrokes(removed));
+        }
+        _drawingStrokes.removeWhere(
+          (stroke) => _selectedDrawingStrokeIds.contains(stroke.id),
+        );
+        _deleteHover = false;
+        _clearDrawingSelectionFields();
+        return;
+      }
       if (_movingDrawingSelection &&
           _drawingSelectionMoved &&
           _drawingMoveStartPointValues.isNotEmpty) {
@@ -2335,6 +2392,205 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       _activeDrawingStrokeId = null;
       _clearDrawingSelectionFields();
     });
+  }
+
+  CollageTextItem? get _activeTextItem {
+    final id = _activeTextItemId;
+    if (id == null) return null;
+    for (final item in _textItems) {
+      if (item.id == id) return item;
+    }
+    return null;
+  }
+
+  void _clearActiveTextItem() {
+    _activeTextItemId = null;
+    _textEditingController.clear();
+    _textFocusNode.unfocus();
+  }
+
+  void _activateTextItem(CollageTextItem item, {bool requestFocus = true}) {
+    _activeTextItemId = item.id;
+    _textEditingController.value = TextEditingValue(
+      text: item.text,
+      selection: TextSelection.collapsed(offset: item.text.length),
+    );
+    _drawingMode = false;
+    _activeDrawingStrokeId = null;
+    _clearDrawingSelectionFields();
+    _controller.clearEditing();
+    _activeItemIndex = null;
+    if (requestFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _activeTextItemId != item.id) return;
+        _textFocusNode.requestFocus();
+      });
+    }
+  }
+
+  void _selectTextItem(CollageTextItem item, {bool requestFocus = true}) {
+    setState(() {
+      _activateTextItem(item, requestFocus: requestFocus);
+      _maxZIndex++;
+      item.zIndex = _maxZIndex;
+      _controller.maxZIndex = _maxZIndex;
+    });
+  }
+
+  void _addTextItem() {
+    final viewport = _viewportSize();
+    final center = _screenToCanvas(viewport.center(Offset.zero));
+    const width = 92.0;
+    const fontSize = 8.0;
+
+    setState(() {
+      final active = _activeTextItem;
+      if (active != null && active.text.trim().isEmpty) {
+        _textItems.removeWhere((item) => item.id == active.id);
+      }
+      _maxZIndex++;
+      _controller.maxZIndex = _maxZIndex;
+      final item = CollageTextItem(
+        id: const Uuid().v4(),
+        text: '',
+        offsetX: center.dx - width / 2,
+        offsetY: center.dy - fontSize,
+        width: width,
+        fontSize: fontSize,
+        colorValue: Colors.white.toARGB32(),
+        opacity: 1.0,
+        fontFamily: 'system',
+        bold: false,
+        italic: false,
+        textAlign: CollageTextItem.alignCenter,
+        zIndex: _maxZIndex,
+      );
+      _textItems.add(item);
+      _activateTextItem(item);
+    });
+  }
+
+  void _finishTextEditing() {
+    setState(() {
+      final active = _activeTextItem;
+      if (active != null && active.text.trim().isEmpty) {
+        _textItems.removeWhere((item) => item.id == active.id);
+      }
+      _draggingTextItemId = null;
+      _deleteHover = false;
+      _clearActiveTextItem();
+    });
+  }
+
+  void _deleteActiveTextItem() {
+    final id = _activeTextItemId;
+    if (id == null) return;
+    setState(() {
+      _textItems.removeWhere((item) => item.id == id);
+      _draggingTextItemId = null;
+      _deleteHover = false;
+      _clearActiveTextItem();
+    });
+  }
+
+  void _updateActiveTextItem(void Function(CollageTextItem item) update) {
+    final item = _activeTextItem;
+    if (item == null) return;
+    setState(() => update(item));
+  }
+
+  void _dragTextItem(
+    CollageTextItem item,
+    Offset delta, {
+    Offset? globalPosition,
+  }) {
+    setState(() {
+      item.offsetX += delta.dx;
+      item.offsetY += delta.dy;
+      _clampTextItemOffset(item);
+      if (globalPosition != null) {
+        final wasHover = _deleteHover;
+        _deleteHover = _deleteRect.contains(globalPosition);
+        if (_deleteHover && !wasHover) {
+          vibrate(5);
+        }
+      }
+    });
+  }
+
+  void _resizeTextItemFromLeft(CollageTextItem item, double deltaX) {
+    setState(() {
+      const minWidth = 46.0;
+      const maxWidth = 220.0;
+      final oldRight = item.offsetX + item.width;
+      final nextWidth = (item.width - deltaX).clamp(minWidth, maxWidth);
+      item.width = nextWidth.toDouble();
+      item.offsetX = oldRight - item.width;
+      _clampTextItemOffset(item);
+    });
+  }
+
+  void _resizeTextItemFromRight(CollageTextItem item, double deltaX) {
+    setState(() {
+      const minWidth = 46.0;
+      const maxWidth = 220.0;
+      item.width = (item.width + deltaX).clamp(minWidth, maxWidth).toDouble();
+      _clampTextItemOffset(item);
+    });
+  }
+
+  void _endTextDrag(CollageTextItem item) {
+    setState(() {
+      if (_deleteHover && _draggingTextItemId == item.id) {
+        _textItems.removeWhere((textItem) => textItem.id == item.id);
+        if (_activeTextItemId == item.id) {
+          _clearActiveTextItem();
+        }
+      }
+      _draggingTextItemId = null;
+      _deleteHover = false;
+    });
+  }
+
+  void _clampTextItemOffset(CollageTextItem item) {
+    final canvas = _currentCanvasSize();
+    const padding = 24.0;
+    final minX = padding;
+    final maxX = math.max(minX, canvas.width - item.width - padding);
+    final minY = padding;
+    final maxY = math.max(minY, canvas.height - item.fontSize - padding);
+    item.offsetX = item.offsetX.clamp(minX, maxX).toDouble();
+    item.offsetY = item.offsetY.clamp(minY, maxY).toDouble();
+  }
+
+  TextAlign _textAlignForItem(CollageTextItem item) {
+    switch (item.textAlign) {
+      case CollageTextItem.alignLeft:
+        return TextAlign.left;
+      case CollageTextItem.alignRight:
+        return TextAlign.right;
+      case CollageTextItem.alignCenter:
+      default:
+        return TextAlign.center;
+    }
+  }
+
+  String? _fontFamilyForItem(CollageTextItem item) {
+    return item.fontFamily == 'system' ? null : item.fontFamily;
+  }
+
+  TextStyle _textStyleForItem(CollageTextItem item) {
+    return TextStyle(
+      color: Color(item.colorValue).withValues(
+        alpha: item.opacity.clamp(0.0, 1.0),
+      ),
+      fontSize: item.fontSize,
+      fontFamily: _fontFamilyForItem(item),
+      fontWeight: item.bold ? FontWeight.w700 : FontWeight.w400,
+      fontStyle: item.italic ? FontStyle.italic : FontStyle.normal,
+      height: 1.08,
+      decoration: TextDecoration.none,
+    );
   }
 
   int _instaCarouselSliceCount(Rect rect) {
@@ -2723,6 +2979,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     // Перед сохранением выключаем edit mode
     _controller.clearEditing();
     _drawingMode = false;
+    final activeText = _activeTextItem;
+    if (activeText != null && activeText.text.trim().isEmpty) {
+      _textItems.removeWhere((item) => item.id == activeText.id);
+    }
+    _clearActiveTextItem();
     setState(() {});
 
     final savedCollage = await _persist.saveToDb(
@@ -2742,6 +3003,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       viewZones: _viewZones,
       previewCropRect: _currentViewZoneCropRect(),
       drawingStrokes: _drawingStrokes,
+      textItems: _textItems,
     );
 
     if (!mounted) return;
@@ -3062,6 +3324,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   Widget build(BuildContext context) {
     final sorted = List<CollagePhotoState>.from(_items)
       ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    final sortedTexts = List<CollageTextItem>.from(_textItems)
+      ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
 
     final CollagePhotoState? editingPhoto =
         sorted.cast<CollagePhotoState?>().firstWhere(
@@ -3073,6 +3337,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     final bool isMobile = isMobilePlatform;
     final double bottomInset = MediaQuery.of(context).padding.bottom;
+    final activeText = _activeTextItem;
 
     final videoOverlays = _overviewMode
         ? const <Widget>[]
@@ -3100,6 +3365,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         focusNode: _focusNode,
         autofocus: true,
         onKeyEvent: (node, event) {
+          if (_activeTextItemId != null) {
+            return KeyEventResult.ignored;
+          }
+
           if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
               event.logicalKey == LogicalKeyboardKey.arrowLeft) {
             if (event is KeyUpEvent) {
@@ -3120,6 +3389,15 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           }
 
           if (event is! KeyDownEvent) return KeyEventResult.ignored;
+
+          if ((event.logicalKey == LogicalKeyboardKey.backspace ||
+                  event.logicalKey == LogicalKeyboardKey.delete) &&
+              _drawingMode &&
+              _drawingSelectMode &&
+              _selectedDrawingStrokeIds.isNotEmpty) {
+            _deleteSelectedDrawingStrokes();
+            return KeyEventResult.handled;
+          }
 
           if (_handleViewZoneHotkeys(event)) {
             return KeyEventResult.handled;
@@ -3357,6 +3635,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                                       ),
                                                     ),
                                                   ),
+                                                for (final textItem
+                                                    in sortedTexts)
+                                                  _buildTextItem(textItem),
                                                 if (_drawingMode)
                                                   Positioned.fill(
                                                     child: GestureDetector(
@@ -3443,7 +3724,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                 if (_overviewMode) _buildOverviewGrid(_items),
                                 if (!isSomePhotoInEditMode &&
                                     (_showForInitDeleteIcon ||
-                                        _draggingIndex != null))
+                                        _draggingIndex != null ||
+                                        _draggingTextItemId != null ||
+                                        _movingDrawingSelection))
                                   Positioned(
                                     left: 0,
                                     right: 0,
@@ -3518,7 +3801,43 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 ],
               ),
               if (_instaSelectionMode) _buildInstaSelectionOverlay(),
-              if (_drawingMode)
+              if (activeText != null)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12 + (isMobile ? bottomInset : 0.0),
+                  child: CollageTextToolbar(
+                    color: Color(activeText.colorValue),
+                    fontSize: activeText.fontSize,
+                    width: activeText.width,
+                    opacity: activeText.opacity,
+                    fontFamily: activeText.fontFamily,
+                    bold: activeText.bold,
+                    italic: activeText.italic,
+                    textAlign: activeText.textAlign,
+                    onColorChanged: (color) => _updateActiveTextItem(
+                      (item) => item.colorValue = color.toARGB32(),
+                    ),
+                    onFontSizeChanged: (value) =>
+                        _updateActiveTextItem((item) => item.fontSize = value),
+                    onWidthChanged: (value) =>
+                        _updateActiveTextItem((item) => item.width = value),
+                    onOpacityChanged: (value) =>
+                        _updateActiveTextItem((item) => item.opacity = value),
+                    onFontFamilyChanged: (value) => _updateActiveTextItem(
+                      (item) => item.fontFamily = value,
+                    ),
+                    onBoldChanged: (value) =>
+                        _updateActiveTextItem((item) => item.bold = value),
+                    onItalicChanged: (value) =>
+                        _updateActiveTextItem((item) => item.italic = value),
+                    onTextAlignChanged: (value) =>
+                        _updateActiveTextItem((item) => item.textAlign = value),
+                    onDelete: _deleteActiveTextItem,
+                    onDone: _finishTextEditing,
+                  ),
+                )
+              else if (_drawingMode)
                 Positioned(
                   left: 12,
                   right: 12,
@@ -3601,7 +3920,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         setState(() => editingPhoto.opacity = v),
                   ),
                 )
-              else if (_draggingIndex == null) ...[
+              else if (_draggingIndex == null &&
+                  _draggingTextItemId == null &&
+                  !_movingDrawingSelection) ...[
                 if (isMobile)
                   ...buildIOSCollageControlsOverlay(
                     context: context,
@@ -3648,7 +3969,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     child: _buildFloatingActionButtons(),
                   ),
               ],
-              if (_isFullscreen && _draggingIndex == null)
+              if (_isFullscreen &&
+                  _draggingIndex == null &&
+                  _draggingTextItemId == null &&
+                  !_movingDrawingSelection)
                 Positioned(
                   top: 0,
                   right: 0,
@@ -3665,7 +3989,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 ),
               if (!_isFullscreen &&
                   !_showDesktopTopBar &&
-                  _draggingIndex == null) ...[
+                  _draggingIndex == null &&
+                  _draggingTextItemId == null &&
+                  !_movingDrawingSelection) ...[
                 Positioned(
                   left: 12,
                   top: 12,
@@ -3864,6 +4190,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         active: _drawingMode,
         onPressed: _toggleDrawingMode,
       ),
+      CollageControlAction(
+        icon: Icons.text_fields,
+        tooltip: 'Add text',
+        color: _activeTextItemId != null ? Colors.amberAccent : Colors.white,
+        active: _activeTextItemId != null,
+        onPressed: _addTextItem,
+      ),
       if (includeViewZones)
         CollageControlAction(
           icon: Icons.crop_free,
@@ -4044,6 +4377,157 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   // Item building
   // ----------------------------
 
+  Widget _buildTextItem(CollageTextItem item) {
+    final isActive = item.id == _activeTextItemId;
+    final style = _textStyleForItem(item);
+    final align = _textAlignForItem(item);
+
+    return Positioned(
+      key: ValueKey('text-${item.id}'),
+      left: item.offsetX,
+      top: item.offsetY,
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => _selectTextItem(item),
+        onPanStart: (_) {
+          setState(() {
+            _draggingTextItemId = item.id;
+            _deleteHover = false;
+            if (!isActive) {
+              _activateTextItem(item, requestFocus: false);
+              _maxZIndex++;
+              item.zIndex = _maxZIndex;
+              _controller.maxZIndex = _maxZIndex;
+            }
+          });
+          _scheduleDeleteRectUpdate();
+        },
+        onPanUpdate: (details) => _dragTextItem(
+          item,
+          details.delta,
+          globalPosition: details.globalPosition,
+        ),
+        onPanEnd: (_) => _endTextDrag(item),
+        onPanCancel: () => _endTextDrag(item),
+        child: MouseRegion(
+          cursor: SystemMouseCursors.move,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              SizedBox(
+                width: item.width,
+                child: isActive
+                    ? Material(
+                        color: Colors.transparent,
+                        child: IgnorePointer(
+                          child: TextField(
+                            controller: _textEditingController,
+                            focusNode: _textFocusNode,
+                            minLines: 1,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
+                            textAlign: align,
+                            style: style,
+                            cursorColor: style.color,
+                            decoration: InputDecoration(
+                              isDense: true,
+                              hintText: 'Text',
+                              hintStyle: style.copyWith(
+                                color: style.color?.withValues(alpha: 0.55),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 3,
+                                vertical: 2,
+                              ),
+                              filled: true,
+                              fillColor: Colors.black.withValues(alpha: 0.10),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(3),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(3),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(3),
+                                borderSide: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            onChanged: (value) {
+                              item.text = value;
+                            },
+                          ),
+                        ),
+                      )
+                    : Text(
+                        item.text,
+                        textAlign: align,
+                        softWrap: true,
+                        style: style,
+                      ),
+              ),
+              if (isActive)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.45),
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                ),
+              if (isActive) ...[
+                Positioned(
+                  left: -5,
+                  top: 0,
+                  bottom: 0,
+                  width: 10,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (details) =>
+                          _resizeTextItemFromLeft(item, details.delta.dx),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -5,
+                  top: 0,
+                  bottom: 0,
+                  width: 10,
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.resizeLeftRight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onPanUpdate: (details) =>
+                          _resizeTextItemFromRight(item, details.delta.dx),
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildPhotoItem(CollagePhotoState item) {
     final w = item.baseWidth * item.scale;
     final h = item.baseHeight * item.scale;
@@ -4091,6 +4575,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                   _exitOverviewLayout(bringToFrontIndex: tappedIndex);
                 } else {
                   setState(() {
+                    _clearActiveTextItem();
                     _controller.clearEditing();
                     _controller.bringToFront(item);
                     _maxZIndex = _controller.maxZIndex;
@@ -4205,6 +4690,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _bringToFront(CollagePhotoState item) {
     if (_overviewMode) return;
     setState(() {
+      _clearActiveTextItem();
       _controller.bringToFront(item);
       _maxZIndex = _controller.maxZIndex;
       _activeItemIndex = _items.indexOf(item);
@@ -5036,6 +5522,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     _transformationController.removeListener(_handleTransformChanged);
     _transformationController.dispose();
     _overviewScrollController.dispose();
+    _textEditingController.dispose();
+    _textFocusNode.dispose();
     _focusNode.dispose();
 
     // Dispose video controllers safely

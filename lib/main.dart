@@ -377,6 +377,8 @@ void _registerAdaptersSafely() {
   safeRegister(() =>
       Hive.registerAdapter(CollageDrawingStrokeAdapter())); // typeId = 103
   safeRegister(
+      () => Hive.registerAdapter(CollageTextItemAdapter())); // typeId = 104
+  safeRegister(
       () => Hive.registerAdapter(TagCategoryAdapter())); // typeId = 200
 }
 
