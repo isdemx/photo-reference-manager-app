@@ -6,6 +6,61 @@ part of 'collage.dart';
 // TypeAdapterGenerator
 // **************************************************************************
 
+class CollageDrawingStrokeAdapter extends TypeAdapter<CollageDrawingStroke> {
+  @override
+  final int typeId = 103;
+
+  @override
+  CollageDrawingStroke read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return CollageDrawingStroke(
+      id: fields[0] as String,
+      pointValues: (fields[1] as List).cast<double>(),
+      colorValue: fields[2] as int,
+      width: (fields[3] as num).toDouble(),
+      opacity: (fields[4] as num?)?.toDouble() ?? 1.0,
+      isEraser: fields[5] as bool? ?? false,
+      zIndex: fields[6] as int? ?? 0,
+      tool: fields[7] as int? ?? CollageDrawingStroke.toolPencil,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, CollageDrawingStroke obj) {
+    writer
+      ..writeByte(8)
+      ..writeByte(0)
+      ..write(obj.id)
+      ..writeByte(1)
+      ..write(obj.pointValues)
+      ..writeByte(2)
+      ..write(obj.colorValue)
+      ..writeByte(3)
+      ..write(obj.width)
+      ..writeByte(4)
+      ..write(obj.opacity)
+      ..writeByte(5)
+      ..write(obj.isEraser)
+      ..writeByte(6)
+      ..write(obj.zIndex)
+      ..writeByte(7)
+      ..write(obj.tool);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CollageDrawingStrokeAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
 class CollageItemAdapter extends TypeAdapter<CollageItem> {
   @override
   final int typeId = 101;
@@ -132,13 +187,14 @@ class CollageAdapter extends TypeAdapter<Collage> {
       canvasOffsetY: fields[9] as double?,
       canvasScale: fields[10] as double?,
       viewZones: (fields[11] as List?)?.cast<CollageViewZoneEntry>(),
+      drawingStrokes: (fields[12] as List?)?.cast<CollageDrawingStroke>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Collage obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(13)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -162,7 +218,9 @@ class CollageAdapter extends TypeAdapter<Collage> {
       ..writeByte(10)
       ..write(obj.canvasScale)
       ..writeByte(11)
-      ..write(obj.viewZones);
+      ..write(obj.viewZones)
+      ..writeByte(12)
+      ..write(obj.drawingStrokes);
   }
 
   @override

@@ -24,7 +24,6 @@ class VideoSurface extends StatefulWidget {
 
   final ValueChanged<VideoPlayerController>? onControllerReady;
 
-
   const VideoSurface({
     Key? key,
     required this.filePath,
@@ -51,6 +50,8 @@ class _VideoSurfaceState extends State<VideoSurface> {
 
   bool _owns = false;
   bool _initing = false;
+  bool _disposed = false;
+  int _setupToken = 0;
   Timer? _tick;
 
   @override
@@ -105,12 +106,21 @@ class _VideoSurfaceState extends State<VideoSurface> {
 
   @override
   void dispose() {
+    _disposed = true;
+    _setupToken++;
     _tick?.cancel();
     _disposeInternal();
     super.dispose();
   }
 
-  bool get _ready => !_initing && _c.value.isInitialized;
+  bool get _ready {
+    if (_disposed || _initing) return false;
+    try {
+      return _c.value.isInitialized;
+    } catch (_) {
+      return false;
+    }
+  }
 
   Duration _clampStart(Duration start, Duration end) {
     if (start < Duration.zero) return Duration.zero;
@@ -120,55 +130,76 @@ class _VideoSurfaceState extends State<VideoSurface> {
 
   Future<void> _setup() async {
     if (_initing) return;
+    final token = ++_setupToken;
     _initing = true;
 
-    if (widget.controller == null) {
-      _internal = VideoPlayerController.file(File(widget.filePath));
-      _owns = true;
-      await _internal.initialize();
-    } else {
-      if (!widget.controller!.value.isInitialized) {
-        await widget.controller!.initialize();
+    try {
+      if (widget.controller == null) {
+        _internal = VideoPlayerController.file(File(widget.filePath));
+        _owns = true;
+        await _internal.initialize();
+      } else {
+        if (!widget.controller!.value.isInitialized) {
+          await widget.controller!.initialize();
+        }
+      }
+      if (!_isCurrentSetup(token)) return;
+
+      widget.onControllerReady?.call(_c);
+
+      await _c.setLooping(false); // лупим вручную в [start; end)
+      if (!_isCurrentSetup(token)) return;
+      await _c.setVolume(widget.volume.clamp(0, 1));
+      if (!_isCurrentSetup(token)) return;
+      await _c.setPlaybackSpeed(widget.speed.clamp(0.1, 4.0));
+      if (!_isCurrentSetup(token)) return;
+
+      final duration = _c.value.duration;
+      widget.onDuration?.call(duration);
+
+      final end = widget.endTime ?? duration;
+      final startClamped = _clampStart(widget.startTime, end);
+      await _c.seekTo(startClamped);
+      if (!_isCurrentSetup(token)) return;
+      if (widget.autoplay) await _c.play(); // ← автостарт
+
+      if (!_isCurrentSetup(token)) return;
+      _tick?.cancel();
+      _tick = Timer.periodic(const Duration(milliseconds: 120), (_) async {
+        if (!_ready) return;
+        final d = _c.value.duration;
+        final end = (widget.endTime == null || widget.endTime! > d)
+            ? d
+            : widget.endTime!;
+        final pos = _c.value.position;
+
+        widget.onPosition?.call(pos);
+
+        if (pos >= end && _ready) {
+          await _c.seekTo(widget.startTime);
+          if (_ready) await _c.play();
+        }
+      });
+
+      if (mounted && !_disposed && token == _setupToken) {
+        setState(() => _initing = false);
+      }
+    } catch (_) {
+      if (mounted && !_disposed && token == _setupToken) {
+        setState(() => _initing = false);
       }
     }
+  }
 
-    widget.onControllerReady?.call(_c);
-
-
-    await _c.setLooping(false); // лупим вручную в [start; end)
-    await _c.setVolume(widget.volume.clamp(0, 1));
-    await _c.setPlaybackSpeed(widget.speed.clamp(0.1, 4.0));
-
-    final duration = _c.value.duration;
-    widget.onDuration?.call(duration);
-
-    final end = widget.endTime ?? duration;
-    final startClamped = _clampStart(widget.startTime, end);
-    await _c.seekTo(startClamped);
-    if (widget.autoplay) await _c.play(); // ← автостарт
-
-    _tick?.cancel();
-    _tick = Timer.periodic(const Duration(milliseconds: 120), (_) async {
-      if (!_ready) return;
-      final d = _c.value.duration;
-      final end =
-          (widget.endTime == null || widget.endTime! > d) ? d : widget.endTime!;
-      final pos = _c.value.position;
-
-      widget.onPosition?.call(pos);
-
-      if (pos >= end) {
-        await _c.seekTo(widget.startTime);
-        await _c.play();
-      }
-    });
-
-    if (mounted) setState(() => _initing = false);
+  bool _isCurrentSetup(int token) {
+    return mounted && !_disposed && token == _setupToken;
   }
 
   void _disposeInternal() {
     if (_owns) {
-      _internal.dispose();
+      try {
+        _internal.dispose();
+      } catch (_) {}
       _owns = false;
     }
   }

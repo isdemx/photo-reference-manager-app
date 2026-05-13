@@ -15,7 +15,6 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image/image.dart' as img;
-import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'package:video_player/video_player.dart';
@@ -35,6 +34,8 @@ import 'package:photographers_reference_app/src/presentation/theme/app_theme.dar
 import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_ios.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_macos.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/collage_controls_shared.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_drawing_painter.dart';
+import 'package:photographers_reference_app/src/presentation/widgets/collage_drawing_toolbar.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_top_center_action.dart';
 import 'package:photographers_reference_app/src/presentation/widgets/macos/macos_ui.dart';
 import 'package:photographers_reference_app/src/services/drag_drop_import_service.dart';
@@ -155,6 +156,7 @@ class VideoUi {
   Duration duration;
   int seekRequestId;
   VideoPlayerController? controller;
+  bool controllerOwnedBySurface;
 
   VideoUi({
     this.startFrac = 0.0,
@@ -165,11 +167,15 @@ class VideoUi {
     this.duration = Duration.zero,
     this.seekRequestId = 0,
     this.controller,
+    this.controllerOwnedBySurface = false,
   });
 
-  void disposeControllerIfAny() {
+  void disposeControllerIfAny({bool force = false}) {
     final c = controller;
     controller = null;
+    final shouldDispose = force || !controllerOwnedBySurface;
+    controllerOwnedBySurface = false;
+    if (!shouldDispose) return;
     if (c != null) {
       try {
         c.dispose();
@@ -365,6 +371,7 @@ class CollagePersistService {
     required double canvasScale,
     required List<_ViewZone?> viewZones,
     required Rect? previewCropRect,
+    required List<CollageDrawingStroke> drawingStrokes,
   }) async {
     final now = DateTime.now();
 
@@ -437,6 +444,7 @@ class CollagePersistService {
         canvasOffsetY: canvasOffsetY,
         canvasScale: canvasScale,
         viewZones: zoneEntries,
+        drawingStrokes: drawingStrokes,
       );
 
       collageBloc.add(AddCollage(newCollage));
@@ -465,6 +473,7 @@ class CollagePersistService {
         canvasOffsetY: canvasOffsetY,
         canvasScale: canvasScale,
         viewZones: zoneEntries,
+        drawingStrokes: drawingStrokes,
       );
 
       collageBloc.add(UpdateCollage(updated));
@@ -912,6 +921,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   final Map<String, bool> _controlsHover = <String, bool>{};
   final Map<String, bool> _videoHover = <String, bool>{};
 
+  final List<CollageDrawingStroke> _drawingStrokes = <CollageDrawingStroke>[];
+  bool _drawingMode = false;
+  Color _drawingColor = Colors.white;
+  double _drawingWidth = 2.0;
+  double _drawingOpacity = 1.0;
+  bool _drawingEraser = false;
+  int _drawingTool = CollageDrawingStroke.toolPencil;
+  String? _activeDrawingStrokeId;
+  bool _drawingSelectMode = false;
+  Rect? _drawingSelectionRect;
+  Offset? _drawingSelectionStart;
+  Offset? _drawingSelectionLastPoint;
+  bool _movingDrawingSelection = false;
+  final Set<String> _selectedDrawingStrokeIds = <String>{};
+  final Set<String> _baseSelectedDrawingStrokeIds = <String>{};
+  final List<_DrawingUndoEntry> _drawingUndoStack = <_DrawingUndoEntry>[];
+  Map<String, List<double>> _drawingMoveStartPointValues =
+      <String, List<double>>{};
+  bool _drawingSelectionMoved = false;
+
   Size _canvasViewportSize = Size.zero;
   static const double _videoControlsHeight = 34.0;
   final ScrollController _overviewScrollController = ScrollController();
@@ -989,6 +1018,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _initEmptyCollage() {
     _items.clear();
     _videoStates.clear();
+    _drawingStrokes.clear();
+    _drawingUndoStack.clear();
+    _clearDrawingSelectionFields();
     _maxZIndex = 0;
     _activeItemIndex = null;
     _controller.maxZIndex = 0;
@@ -999,6 +1031,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   void _initCollageFromSelectedPhotos() {
     _items.clear();
     _videoStates.clear();
+    _drawingStrokes.clear();
+    _drawingUndoStack.clear();
+    _clearDrawingSelectionFields();
     _pendingInitialLayout = true;
 
     final filtered = widget.photos.where(
@@ -1189,6 +1224,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   bool get _canPanCanvasByTouch {
     return isMobilePlatform &&
         !_overviewMode &&
+        !_drawingMode &&
         !_instaSelectionMode &&
         !_showViewZoneOverlay &&
         !_isSavingInstaCarousel &&
@@ -1260,6 +1296,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     _items.clear();
     _videoStates.clear();
+    _drawingStrokes
+      ..clear()
+      ..addAll(collage.drawingStrokes ?? const <CollageDrawingStroke>[]);
+    _drawingUndoStack.clear();
+    _clearDrawingSelectionFields();
 
     for (final src in collage.items) {
       final photo = widget.allPhotos.firstWhere(
@@ -1317,8 +1358,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       }
     }
 
-    _maxZIndex =
-        _items.isEmpty ? 0 : _items.map((e) => e.zIndex).reduce(math.max);
+    final zIndexes = <int>[
+      for (final item in _items) item.zIndex,
+      for (final stroke in _drawingStrokes) stroke.zIndex,
+    ];
+    _maxZIndex = zIndexes.isEmpty ? 0 : zIndexes.reduce(math.max);
     _controller.maxZIndex = _maxZIndex;
 
     for (var i = 0; i < _viewZones.length; i++) {
@@ -1341,6 +1385,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       // ✅ создаём новый коллаж — всегда пустой
       _items.clear();
       _videoStates.clear();
+      _drawingStrokes.clear();
+      _drawingUndoStack.clear();
+      _clearDrawingSelectionFields();
       _maxZIndex = 0;
       _activeItemIndex = null;
       setState(() {});
@@ -1348,6 +1395,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     }
     _items.clear();
     _videoStates.clear();
+    _drawingStrokes.clear();
+    _drawingUndoStack.clear();
+    _clearDrawingSelectionFields();
 
     final filtered = widget.photos.where(
       (p) => p.mediaType == 'image' || p.mediaType == 'video',
@@ -1844,12 +1894,447 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Future<void> _onGenerateCollage() async {
     _controller.clearEditing();
+    _drawingMode = false;
     setState(() {});
     await CollageSaveHelper.saveCollage(
       _collageKey,
       context,
       cropRect: _currentViewZoneCropRect(),
     );
+  }
+
+  void _toggleDrawingMode() {
+    setState(() {
+      final next = !_drawingMode;
+      _drawingMode = next;
+      _activeDrawingStrokeId = null;
+      _drawingSelectMode = false;
+      _drawingSelectionRect = null;
+      _drawingSelectionStart = null;
+      _drawingSelectionLastPoint = null;
+      _movingDrawingSelection = false;
+      _selectedDrawingStrokeIds.clear();
+      if (next) {
+        _controller.clearEditing();
+        _draggingIndex = null;
+        _deleteHover = false;
+        _isItemScaleGestureActive = false;
+        _instaSelectionMode = false;
+      }
+    });
+  }
+
+  Offset _clampCanvasPoint(Offset point) {
+    final size = _currentCanvasSize();
+    return Offset(
+      point.dx.clamp(0.0, size.width).toDouble(),
+      point.dy.clamp(0.0, size.height).toDouble(),
+    );
+  }
+
+  void _startDrawingGesture(DragStartDetails details) {
+    if (!_drawingMode) return;
+    if (_drawingSelectMode) {
+      _startDrawingSelection(details);
+    } else {
+      _startDrawingStroke(details);
+    }
+  }
+
+  void _updateDrawingGesture(DragUpdateDetails details) {
+    if (!_drawingMode) return;
+    if (_drawingSelectMode) {
+      _updateDrawingSelection(details);
+    } else {
+      _updateDrawingStroke(details);
+    }
+  }
+
+  void _endDrawingGesture() {
+    if (!_drawingMode) return;
+    if (_drawingSelectMode) {
+      _endDrawingSelection();
+    } else {
+      _endDrawingStroke();
+    }
+  }
+
+  void _startDrawingStroke(DragStartDetails details) {
+    final point = _clampCanvasPoint(details.localPosition);
+    final tool =
+        _drawingEraser ? CollageDrawingStroke.toolPencil : _drawingTool;
+    final pointValues = tool == CollageDrawingStroke.toolBrush
+        ? <double>[point.dx, point.dy, _drawingWidth]
+        : <double>[point.dx, point.dy];
+    setState(() {
+      _maxZIndex++;
+      _controller.maxZIndex = _maxZIndex;
+      final id = const Uuid().v4();
+      _activeDrawingStrokeId = id;
+      _drawingStrokes.add(
+        CollageDrawingStroke(
+          id: id,
+          pointValues: pointValues,
+          colorValue: _drawingColor.toARGB32(),
+          width: _drawingWidth,
+          opacity: _drawingOpacity,
+          isEraser: _drawingEraser,
+          zIndex: _maxZIndex,
+          tool: tool,
+        ),
+      );
+    });
+  }
+
+  void _updateDrawingStroke(DragUpdateDetails details) {
+    if (!_drawingMode) return;
+    final id = _activeDrawingStrokeId;
+    if (id == null) return;
+    final index = _drawingStrokes.indexWhere((stroke) => stroke.id == id);
+    if (index == -1) return;
+
+    final point = _clampCanvasPoint(details.localPosition);
+    final stroke = _drawingStrokes[index];
+    final previous = _lastDrawingPoint(stroke);
+    if (previous != null && (point - previous).distance < 1.5) return;
+
+    setState(() {
+      if (stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser) {
+        final dynamicWidth = _brushWidthForDelta(
+          point - (previous ?? point),
+          stroke.width,
+        );
+        stroke.pointValues.addAll(<double>[point.dx, point.dy, dynamicWidth]);
+      } else {
+        stroke.pointValues.addAll(<double>[point.dx, point.dy]);
+      }
+    });
+  }
+
+  void _endDrawingStroke() {
+    final id = _activeDrawingStrokeId;
+    if (id == null) return;
+    setState(() {
+      final index = _drawingStrokes.indexWhere((stroke) => stroke.id == id);
+      final stroke = index == -1 ? null : _drawingStrokes[index];
+      if (stroke != null && _strokePointCount(stroke) < 2) {
+        _drawingStrokes.removeAt(index);
+      } else if (stroke != null) {
+        _drawingUndoStack.add(_DrawingUndoEntry.addStroke(stroke.id));
+      }
+      _activeDrawingStrokeId = null;
+    });
+  }
+
+  Offset? _lastDrawingPoint(CollageDrawingStroke stroke) {
+    final values = stroke.pointValues;
+    if (stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser) {
+      if (values.length < 3) return null;
+      return Offset(values[values.length - 3], values[values.length - 2]);
+    }
+    if (values.length < 2) return null;
+    return Offset(values[values.length - 2], values.last);
+  }
+
+  int _strokePointCount(CollageDrawingStroke stroke) {
+    final step =
+        stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser
+            ? 3
+            : 2;
+    return stroke.pointValues.length ~/ step;
+  }
+
+  double _brushWidthForDelta(Offset delta, double baseWidth) {
+    final speed = delta.distance;
+    final t = (speed / 8.0).clamp(0.0, 1.0);
+    final eased = math.sqrt(t);
+    final slowWidth = baseWidth * 1.55;
+    final fastWidth = baseWidth * 0.28;
+    return slowWidth + (fastWidth - slowWidth) * eased;
+  }
+
+  void _startDrawingSelection(DragStartDetails details) {
+    final point = _clampCanvasPoint(details.localPosition);
+    setState(() {
+      _activeDrawingStrokeId = null;
+      final existing = _drawingSelectionRect;
+      final additive = HardwareKeyboard.instance.isShiftPressed;
+      final canMove = existing != null &&
+          existing.contains(point) &&
+          _selectedDrawingStrokeIds.isNotEmpty;
+      _movingDrawingSelection = canMove;
+      _drawingSelectionLastPoint = point;
+      _drawingSelectionMoved = false;
+      _drawingMoveStartPointValues = canMove
+          ? {
+              for (final stroke in _drawingStrokes)
+                if (_selectedDrawingStrokeIds.contains(stroke.id))
+                  stroke.id: List<double>.of(stroke.pointValues),
+            }
+          : <String, List<double>>{};
+      if (!canMove) {
+        _drawingSelectionStart = point;
+        _drawingSelectionRect = Rect.fromPoints(point, point);
+        _baseSelectedDrawingStrokeIds
+          ..clear()
+          ..addAll(additive ? _selectedDrawingStrokeIds : const <String>{});
+        if (!additive) {
+          _selectedDrawingStrokeIds.clear();
+        }
+      }
+    });
+  }
+
+  void _updateDrawingSelection(DragUpdateDetails details) {
+    final point = _clampCanvasPoint(details.localPosition);
+    setState(() {
+      if (_movingDrawingSelection) {
+        final last = _drawingSelectionLastPoint;
+        if (last == null) {
+          _drawingSelectionLastPoint = point;
+          return;
+        }
+        final delta = point - last;
+        if (delta == Offset.zero) return;
+        _translateSelectedDrawingStrokes(delta);
+        _drawingSelectionRect = _drawingSelectionRect?.shift(delta);
+        _drawingSelectionLastPoint = point;
+        _drawingSelectionMoved = true;
+        return;
+      }
+
+      final start = _drawingSelectionStart;
+      if (start == null) return;
+      final rect = Rect.fromPoints(start, point);
+      _drawingSelectionRect = rect;
+      final hits = _drawingStrokes
+          .where((stroke) => _strokeIntersectsRect(stroke, rect))
+          .map((stroke) => stroke.id);
+      _selectedDrawingStrokeIds
+        ..clear()
+        ..addAll(_baseSelectedDrawingStrokeIds)
+        ..addAll(hits);
+    });
+  }
+
+  void _endDrawingSelection() {
+    setState(() {
+      if (_movingDrawingSelection &&
+          _drawingSelectionMoved &&
+          _drawingMoveStartPointValues.isNotEmpty) {
+        _drawingUndoStack.add(
+          _DrawingUndoEntry.moveStrokes(_drawingMoveStartPointValues),
+        );
+      }
+      _drawingSelectionStart = null;
+      _drawingSelectionLastPoint = null;
+      _movingDrawingSelection = false;
+      _drawingSelectionMoved = false;
+      _drawingMoveStartPointValues = <String, List<double>>{};
+      final rect = _drawingSelectionRect;
+      if (_selectedDrawingStrokeIds.isNotEmpty) {
+        _drawingSelectionRect = _selectedDrawingStrokesBounds();
+      } else if (rect != null && (rect.width < 2 || rect.height < 2)) {
+        _drawingSelectionRect = null;
+      }
+      _baseSelectedDrawingStrokeIds.clear();
+    });
+  }
+
+  void _translateSelectedDrawingStrokes(Offset delta) {
+    if (_selectedDrawingStrokeIds.isEmpty) return;
+    for (final stroke in _drawingStrokes) {
+      if (!_selectedDrawingStrokeIds.contains(stroke.id)) continue;
+      final step =
+          stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser
+              ? 3
+              : 2;
+      for (var i = 0; i + 1 < stroke.pointValues.length; i += step) {
+        stroke.pointValues[i] += delta.dx;
+        stroke.pointValues[i + 1] += delta.dy;
+      }
+    }
+  }
+
+  void _clearDrawingSelection() {
+    setState(() {
+      _clearDrawingSelectionFields();
+    });
+  }
+
+  void _deleteSelectedDrawingStrokes() {
+    if (_selectedDrawingStrokeIds.isEmpty) return;
+    setState(() {
+      final removed = _drawingStrokes
+          .where((stroke) => _selectedDrawingStrokeIds.contains(stroke.id))
+          .map(_cloneDrawingStroke)
+          .toList(growable: false);
+      if (removed.isNotEmpty) {
+        _drawingUndoStack.add(_DrawingUndoEntry.restoreStrokes(removed));
+      }
+      _drawingStrokes.removeWhere(
+          (stroke) => _selectedDrawingStrokeIds.contains(stroke.id));
+      _clearDrawingSelectionFields();
+    });
+  }
+
+  void _clearDrawingSelectionFields() {
+    _drawingSelectionRect = null;
+    _drawingSelectionStart = null;
+    _drawingSelectionLastPoint = null;
+    _movingDrawingSelection = false;
+    _drawingSelectionMoved = false;
+    _drawingMoveStartPointValues = <String, List<double>>{};
+    _selectedDrawingStrokeIds.clear();
+    _baseSelectedDrawingStrokeIds.clear();
+  }
+
+  bool _strokeIntersectsRect(CollageDrawingStroke stroke, Rect rect) {
+    final normalized = _normalizeRect(rect);
+    if (normalized.isEmpty) return false;
+    final bounds = _strokeBounds(stroke);
+    if (bounds == null) return false;
+    final hitRect = normalized.inflate(math.max(1.0, stroke.width * 0.5));
+    if (!bounds.overlaps(hitRect) && !hitRect.overlaps(bounds)) return false;
+
+    final points = _drawingStrokePoints(stroke);
+    if (points.any(hitRect.contains)) return true;
+    for (var i = 0; i < points.length - 1; i++) {
+      if (_segmentIntersectsRect(points[i], points[i + 1], hitRect)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Rect _normalizeRect(Rect rect) {
+    return Rect.fromLTRB(
+      math.min(rect.left, rect.right),
+      math.min(rect.top, rect.bottom),
+      math.max(rect.left, rect.right),
+      math.max(rect.top, rect.bottom),
+    );
+  }
+
+  bool _segmentIntersectsRect(Offset a, Offset b, Rect rect) {
+    if (rect.contains(a) || rect.contains(b)) return true;
+    return _segmentsIntersect(a, b, rect.topLeft, rect.topRight) ||
+        _segmentsIntersect(a, b, rect.topRight, rect.bottomRight) ||
+        _segmentsIntersect(a, b, rect.bottomRight, rect.bottomLeft) ||
+        _segmentsIntersect(a, b, rect.bottomLeft, rect.topLeft);
+  }
+
+  bool _segmentsIntersect(Offset a, Offset b, Offset c, Offset d) {
+    final d1 = _cross(b - a, c - a);
+    final d2 = _cross(b - a, d - a);
+    final d3 = _cross(d - c, a - c);
+    final d4 = _cross(d - c, b - c);
+    return ((d1 >= 0 && d2 <= 0) || (d1 <= 0 && d2 >= 0)) &&
+        ((d3 >= 0 && d4 <= 0) || (d3 <= 0 && d4 >= 0));
+  }
+
+  double _cross(Offset a, Offset b) {
+    return a.dx * b.dy - a.dy * b.dx;
+  }
+
+  Rect? _selectedDrawingStrokesBounds() {
+    Rect? result;
+    for (final stroke in _drawingStrokes) {
+      if (!_selectedDrawingStrokeIds.contains(stroke.id)) continue;
+      final bounds = _strokeBounds(stroke);
+      if (bounds == null) continue;
+      result = result == null ? bounds : result.expandToInclude(bounds);
+    }
+    return result;
+  }
+
+  Rect? _strokeBounds(CollageDrawingStroke stroke) {
+    final points = _drawingStrokePoints(stroke);
+    if (points.isEmpty) return null;
+    var left = points.first.dx;
+    var right = points.first.dx;
+    var top = points.first.dy;
+    var bottom = points.first.dy;
+    for (final point in points.skip(1)) {
+      left = math.min(left, point.dx);
+      right = math.max(right, point.dx);
+      top = math.min(top, point.dy);
+      bottom = math.max(bottom, point.dy);
+    }
+    return Rect.fromLTRB(left, top, right, bottom)
+        .inflate(math.max(4.0, stroke.width));
+  }
+
+  List<Offset> _drawingStrokePoints(CollageDrawingStroke stroke) {
+    final values = stroke.pointValues;
+    final step =
+        stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser
+            ? 3
+            : 2;
+    final points = <Offset>[];
+    for (var i = 0; i + 1 < values.length; i += step) {
+      points.add(Offset(values[i], values[i + 1]));
+    }
+    return points;
+  }
+
+  CollageDrawingStroke _cloneDrawingStroke(CollageDrawingStroke stroke) {
+    return CollageDrawingStroke(
+      id: stroke.id,
+      pointValues: List<double>.of(stroke.pointValues),
+      colorValue: stroke.colorValue,
+      width: stroke.width,
+      opacity: stroke.opacity,
+      isEraser: stroke.isEraser,
+      zIndex: stroke.zIndex,
+      tool: stroke.tool,
+    );
+  }
+
+  void _undoDrawingAction() {
+    if (_drawingUndoStack.isEmpty) return;
+    setState(() {
+      _activeDrawingStrokeId = null;
+      _clearDrawingSelectionFields();
+      final entry = _drawingUndoStack.removeLast();
+      switch (entry.type) {
+        case _DrawingUndoType.addStroke:
+          _drawingStrokes.removeWhere((stroke) => stroke.id == entry.strokeId);
+        case _DrawingUndoType.moveStrokes:
+          for (final item in entry.pointValuesByStrokeId.entries) {
+            final index =
+                _drawingStrokes.indexWhere((stroke) => stroke.id == item.key);
+            if (index == -1) continue;
+            _drawingStrokes[index].pointValues = List<double>.of(item.value);
+          }
+        case _DrawingUndoType.restoreStrokes:
+          _drawingStrokes.addAll(
+            entry.strokes.map(_cloneDrawingStroke),
+          );
+      }
+    });
+  }
+
+  void _clearDrawingStrokes() {
+    if (_drawingStrokes.isEmpty) return;
+    setState(() {
+      _activeDrawingStrokeId = null;
+      _clearDrawingSelectionFields();
+      _drawingUndoStack.add(
+        _DrawingUndoEntry.restoreStrokes(
+          _drawingStrokes.map(_cloneDrawingStroke).toList(growable: false),
+        ),
+      );
+      _drawingStrokes.clear();
+    });
+  }
+
+  void _finishDrawingMode() {
+    setState(() {
+      _drawingMode = false;
+      _activeDrawingStrokeId = null;
+      _clearDrawingSelectionFields();
+    });
   }
 
   int _instaCarouselSliceCount(Rect rect) {
@@ -2237,6 +2722,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     // Перед сохранением выключаем edit mode
     _controller.clearEditing();
+    _drawingMode = false;
     setState(() {});
 
     final savedCollage = await _persist.saveToDb(
@@ -2255,6 +2741,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
       canvasScale: TransformMath.getScale(_transformationController.value),
       viewZones: _viewZones,
       previewCropRect: _currentViewZoneCropRect(),
+      drawingStrokes: _drawingStrokes,
     );
 
     if (!mounted) return;
@@ -2778,11 +3265,11 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                         return Listener(
                           behavior: HitTestBehavior.opaque,
                           onPointerPanZoomStart: (_) {
-                            if (_overviewMode) return;
+                            if (_overviewMode || _drawingMode) return;
                             _isTrackpadPanZoomActive = true;
                           },
                           onPointerPanZoomUpdate: (e) {
-                            if (_overviewMode) return;
+                            if (_overviewMode || _drawingMode) return;
                             if (_isItemScaleGestureActive &&
                                 !_isTrackpadPanZoomActive) {
                               return;
@@ -2796,7 +3283,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                             }
                           },
                           onPointerPanZoomEnd: (_) {
-                            if (_overviewMode) return;
+                            if (_overviewMode || _drawingMode) return;
                             _isTrackpadPanZoomActive = false;
                             _saveCollageScale(_collageScale);
                           },
@@ -2858,6 +3345,53 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                                                 ),
                                                 for (final item in sorted)
                                                   _buildPhotoItem(item),
+                                                if (_drawingStrokes.isNotEmpty)
+                                                  Positioned.fill(
+                                                    child: IgnorePointer(
+                                                      child: CustomPaint(
+                                                        painter:
+                                                            CollageDrawingPainter(
+                                                          strokes:
+                                                              _drawingStrokes,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                if (_drawingMode)
+                                                  Positioned.fill(
+                                                    child: GestureDetector(
+                                                      behavior: HitTestBehavior
+                                                          .opaque,
+                                                      onPanStart:
+                                                          _startDrawingGesture,
+                                                      onPanUpdate:
+                                                          _updateDrawingGesture,
+                                                      onPanEnd: (_) =>
+                                                          _endDrawingGesture(),
+                                                      onPanCancel:
+                                                          _endDrawingGesture,
+                                                      child: const SizedBox
+                                                          .expand(),
+                                                    ),
+                                                  ),
+                                                if (_drawingMode &&
+                                                    _drawingSelectMode &&
+                                                    _drawingSelectionRect !=
+                                                        null)
+                                                  Positioned.fill(
+                                                    child: IgnorePointer(
+                                                      child: CustomPaint(
+                                                        painter:
+                                                            _DrawingSelectionPainter(
+                                                          rect:
+                                                              _drawingSelectionRect!,
+                                                          hasSelection:
+                                                              _selectedDrawingStrokeIds
+                                                                  .isNotEmpty,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
                                                 if (_showViewZoneOverlay)
                                                   Positioned.fill(
                                                     child: CustomPaint(
@@ -2984,7 +3518,56 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                 ],
               ),
               if (_instaSelectionMode) _buildInstaSelectionOverlay(),
-              if (isSomePhotoInEditMode && editingPhoto != null)
+              if (_drawingMode)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 12 + (isMobile ? bottomInset : 0.0),
+                  child: CollageDrawingToolbar(
+                    color: _drawingColor,
+                    width: _drawingWidth,
+                    opacity: _drawingOpacity,
+                    isBrush: _drawingTool == CollageDrawingStroke.toolBrush,
+                    isEraser: _drawingEraser,
+                    isSelect: _drawingSelectMode,
+                    canUndo: _drawingUndoStack.isNotEmpty,
+                    canClear: _drawingStrokes.isNotEmpty,
+                    hasSelection: _selectedDrawingStrokeIds.isNotEmpty,
+                    onColorChanged: (color) => setState(() {
+                      _drawingColor = color;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onWidthChanged: (value) =>
+                        setState(() => _drawingWidth = value),
+                    onOpacityChanged: (value) =>
+                        setState(() => _drawingOpacity = value),
+                    onSelectPencil: () => setState(() {
+                      _drawingTool = CollageDrawingStroke.toolPencil;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectBrush: () => setState(() {
+                      _drawingTool = CollageDrawingStroke.toolBrush;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectEraser: () => setState(() {
+                      _drawingEraser = true;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectArea: () => setState(() {
+                      _drawingEraser = false;
+                      _drawingSelectMode = true;
+                    }),
+                    onClearSelection: _clearDrawingSelection,
+                    onDeleteSelected: _deleteSelectedDrawingStrokes,
+                    onUndo: _undoDrawingAction,
+                    onClear: _clearDrawingStrokes,
+                    onDone: _finishDrawingMode,
+                  ),
+                )
+              else if (isSomePhotoInEditMode && editingPhoto != null)
                 Positioned(
                   left: 12,
                   right: 12,
@@ -3273,6 +3856,13 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         icon: Iconsax.add,
         tooltip: 'Add photo (A)',
         onPressed: _showAllPhotosSheet,
+      ),
+      CollageControlAction(
+        icon: Icons.brush,
+        tooltip: 'Draw on collage',
+        color: _drawingMode ? Colors.amberAccent : Colors.white,
+        active: _drawingMode,
+        onPressed: _toggleDrawingMode,
       ),
       if (includeViewZones)
         CollageControlAction(
@@ -3778,7 +4368,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                               onControllerReady: (c) {
                                 final ui = _videoStates[item.id];
                                 if (ui == null) return;
-                                setState(() => ui.controller = c);
+                                setState(() {
+                                  ui.controller = c;
+                                  ui.controllerOwnedBySurface = true;
+                                });
                               },
                             ),
                           )
@@ -4447,7 +5040,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
     // Dispose video controllers safely
     for (final ui in _videoStates.values) {
-      ui.disposeControllerIfAny();
+      ui.disposeControllerIfAny(force: true);
     }
 
     super.dispose();
@@ -4475,6 +5068,47 @@ class _CropBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class _DrawingSelectionPainter extends CustomPainter {
+  final Rect rect;
+  final bool hasSelection;
+
+  const _DrawingSelectionPainter({
+    required this.rect,
+    required this.hasSelection,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final normalized = Rect.fromLTRB(
+      math.min(rect.left, rect.right),
+      math.min(rect.top, rect.bottom),
+      math.max(rect.left, rect.right),
+      math.max(rect.top, rect.bottom),
+    );
+    if (normalized.width < 1 || normalized.height < 1) return;
+
+    final color = hasSelection ? Colors.lightBlueAccent : Colors.white;
+    canvas.drawRect(
+      normalized,
+      Paint()
+        ..color = color.withValues(alpha: 0.08)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawRect(
+      normalized,
+      Paint()
+        ..color = color.withValues(alpha: 0.9)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _DrawingSelectionPainter oldDelegate) {
+    return oldDelegate.rect != rect || oldDelegate.hasSelection != hasSelection;
+  }
 }
 
 class _ViewZonesPainter extends CustomPainter {
@@ -4627,6 +5261,54 @@ class _ViewZone {
     required this.translation,
     required this.scale,
   });
+}
+
+enum _DrawingUndoType {
+  addStroke,
+  moveStrokes,
+  restoreStrokes,
+}
+
+class _DrawingUndoEntry {
+  const _DrawingUndoEntry._({
+    required this.type,
+    this.strokeId,
+    this.pointValuesByStrokeId = const <String, List<double>>{},
+    this.strokes = const <CollageDrawingStroke>[],
+  });
+
+  final _DrawingUndoType type;
+  final String? strokeId;
+  final Map<String, List<double>> pointValuesByStrokeId;
+  final List<CollageDrawingStroke> strokes;
+
+  factory _DrawingUndoEntry.addStroke(String strokeId) {
+    return _DrawingUndoEntry._(
+      type: _DrawingUndoType.addStroke,
+      strokeId: strokeId,
+    );
+  }
+
+  factory _DrawingUndoEntry.moveStrokes(
+    Map<String, List<double>> pointValuesByStrokeId,
+  ) {
+    return _DrawingUndoEntry._(
+      type: _DrawingUndoType.moveStrokes,
+      pointValuesByStrokeId: {
+        for (final entry in pointValuesByStrokeId.entries)
+          entry.key: List<double>.of(entry.value),
+      },
+    );
+  }
+
+  factory _DrawingUndoEntry.restoreStrokes(
+    List<CollageDrawingStroke> strokes,
+  ) {
+    return _DrawingUndoEntry._(
+      type: _DrawingUndoType.restoreStrokes,
+      strokes: strokes,
+    );
+  }
 }
 
 class _ViewZoneChip extends StatelessWidget {

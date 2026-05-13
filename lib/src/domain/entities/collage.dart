@@ -1,6 +1,75 @@
 import 'package:hive/hive.dart';
 part 'collage.g.dart';
 
+@HiveType(typeId: 103)
+class CollageDrawingStroke extends HiveObject {
+  static const int toolPencil = 0;
+  static const int toolBrush = 1;
+
+  @HiveField(0)
+  String id;
+
+  /// Pencil points are [dx0, dy0, dx1, dy1, ...].
+  /// Brush points are [dx0, dy0, width0, dx1, dy1, width1, ...].
+  @HiveField(1)
+  List<double> pointValues;
+
+  @HiveField(2)
+  int colorValue;
+
+  @HiveField(3)
+  double width;
+
+  @HiveField(4)
+  double opacity;
+
+  @HiveField(5)
+  bool isEraser;
+
+  @HiveField(6)
+  int zIndex;
+
+  @HiveField(7)
+  int tool;
+
+  CollageDrawingStroke({
+    required this.id,
+    required this.pointValues,
+    required this.colorValue,
+    required this.width,
+    required this.opacity,
+    required this.isEraser,
+    required this.zIndex,
+    this.tool = toolPencil,
+  });
+
+  factory CollageDrawingStroke.fromJson(Map<String, dynamic> json) {
+    return CollageDrawingStroke(
+      id: json['id'] as String,
+      pointValues: (json['pointValues'] as List<dynamic>)
+          .map((e) => (e as num).toDouble())
+          .toList(),
+      colorValue: json['colorValue'] as int,
+      width: (json['width'] as num).toDouble(),
+      opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
+      isEraser: (json['isEraser'] as bool?) ?? false,
+      zIndex: (json['zIndex'] as int?) ?? 0,
+      tool: (json['tool'] as int?) ?? toolPencil,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'pointValues': pointValues,
+        'colorValue': colorValue,
+        'width': width,
+        'opacity': opacity,
+        'isEraser': isEraser,
+        'zIndex': zIndex,
+        'tool': tool,
+      };
+}
+
 @HiveType(typeId: 101)
 class CollageItem extends HiveObject {
   @HiveField(0)
@@ -239,6 +308,9 @@ class Collage extends HiveObject {
   @HiveField(11)
   List<CollageViewZoneEntry>? viewZones;
 
+  @HiveField(12)
+  List<CollageDrawingStroke>? drawingStrokes;
+
   Collage(
       {required this.id,
       required this.title,
@@ -251,7 +323,8 @@ class Collage extends HiveObject {
       this.canvasOffsetX,
       this.canvasOffsetY,
       this.canvasScale,
-      this.viewZones});
+      this.viewZones,
+      this.drawingStrokes});
 
   factory Collage.fromJson(Map<String, dynamic> json) => Collage(
         id: json['id'],
@@ -274,6 +347,9 @@ class Collage extends HiveObject {
         viewZones: (json['viewZones'] as List<dynamic>?)
             ?.map((e) => CollageViewZoneEntry.fromJson(e))
             .toList(),
+        drawingStrokes: (json['drawingStrokes'] as List<dynamic>?)
+            ?.map((e) => CollageDrawingStroke.fromJson(e))
+            .toList(),
       );
 
   Map<String, dynamic> toJson() => {
@@ -289,5 +365,6 @@ class Collage extends HiveObject {
         'canvasOffsetY': canvasOffsetY,
         'canvasScale': canvasScale,
         'viewZones': viewZones?.map((e) => e.toJson()).toList(),
+        'drawingStrokes': drawingStrokes?.map((e) => e.toJson()).toList(),
       };
 }

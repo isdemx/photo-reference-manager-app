@@ -202,7 +202,9 @@ void main(List<String> args) async {
     // Чтобы видеть причину «чёрного экрана», если где-то в изоляте упало
     // ignore: avoid_print
     print('[AppError] $e\n$st');
-    _runFatalStartupApp(e, st);
+    if (!_firstFrameRendered) {
+      _runFatalStartupApp(e, st);
+    }
   });
 }
 
@@ -372,6 +374,8 @@ void _registerAdaptersSafely() {
       () => Hive.registerAdapter(CollageItemAdapter())); // typeId = 101
   safeRegister(() =>
       Hive.registerAdapter(CollageViewZoneEntryAdapter())); // typeId = 102
+  safeRegister(() =>
+      Hive.registerAdapter(CollageDrawingStrokeAdapter())); // typeId = 103
   safeRegister(
       () => Hive.registerAdapter(TagCategoryAdapter())); // typeId = 200
 }
