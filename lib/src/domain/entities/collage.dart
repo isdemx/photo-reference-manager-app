@@ -5,6 +5,14 @@ part 'collage.g.dart';
 class CollageDrawingStroke extends HiveObject {
   static const int toolPencil = 0;
   static const int toolBrush = 1;
+  static const int toolGraffiti = 2;
+  static const int toolNeon = 3;
+  static const int toolHighlighter = 4;
+  static const int toolArrow = 5;
+
+  static bool usesVariableWidth(int tool) {
+    return tool == toolBrush || tool == toolGraffiti || tool == toolNeon;
+  }
 
   @HiveField(0)
   String id;
@@ -141,7 +149,7 @@ class CollageTextItem extends HiveObject {
       fontSize: (json['fontSize'] as num?)?.toDouble() ?? 32.0,
       colorValue: (json['colorValue'] as int?) ?? 0xFFFFFFFF,
       opacity: (json['opacity'] as num?)?.toDouble() ?? 1.0,
-      fontFamily: (json['fontFamily'] as String?) ?? 'system',
+      fontFamily: (json['fontFamily'] as String?) ?? 'Arial',
       bold: (json['bold'] as bool?) ?? false,
       italic: (json['italic'] as bool?) ?? false,
       textAlign: (json['textAlign'] as int?) ?? alignCenter,

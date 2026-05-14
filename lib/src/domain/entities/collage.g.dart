@@ -80,7 +80,7 @@ class CollageTextItemAdapter extends TypeAdapter<CollageTextItem> {
       fontSize: (fields[5] as num?)?.toDouble() ?? 32.0,
       colorValue: fields[6] as int? ?? 0xFFFFFFFF,
       opacity: (fields[7] as num?)?.toDouble() ?? 1.0,
-      fontFamily: fields[8] as String? ?? 'system',
+      fontFamily: fields[8] as String? ?? 'Arial',
       bold: fields[9] as bool? ?? false,
       italic: fields[10] as bool? ?? false,
       textAlign: fields[11] as int? ?? CollageTextItem.alignCenter,

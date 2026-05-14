@@ -1994,7 +1994,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     final point = _clampCanvasPoint(details.localPosition);
     final tool =
         _drawingEraser ? CollageDrawingStroke.toolPencil : _drawingTool;
-    final pointValues = tool == CollageDrawingStroke.toolBrush
+    final pointValues = CollageDrawingStroke.usesVariableWidth(tool)
         ? <double>[point.dx, point.dy, _drawingWidth]
         : <double>[point.dx, point.dy];
     setState(() {
@@ -2030,7 +2030,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (previous != null && (point - previous).distance < 1.5) return;
 
     setState(() {
-      if (stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser) {
+      if (CollageDrawingStroke.usesVariableWidth(stroke.tool) &&
+          !stroke.isEraser) {
         final dynamicWidth = _brushWidthForDelta(
           point - (previous ?? point),
           stroke.width,
@@ -2059,7 +2060,8 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   Offset? _lastDrawingPoint(CollageDrawingStroke stroke) {
     final values = stroke.pointValues;
-    if (stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser) {
+    if (CollageDrawingStroke.usesVariableWidth(stroke.tool) &&
+        !stroke.isEraser) {
       if (values.length < 3) return null;
       return Offset(values[values.length - 3], values[values.length - 2]);
     }
@@ -2069,7 +2071,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
 
   int _strokePointCount(CollageDrawingStroke stroke) {
     final step =
-        stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser
+        CollageDrawingStroke.usesVariableWidth(stroke.tool) && !stroke.isEraser
             ? 3
             : 2;
     return stroke.pointValues.length ~/ step;
@@ -2202,10 +2204,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
     if (_selectedDrawingStrokeIds.isEmpty) return;
     for (final stroke in _drawingStrokes) {
       if (!_selectedDrawingStrokeIds.contains(stroke.id)) continue;
-      final step =
-          stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser
-              ? 3
-              : 2;
+      final step = CollageDrawingStroke.usesVariableWidth(stroke.tool) &&
+              !stroke.isEraser
+          ? 3
+          : 2;
       for (var i = 0; i + 1 < stroke.pointValues.length; i += step) {
         stroke.pointValues[i] += delta.dx;
         stroke.pointValues[i + 1] += delta.dy;
@@ -2325,7 +2327,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   List<Offset> _drawingStrokePoints(CollageDrawingStroke stroke) {
     final values = stroke.pointValues;
     final step =
-        stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser
+        CollageDrawingStroke.usesVariableWidth(stroke.tool) && !stroke.isEraser
             ? 3
             : 2;
     final points = <Offset>[];
@@ -2459,7 +2461,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
         fontSize: fontSize,
         colorValue: Colors.white.toARGB32(),
         opacity: 1.0,
-        fontFamily: 'system',
+        fontFamily: 'Arial',
         bold: false,
         italic: false,
         textAlign: CollageTextItem.alignCenter,
@@ -2576,7 +2578,16 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
   }
 
   String? _fontFamilyForItem(CollageTextItem item) {
-    return item.fontFamily == 'system' ? null : item.fontFamily;
+    switch (item.fontFamily) {
+      case 'system':
+        return null;
+      case 'serif':
+        return 'Times New Roman';
+      case 'monospace':
+        return 'Courier New';
+      default:
+        return item.fontFamily;
+    }
   }
 
   TextStyle _textStyleForItem(CollageTextItem item) {
@@ -3811,6 +3822,7 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     fontSize: activeText.fontSize,
                     width: activeText.width,
                     opacity: activeText.opacity,
+                    isMobile: isMobile,
                     fontFamily: activeText.fontFamily,
                     bold: activeText.bold,
                     italic: activeText.italic,
@@ -3837,7 +3849,10 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     onDone: _finishTextEditing,
                   ),
                 )
-              else if (_drawingMode)
+              else if (_drawingMode &&
+                  _activeDrawingStrokeId == null &&
+                  _drawingSelectionStart == null &&
+                  !_movingDrawingSelection)
                 Positioned(
                   left: 12,
                   right: 12,
@@ -3846,7 +3861,14 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     color: _drawingColor,
                     width: _drawingWidth,
                     opacity: _drawingOpacity,
+                    isMobile: isMobile,
                     isBrush: _drawingTool == CollageDrawingStroke.toolBrush,
+                    isGraffiti:
+                        _drawingTool == CollageDrawingStroke.toolGraffiti,
+                    isNeon: _drawingTool == CollageDrawingStroke.toolNeon,
+                    isHighlighter:
+                        _drawingTool == CollageDrawingStroke.toolHighlighter,
+                    isArrow: _drawingTool == CollageDrawingStroke.toolArrow,
                     isEraser: _drawingEraser,
                     isSelect: _drawingSelectMode,
                     canUndo: _drawingUndoStack.isNotEmpty,
@@ -3868,6 +3890,26 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
                     }),
                     onSelectBrush: () => setState(() {
                       _drawingTool = CollageDrawingStroke.toolBrush;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectGraffiti: () => setState(() {
+                      _drawingTool = CollageDrawingStroke.toolGraffiti;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectNeon: () => setState(() {
+                      _drawingTool = CollageDrawingStroke.toolNeon;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectHighlighter: () => setState(() {
+                      _drawingTool = CollageDrawingStroke.toolHighlighter;
+                      _drawingEraser = false;
+                      _drawingSelectMode = false;
+                    }),
+                    onSelectArrow: () => setState(() {
+                      _drawingTool = CollageDrawingStroke.toolArrow;
                       _drawingEraser = false;
                       _drawingSelectMode = false;
                     }),
@@ -4393,12 +4435,9 @@ class _PhotoCollageWidgetState extends State<PhotoCollageWidget> {
           setState(() {
             _draggingTextItemId = item.id;
             _deleteHover = false;
-            if (!isActive) {
-              _activateTextItem(item, requestFocus: false);
-              _maxZIndex++;
-              item.zIndex = _maxZIndex;
-              _controller.maxZIndex = _maxZIndex;
-            }
+            _maxZIndex++;
+            item.zIndex = _maxZIndex;
+            _controller.maxZIndex = _maxZIndex;
           });
           _scheduleDeleteRectUpdate();
         },

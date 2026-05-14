@@ -9,7 +9,12 @@ class CollageDrawingToolbar extends StatelessWidget {
     required this.color,
     required this.width,
     required this.opacity,
+    required this.isMobile,
     required this.isBrush,
+    required this.isGraffiti,
+    required this.isNeon,
+    required this.isHighlighter,
+    required this.isArrow,
     required this.isEraser,
     required this.isSelect,
     required this.canUndo,
@@ -20,6 +25,10 @@ class CollageDrawingToolbar extends StatelessWidget {
     required this.onOpacityChanged,
     required this.onSelectPencil,
     required this.onSelectBrush,
+    required this.onSelectGraffiti,
+    required this.onSelectNeon,
+    required this.onSelectHighlighter,
+    required this.onSelectArrow,
     required this.onSelectEraser,
     required this.onSelectArea,
     required this.onClearSelection,
@@ -32,7 +41,12 @@ class CollageDrawingToolbar extends StatelessWidget {
   final Color color;
   final double width;
   final double opacity;
+  final bool isMobile;
   final bool isBrush;
+  final bool isGraffiti;
+  final bool isNeon;
+  final bool isHighlighter;
+  final bool isArrow;
   final bool isEraser;
   final bool isSelect;
   final bool canUndo;
@@ -43,6 +57,10 @@ class CollageDrawingToolbar extends StatelessWidget {
   final ValueChanged<double> onOpacityChanged;
   final VoidCallback onSelectPencil;
   final VoidCallback onSelectBrush;
+  final VoidCallback onSelectGraffiti;
+  final VoidCallback onSelectNeon;
+  final VoidCallback onSelectHighlighter;
+  final VoidCallback onSelectArrow;
   final VoidCallback onSelectEraser;
   final VoidCallback onSelectArea;
   final VoidCallback onClearSelection;
@@ -74,12 +92,18 @@ class CollageDrawingToolbar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final compact = constraints.maxWidth < 620;
+            final compact = constraints.maxWidth < 760;
             final controls = <Widget>[
               _ToolModeButton(
                 icon: Icons.edit,
                 tooltip: 'Pencil',
-                selected: !isBrush && !isEraser && !isSelect,
+                selected: !isBrush &&
+                    !isGraffiti &&
+                    !isNeon &&
+                    !isHighlighter &&
+                    !isArrow &&
+                    !isEraser &&
+                    !isSelect,
                 onTap: onSelectPencil,
               ),
               _ToolModeButton(
@@ -87,6 +111,30 @@ class CollageDrawingToolbar extends StatelessWidget {
                 tooltip: 'Brush',
                 selected: isBrush && !isEraser && !isSelect,
                 onTap: onSelectBrush,
+              ),
+              _ToolModeButton(
+                icon: Icons.format_paint,
+                tooltip: 'Graffiti',
+                selected: isGraffiti && !isEraser && !isSelect,
+                onTap: onSelectGraffiti,
+              ),
+              _ToolModeButton(
+                icon: Icons.auto_awesome,
+                tooltip: 'Neon brush',
+                selected: isNeon && !isEraser && !isSelect,
+                onTap: onSelectNeon,
+              ),
+              _ToolModeButton(
+                icon: Icons.border_color,
+                tooltip: 'Highlighter',
+                selected: isHighlighter && !isEraser && !isSelect,
+                onTap: onSelectHighlighter,
+              ),
+              _ToolModeButton(
+                icon: Icons.arrow_forward,
+                tooltip: 'Arrow',
+                selected: isArrow && !isEraser && !isSelect,
+                onTap: onSelectArrow,
               ),
               _ToolModeButton(
                 icon: Icons.auto_fix_off,
@@ -179,6 +227,63 @@ class CollageDrawingToolbar extends StatelessWidget {
                 onChanged: onOpacityChanged,
               ),
             ];
+
+            if (isMobile) {
+              final sliderTheme = SliderTheme.of(context).copyWith(
+                trackHeight: 4,
+                activeTrackColor: colors.text,
+                inactiveTrackColor: colors.border,
+                thumbColor: colors.text,
+                overlayColor: colors.text.withValues(alpha: 0.12),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+              );
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: controls
+                                .map((w) => Padding(
+                                      padding: const EdgeInsets.only(right: 4),
+                                      child: w,
+                                    ))
+                                .toList(),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        swatches,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 34,
+                    height: 138,
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: SliderTheme(
+                        data: sliderTheme,
+                        child: Slider(
+                          min: 1,
+                          max: 18,
+                          divisions: 34,
+                          value: width.clamp(1, 18),
+                          onChanged: onWidthChanged,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
 
             if (compact) {
               return Column(

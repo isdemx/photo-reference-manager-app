@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:photographers_reference_app/src/domain/entities/collage.dart';
 
@@ -27,15 +29,45 @@ class CollageDrawingPainter extends CustomPainter {
           alpha: stroke.opacity.clamp(0.0, 1.0),
         );
 
-      if (stroke.tool == CollageDrawingStroke.toolBrush && !stroke.isEraser) {
-        _drawBrushStroke(canvas, stroke, paint);
-      } else {
-        final points = _pointsFromValues(stroke.pointValues);
-        if (points.length < 2) continue;
-        canvas.drawPath(_smoothPath(points), paint);
+      switch (stroke.tool) {
+        case CollageDrawingStroke.toolBrush:
+          if (stroke.isEraser) {
+            _drawSimpleStroke(canvas, stroke, paint);
+          } else {
+            _drawBrushStroke(canvas, stroke, paint);
+          }
+        case CollageDrawingStroke.toolGraffiti:
+          if (stroke.isEraser) {
+            _drawSimpleStroke(canvas, stroke, paint);
+          } else {
+            _drawGraffitiStroke(canvas, stroke, paint);
+          }
+        case CollageDrawingStroke.toolNeon:
+          if (stroke.isEraser) {
+            _drawSimpleStroke(canvas, stroke, paint);
+          } else {
+            _drawNeonStroke(canvas, stroke, paint);
+          }
+        case CollageDrawingStroke.toolHighlighter:
+          _drawHighlighterStroke(canvas, stroke, paint);
+        case CollageDrawingStroke.toolArrow:
+          _drawArrowStroke(canvas, stroke, paint);
+        case CollageDrawingStroke.toolPencil:
+        default:
+          _drawSimpleStroke(canvas, stroke, paint);
       }
     }
     canvas.restore();
+  }
+
+  static void _drawSimpleStroke(
+    Canvas canvas,
+    CollageDrawingStroke stroke,
+    Paint paint,
+  ) {
+    final points = _pointsFromValues(stroke.pointValues);
+    if (points.length < 2) return;
+    canvas.drawPath(_smoothPath(points), paint);
   }
 
   static List<Offset> _pointsFromValues(List<double> values) {
@@ -79,6 +111,178 @@ class CollageDrawingPainter extends CustomPainter {
         ..color = basePaint.color;
       canvas.drawLine(a.offset, b.offset, paint);
     }
+  }
+
+  static void _drawGraffitiStroke(
+    Canvas canvas,
+    CollageDrawingStroke stroke,
+    Paint basePaint,
+  ) {
+    final points = _brushPointsFromValues(stroke.pointValues);
+    if (points.length < 2) return;
+
+    for (var i = 0; i < points.length - 1; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final width = ((a.width + b.width) / 2) * _renderWidthScale;
+      final direction = b.offset - a.offset;
+      final normal = direction.distance == 0
+          ? Offset.zero
+          : Offset(-direction.dy, direction.dx) / direction.distance;
+      final wobble = ((i % 5) - 2) * width * 0.16;
+
+      final shadowPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = width * 2.2
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.srcOver
+        ..color = basePaint.color.withValues(
+          alpha: basePaint.color.a * 0.18,
+        );
+      canvas.drawLine(a.offset, b.offset, shadowPaint);
+
+      final bodyPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = width * 1.22
+        ..isAntiAlias = true
+        ..blendMode = basePaint.blendMode
+        ..color = basePaint.color.withValues(
+          alpha: (basePaint.color.a * 0.88).clamp(0.0, 1.0),
+        );
+      canvas.drawLine(a.offset, b.offset, bodyPaint);
+
+      final edgePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = width * 0.38
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.srcOver
+        ..color = basePaint.color.withValues(
+          alpha: basePaint.color.a * 0.28,
+        );
+      final edgeOffset = normal * wobble;
+      canvas.drawLine(a.offset + edgeOffset, b.offset + edgeOffset, edgePaint);
+    }
+  }
+
+  static void _drawNeonStroke(
+    Canvas canvas,
+    CollageDrawingStroke stroke,
+    Paint basePaint,
+  ) {
+    final points = _brushPointsFromValues(stroke.pointValues);
+    if (points.length < 2) return;
+
+    for (final multiplier in const [5.0, 3.0, 1.8]) {
+      for (var i = 0; i < points.length - 1; i++) {
+        final a = points[i];
+        final b = points[i + 1];
+        final width = ((a.width + b.width) / 2) * _renderWidthScale;
+        final glowPaint = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..strokeWidth = width * multiplier
+          ..isAntiAlias = true
+          ..blendMode = BlendMode.plus
+          ..color = basePaint.color.withValues(
+            alpha: basePaint.color.a * (0.07 + 0.04 / multiplier),
+          );
+        canvas.drawLine(a.offset, b.offset, glowPaint);
+      }
+    }
+
+    for (var i = 0; i < points.length - 1; i++) {
+      final a = points[i];
+      final b = points[i + 1];
+      final width = ((a.width + b.width) / 2) * _renderWidthScale;
+      final bodyPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = width * 0.9
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.srcOver
+        ..color = basePaint.color;
+      canvas.drawLine(a.offset, b.offset, bodyPaint);
+
+      final corePaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = width * 0.28
+        ..isAntiAlias = true
+        ..blendMode = BlendMode.srcOver
+        ..color = Colors.white.withValues(
+          alpha: basePaint.color.a * 0.72,
+        );
+      canvas.drawLine(a.offset, b.offset, corePaint);
+    }
+  }
+
+  static void _drawHighlighterStroke(
+    Canvas canvas,
+    CollageDrawingStroke stroke,
+    Paint basePaint,
+  ) {
+    final points = _pointsFromValues(stroke.pointValues);
+    if (points.length < 2) return;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.square
+      ..strokeJoin = StrokeJoin.round
+      ..strokeWidth = stroke.width * _renderWidthScale * 3.2
+      ..isAntiAlias = true
+      ..blendMode = BlendMode.srcOver
+      ..color = basePaint.color.withValues(
+        alpha: basePaint.color.a * 0.34,
+      );
+    canvas.drawPath(_smoothPath(points), paint);
+  }
+
+  static void _drawArrowStroke(
+    Canvas canvas,
+    CollageDrawingStroke stroke,
+    Paint basePaint,
+  ) {
+    final points = _pointsFromValues(stroke.pointValues);
+    if (points.length < 2) return;
+    canvas.drawPath(_smoothPath(points), basePaint);
+
+    final end = points.last;
+    Offset? previous;
+    for (var i = points.length - 2; i >= 0; i--) {
+      if ((end - points[i]).distance >= 0.5) {
+        previous = points[i];
+        break;
+      }
+    }
+    if (previous == null) return;
+
+    final direction = end - previous;
+    if (direction.distance == 0) return;
+    final angle = direction.direction;
+    final headLength = (basePaint.strokeWidth * 5.5).clamp(7.0, 34.0);
+    final wingAngle = 0.68;
+    final left = end -
+        Offset(
+              math.cos(angle - wingAngle),
+              math.sin(angle - wingAngle),
+            ) *
+            headLength;
+    final right = end -
+        Offset(
+              math.cos(angle + wingAngle),
+              math.sin(angle + wingAngle),
+            ) *
+            headLength;
+    canvas.drawLine(end, left, basePaint);
+    canvas.drawLine(end, right, basePaint);
   }
 
   static Path _smoothPath(List<Offset> points) {

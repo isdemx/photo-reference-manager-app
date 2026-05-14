@@ -11,6 +11,7 @@ class CollageTextToolbar extends StatelessWidget {
     required this.fontSize,
     required this.width,
     required this.opacity,
+    required this.isMobile,
     required this.fontFamily,
     required this.bold,
     required this.italic,
@@ -31,6 +32,7 @@ class CollageTextToolbar extends StatelessWidget {
   final double fontSize;
   final double width;
   final double opacity;
+  final bool isMobile;
   final String fontFamily;
   final bool bold;
   final bool italic;
@@ -157,27 +159,77 @@ class CollageTextToolbar extends StatelessWidget {
                 format: (v) => v.round().toString(),
                 onChanged: onFontSizeChanged,
               ),
-              MiniSlider(
-                label: 'Box',
-                value: width,
-                min: 46,
-                max: 220,
-                divisions: 58,
-                centerValue: 92,
-                format: (v) => v.round().toString(),
-                onChanged: onWidthChanged,
-              ),
-              MiniSlider(
-                label: 'Op',
-                value: opacity,
-                min: 0.1,
-                max: 1,
-                divisions: 18,
-                centerValue: 1,
-                format: (v) => '${(v * 100).round()}%',
-                onChanged: onOpacityChanged,
-              ),
+              if (!isMobile)
+                MiniSlider(
+                  label: 'Op',
+                  value: opacity,
+                  min: 0.1,
+                  max: 1,
+                  divisions: 18,
+                  centerValue: 1,
+                  format: (v) => '${(v * 100).round()}%',
+                  onChanged: onOpacityChanged,
+                ),
             ];
+
+            if (isMobile) {
+              final sliderTheme = SliderTheme.of(context).copyWith(
+                trackHeight: 4,
+                activeTrackColor: colors.text,
+                inactiveTrackColor: colors.border,
+                thumbColor: colors.text,
+                overlayColor: colors.text.withValues(alpha: 0.12),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+              );
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              fontPicker,
+                              const SizedBox(width: 6),
+                              ...controls.map((w) => Padding(
+                                    padding: const EdgeInsets.only(right: 4),
+                                    child: w,
+                                  )),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        swatches,
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 34,
+                    height: 138,
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: SliderTheme(
+                        data: sliderTheme,
+                        child: Slider(
+                          min: 2,
+                          max: 24,
+                          divisions: 44,
+                          value: fontSize.clamp(2, 24),
+                          onChanged: onFontSizeChanged,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
 
             if (compact) {
               return Column(
@@ -247,6 +299,15 @@ class _FontPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.appThemeColors;
+    const fonts = <String>[
+      'Arial',
+      'Verdana',
+      'Tahoma',
+      'Times New Roman',
+      'Georgia',
+      'Courier New',
+    ];
+    final normalizedValue = fonts.contains(value) ? value : 'Arial';
     return Container(
       height: 28,
       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -257,15 +318,24 @@ class _FontPicker extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: normalizedValue,
           dropdownColor: colors.surface,
           style: TextStyle(color: colors.text, fontSize: 12),
           iconSize: 16,
           isDense: true,
           items: const [
-            DropdownMenuItem(value: 'system', child: Text('System')),
-            DropdownMenuItem(value: 'serif', child: Text('Serif')),
-            DropdownMenuItem(value: 'monospace', child: Text('Mono')),
+            DropdownMenuItem(value: 'Arial', child: Text('Arial')),
+            DropdownMenuItem(value: 'Verdana', child: Text('Verdana')),
+            DropdownMenuItem(value: 'Tahoma', child: Text('Tahoma')),
+            DropdownMenuItem(
+              value: 'Times New Roman',
+              child: Text('Times'),
+            ),
+            DropdownMenuItem(value: 'Georgia', child: Text('Georgia')),
+            DropdownMenuItem(
+              value: 'Courier New',
+              child: Text('Courier'),
+            ),
           ],
           onChanged: (next) {
             if (next == null) return;

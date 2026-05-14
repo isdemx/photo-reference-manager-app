@@ -64,25 +64,26 @@ List<Widget> buildIOSCollageControlsOverlay({
       )
     else if (expanded) ...[
       Positioned(
-        right: 18,
-        bottom: bottom + 76,
+        right: isFullscreen ? 66 : 18,
+        bottom: bottom,
         child: joystick,
       ),
       Positioned(
-        left: (screenWidth - zoomWidth) / 2,
+        left: 14,
+        right: isFullscreen ? 112 : 84,
         bottom: bottom,
         child: CollageIOSZoomControl(
-          width: zoomWidth,
+          width: math.min(zoomWidth, screenWidth - (isFullscreen ? 126 : 98)),
           value: sliderValue,
           onChanged: onSliderChanged,
         ),
       ),
       Positioned(
         left: 14,
-        right: 74,
+        right: 14,
         bottom: bottom + 82,
         child: Align(
-          alignment: Alignment.centerRight,
+          alignment: Alignment.center,
           child: CollageIOSActionDock(actions: actions),
         ),
       ),
